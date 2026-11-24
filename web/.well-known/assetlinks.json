@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.onoseto.chipsnfish",
+      "sha256_cert_fingerprints": ["51:5C:FC:47:FB:4D:6C:56:80:A9:7E:B6:7C:7D:EB:FC:97:01:7D:4E:7A:F6:20:7F:C8:8B:DC:F0:C7:69:CD:64"]
+    }
+  }
+]
