@@ -50,7 +50,7 @@ object Ui {
         Game.gameTick()
     }
 
-    fun setView(v: String) { view = v; refreshActive() }
+    fun goView(v: String) { view = v; refreshActive() }
     fun showMenu() { menu = true; refreshActive() }
     fun hideMenu() { menu = false; refreshActive() }
 

@@ -100,8 +100,8 @@ fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
             Game.raiseOpen -> { Game.raiseOpen = false; Game.bump() }
             Ui.splash -> onExit()
             Ui.menu -> { Game.saveLocal(); onExit() }
-            Ui.solo -> { Ui.solo = false; Ui.setView("table"); Ui.showMenu() }
-            Ui.view != "table" -> Ui.setView("table")
+            Ui.solo -> { Ui.solo = false; Ui.goView("table"); Ui.showMenu() }
+            Ui.view != "table" -> Ui.goView("table")
             else -> Ui.showMenu()
         }
     }
@@ -182,7 +182,7 @@ private fun TopBar() {
                 })
         )
         if (Ui.solo) {
-            Box(Modifier.height(32.dp).clip(RoundedCornerShape(9.dp)).border(1.dp, C.line, RoundedCornerShape(9.dp)).tap { Ui.solo = false; Ui.setView("table"); Ui.showMenu() }.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.height(32.dp).clip(RoundedCornerShape(9.dp)).border(1.dp, C.line, RoundedCornerShape(9.dp)).tap { Ui.solo = false; Ui.goView("table"); Ui.showMenu() }.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
                 T(tr("‹ Menu"), 13.sp, C.gold, FontWeight.ExtraBold)
             }
         } else {
@@ -190,7 +190,7 @@ private fun TopBar() {
                 val on = Ui.view == v
                 Box(
                     Modifier.size(44.dp, 32.dp).clip(RoundedCornerShape(9.dp)).background(if (on) C.gold.copy(alpha = 0.08f) else Color.Transparent)
-                        .border(1.dp, if (on) C.gold.copy(alpha = 0.4f) else Color.Transparent, RoundedCornerShape(9.dp)).tap { Ui.setView(v) },
+                        .border(1.dp, if (on) C.gold.copy(alpha = 0.4f) else Color.Transparent, RoundedCornerShape(9.dp)).tap { Ui.goView(v) },
                     contentAlignment = Alignment.Center,
                 ) { Icon24(v, if (on) C.gold else C.muted, 21.dp) }
             }
@@ -292,7 +292,7 @@ private fun MenuScreen(onExit: () -> Unit) {
                     sub = if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Fortsetzen · Hand #${gs!!.handNo}") else tr("Nová hra"),
                     cur = g.gm() && gOn, newBtn = gOn, onNew = { Ui.openGameSetup() },
                 ) {
-                    if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.setView("table") } else Ui.openGameSetup()
+                    if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.goView("table") } else Ui.openGameSetup()
                 }
                 ModeCard(
                     icon = { BulbIcon(C.gold, 30.dp) }, title = tr("Rádce"),
@@ -300,19 +300,19 @@ private fun MenuScreen(onExit: () -> Unit) {
                     sub = if (coachSt != null && coachSt.phase == "play") L("Pokračovat · hand #${coachSt.handNo}", "Continue · hand #${coachSt.handNo}", "Fortsetzen · Hand #${coachSt.handNo}") else if (cOn) tr("Pokračovat") else tr("Ke stolu"),
                     cur = !g.gm() && cOn, newBtn = cOn, onNew = {
                         Ui.confirm(tr("Nová hra?"), tr("Rozehraná hra skončí. Hráči a záznam hand zůstanou uložené."), tr("Nová hra")) {
-                            g.switchMode("coach"); g.restart(false); Ui.hideMenu(); Ui.setView("table")
+                            g.switchMode("coach"); g.restart(false); Ui.hideMenu(); Ui.goView("table")
                         }
                     },
-                ) { g.switchMode("coach"); Ui.hideMenu(); Ui.setView("table") }
+                ) { g.switchMode("coach"); Ui.hideMenu(); Ui.goView("table") }
                 ModeCard(
                     icon = { Icon24("players", C.gold, 30.dp) }, title = tr("Hráči"),
                     desc = tr("Seznam hráčů, fotky, poznámky a statistiky."),
                     sub = tr("Otevřít"), cur = false, newBtn = false, onNew = {},
-                ) { Ui.hideMenu(); Ui.solo = true; Ui.setView("players") }
+                ) { Ui.hideMenu(); Ui.solo = true; Ui.goView("players") }
             }
         }
         Row(Modifier.align(Alignment.TopEnd).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap { Ui.hideMenu(); Ui.setView("table"); Ui.openSettings() }, contentAlignment = Alignment.Center) { Icon24("gear", C.ink) }
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap { Ui.hideMenu(); Ui.goView("table"); Ui.openSettings() }, contentAlignment = Alignment.Center) { Icon24("gear", C.ink) }
             Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap { g.saveLocal(); onExit() }, contentAlignment = Alignment.Center) { Icon24("power", C.ink) }
         }
     }

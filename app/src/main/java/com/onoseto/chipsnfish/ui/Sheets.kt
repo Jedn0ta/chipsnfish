@@ -980,7 +980,7 @@ private fun GameSetupSheet(c: GameCfg) {
         Game.gameCfg = c.copy(); Game.saveCfg()
         Ui.sheet = null; Ui.menu = false
         Game.newGame(c)
-        Ui.setView("table")
+        Ui.goView("table")
         Game.toast(tr("Hra začala · hodně štěstí!"))
     }
 }
