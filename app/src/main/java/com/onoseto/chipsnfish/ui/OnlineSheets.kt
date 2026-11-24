@@ -243,7 +243,7 @@ fun OnlineSettingsGame() {
         }
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Switch(O.advisor, { if (O.isHost) O.setAdvisor(it) }, enabled = O.isHost, colors = SwitchDefaults.colors(checkedThumbColor = C.goldInk, checkedTrackColor = C.gold))
+        Switch(O.advisor, { if (O.isHost) O.changeAdvisor(it) }, enabled = O.isHost, colors = SwitchDefaults.colors(checkedThumbColor = C.goldInk, checkedTrackColor = C.gold))
         Column {
             T(L("Rádce u stolu povolen", "Coach allowed at this table", "Berater an diesem Tisch erlaubt"), 14.sp, weight = FontWeight.Bold)
             T(if (O.isHost) L("Platí pro všechny hráče u stolu.", "Applies to every player at the table.", "Gilt für alle Spieler am Tisch.") else L("Může změnit jen zakladatel stolu.", "Only the host can change this.", "Nur der Gastgeber kann das ändern."), 11.5.sp, C.muted)

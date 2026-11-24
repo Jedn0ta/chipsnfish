@@ -287,7 +287,7 @@ object Online {
     fun start() = call("cf_start", "p_code" to code)
     fun next() = call("cf_next", "p_code" to code)
     fun restart() = call("cf_restart", "p_code" to code)
-    fun setAdvisor(on: Boolean) = call("cf_set_advisor", "p_code" to code, "p_on" to on)
+    fun changeAdvisor(on: Boolean) = call("cf_set_advisor", "p_code" to code, "p_on" to on)
     fun show() {
         val s = raw ?: return
         shownHand = s.handNo
