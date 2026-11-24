@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- gold poker chip -->
+    <path android:fillColor="#FFF2C14E"
+        android:pathData="M54,24a30,30 0 1,0 0.01,0z" />
+    <path android:fillColor="#FF2B1C02"
+        android:pathData="M54,32a22,22 0 1,0 0.01,0z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M51,24h6v8h-6z M51,76h6v8h-6z M24,51h8v6h-8z M76,51h8v6h-8z" />
+    <!-- fish -->
+    <path android:fillColor="#FFF2C14E"
+        android:pathData="M40,54 C46,44 60,44 66,54 C60,64 46,64 40,54z M66,54 L74,47 L74,61z" />
+    <path android:fillColor="#FF2B1C02"
+        android:pathData="M48,52.5a2,2 0 1,0 0.01,0z" />
+</vector>
