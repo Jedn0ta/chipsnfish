@@ -337,7 +337,7 @@ private fun AnalysisSheet() {
                     Row(Modifier.fillMaxWidth()) {
                         T(I18n.cat(Cards.CAT[c]), 14.sp, modifier = Modifier.weight(1f))
                         if (v.outs) T(L("${t.by[c]} outů", "${t.by[c]} outs", "${t.by[c]} Outs"), 13.sp, C.muted, modifier = Modifier.padding(end = 10.dp))
-                        T(g.pc(p), 14.sp, FontWeight.Bold, modifier = Modifier.widthIn(min = 58.dp), align = TextAlign.End)
+                        T(g.pc(p), 14.sp, weight = FontWeight.Bold, modifier = Modifier.widthIn(min = 58.dp), align = TextAlign.End)
                     }
                     Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(9.dp)).background(C.panel)) {
                         Box(Modifier.fillMaxWidth(min(1.0, p / max(0.0001, tot)).toFloat()).fillMaxHeight().background(C.gold))

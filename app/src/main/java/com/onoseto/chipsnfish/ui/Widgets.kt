@@ -107,7 +107,7 @@ fun Label(text: String, modifier: Modifier = Modifier) =
 @Composable
 fun Note(text: String, modifier: Modifier = Modifier) = Text(rich(text), modifier = modifier, color = C.muted, fontSize = 12.5.sp, lineHeight = 16.sp)
 
-fun Modifier.tap(onClick: () -> Unit): Modifier = this.clickable(remember { MutableInteractionSource() }, null, onClick = onClick)
+fun Modifier.tap(onClick: () -> Unit): Modifier = this.clickable(interactionSource = null, indication = null, onClick = onClick)
 
 // ---------------- cards ----------------
 
