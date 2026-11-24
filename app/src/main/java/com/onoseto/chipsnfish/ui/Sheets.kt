@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.onoseto.chipsnfish.I18n
 import com.onoseto.chipsnfish.L
 import com.onoseto.chipsnfish.game.Advisor
@@ -86,9 +87,9 @@ fun SheetHost() {
     val sh = Ui.sheet ?: return
     @Suppress("UNUSED_VARIABLE") val r1 = Ui.sheetRev
     @Suppress("UNUSED_VARIABLE") val r2 = Game.rev
-    val wide = sh.kind == "card" || sh.kind == "settings" || sh.kind == "gamesetup"
+    val wide = sh.kind == "card" || sh.kind == "settings" || sh.kind == "gamesetup" || sh.kind == "online"
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)).tap { Ui.close() }.padding(8.dp),
+        Modifier.fillMaxSize().zIndex(40f).background(Color.Black.copy(alpha = 0.65f)).tap { Ui.close() }.padding(8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -111,6 +112,9 @@ fun SheetHost() {
                 "gamesetup" -> GameSetupSheet(sh.arg as GameCfg)
                 "about" -> AboutSheet()
                 "confirm" -> ConfirmSheet(sh.arg as ConfirmArg)
+                "online" -> OnlineSheet(sh.arg as? OnlineArg ?: OnlineArg())
+                "groups" -> GroupsSheet()
+                "group" -> GroupSheet(sh.arg as GroupArg)
             }
         }
     }
@@ -380,7 +384,7 @@ private fun HeadWho(p: Player, name: String, onName: (String) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         Avatar(p, 60.dp)
         Column(Modifier.weight(1f)) {
-            if (p.bot) T(p.name, 19.sp, weight = FontWeight.ExtraBold)
+            if (p.bot || Game.online()) T(p.name, 19.sp, weight = FontWeight.ExtraBold)
             else BasicTextField(name, onName, singleLine = true, textStyle = TextStyle(color = C.ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold), cursorBrush = SolidColor(C.gold), modifier = Modifier.fillMaxWidth())
             Box(Modifier.fillMaxWidth().height(1.dp).background(C.line))
             T(if (p.id == "hero") tr("To jsi ty") else Reads.typeLine(p), 12.5.sp, C.muted)
@@ -457,7 +461,7 @@ private fun SeatSheet(k: Int) {
     val type = remember(p.id) { mutableStateOf(p.override) }
     PlayerBlock(p, notes, type)
     Btn(tr("Uložit hráče"), modifier = Modifier.fillMaxWidth()) { savePlayer(p, name, notes.value, type.value) }
-    if (k != 0 && !g.playing()) {
+    if (k != 0 && !g.playing() && !g.gm()) {
         val others = g.P.values.filter { q -> q.id != "hero" && q.stored && st.seats.none { it.pid == q.id } }.sortedByDescending { it.t }
         Label(tr("Na tomto místě sedí"))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -730,7 +734,7 @@ private fun SettingsSheet(d: SettingsArg) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         T(tr("Nastavení").uppercase(), 24.sp, num = true)
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk").forEach { (k, l) ->
+            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk").filter { it.first != "game" || g.gm() }.forEach { (k, l) ->
                 val on = d.tab == k
                 Box(Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) C.ink else Color.Transparent).border(1.dp, if (on) C.ink else C.line, RoundedCornerShape(99.dp)).tap { d.tab = k; Ui.redraw() }.padding(horizontal = 11.dp, vertical = 5.dp)) {
                     T(tr(l), 12.5.sp, if (on) C.room else C.muted, FontWeight.Bold)
@@ -741,7 +745,8 @@ private fun SettingsSheet(d: SettingsArg) {
     }
     when (d.tab) {
         "game" -> {
-            if (g.gm()) {
+            if (g.online()) OnlineSettingsGame()
+            else if (g.gm()) {
                 Summary(listOf(
                     tr("Soupeřů") to "${st.seats.drop(1).count { !it.out }} / ${st.n - 1}",
                     tr("Blindy teď") to Cards.lvlStr(st.curLevel),

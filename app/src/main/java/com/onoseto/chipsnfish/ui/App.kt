@@ -89,6 +89,17 @@ fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
             }
         }
     }
+    LaunchedEffect(Ui.deep, Ui.splash) {
+        val d = Ui.deep
+        if (d != null && !Ui.splash) {
+            Ui.deep = null
+            if (!com.onoseto.chipsnfish.online.SupaCfg.configured) Game.toast(L("Online server zatím není připojený.", "The online server isn't connected yet.", "Der Online-Server ist noch nicht verbunden."))
+            else if (d.first == "t") com.onoseto.chipsnfish.online.Online.join(d.second) { goTable() }
+            else com.onoseto.chipsnfish.online.Online.joinGroup(d.second) { n ->
+                Game.toast(L("Jsi ve skupině „$n“", "You joined \"$n\"", "Du bist in der Gruppe „$n“")); Ui.open("groups")
+            }
+        }
+    }
     LaunchedEffect(Ui.exitRequest) { if (Ui.exitRequest > 0) { Game.saveLocal(); onExit() } }
     val keep = !Game.gm() && Game.playing() && Ui.view == "table" && !Ui.menu && !Ui.splash
     LaunchedEffect(keep) { setKeepOn(keep) }
@@ -272,47 +283,50 @@ private fun BlindGroup() {
 @Composable
 private fun MenuScreen(onExit: () -> Unit) {
     val g = Game
-    val coachSt = if (g.gm()) null else g.st
+    val O = com.onoseto.chipsnfish.online.Online
     val gs = g.gameSaved()
     val gOn = gs != null && gs.over == null
-    val cOn = coachSt != null && (coachSt.phase == "play" || coachSt.phase == "ready")
     Box(Modifier.fillMaxSize().zIndex(30f).background(Brush.radialGradient(listOf(C.room2, C.room))).tap { }, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FishLogo(Modifier.size(54.dp))
+                FishLogo(Modifier.size(50.dp))
                 Row {
-                    T("HOLD'EM ", 34.sp, C.ink, num = true, letter = 1.sp)
-                    T("CHIPS&FISH", 34.sp, C.gold, num = true, letter = 1.sp)
+                    T("HOLD'EM ", 32.sp, C.ink, num = true, letter = 1.sp)
+                    T("CHIPS&FISH", 32.sp, C.gold, num = true, letter = 1.sp)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ModeCard(
-                    icon = { CardsIcon() }, title = tr("Poker"),
-                    desc = tr("Texas Hold'em proti počítači. 1–9 soupeřů, každý hraje jiným stylem."),
-                    sub = if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Fortsetzen · Hand #${gs!!.handNo}") else tr("Nová hra"),
-                    cur = g.gm() && gOn, newBtn = gOn, onNew = { Ui.openGameSetup() },
-                ) {
-                    if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.goView("table") } else Ui.openGameSetup()
-                }
+                    icon = { CardsIcon() }, title = L("Hrát s přáteli", "Play with friends", "Mit Freunden"),
+                    desc = L("Online stůl pro 2–10 hráčů. Přátele pozveš odkazem nebo kódem.", "Online table for 2–10 players. Invite friends with a link or code.", "Online-Tisch für 2–10 Spieler. Lade Freunde per Link oder Code ein."),
+                    sub = if (O.code != null) L("Pokračovat · stůl ${O.code}", "Continue · table ${O.code}", "Weiter · Tisch ${O.code}") else L("Nový stůl nebo kód", "New table or code", "Neuer Tisch oder Code"),
+                    cur = O.code != null, newBtn = O.code != null, newLabel = L("+ Jiný stůl", "+ Other table", "+ Anderer Tisch"), onNew = { Ui.open("online", OnlineArg()) },
+                ) { if (O.code != null) goTable() else Ui.open("online", OnlineArg()) }
                 ModeCard(
-                    icon = { BulbIcon(C.gold, 30.dp) }, title = tr("Rádce"),
-                    desc = tr("Hraješ naživo s přáteli. Aplikace hlídá sázky, počítá šance a radí."),
-                    sub = if (coachSt != null && coachSt.phase == "play") L("Pokračovat · hand #${coachSt.handNo}", "Continue · hand #${coachSt.handNo}", "Fortsetzen · Hand #${coachSt.handNo}") else if (cOn) tr("Pokračovat") else tr("Ke stolu"),
-                    cur = !g.gm() && cOn, newBtn = cOn, onNew = {
-                        Ui.confirm(tr("Nová hra?"), tr("Rozehraná hra skončí. Hráči a záznam hand zůstanou uložené."), tr("Nová hra")) {
-                            g.switchMode("coach"); g.restart(false); Ui.hideMenu(); Ui.goView("table")
-                        }
-                    },
-                ) { g.switchMode("coach"); Ui.hideMenu(); Ui.goView("table") }
+                    icon = { Icon24("players", C.gold, 30.dp) }, title = L("Skupiny", "Groups", "Gruppen"),
+                    desc = L("Parta, se kterou hraješ pravidelně. Pozvánku do skupiny pošleš odkazem.", "The crew you play with regularly. Send a group invite as a link.", "Deine feste Runde. Die Gruppeneinladung verschickst du als Link."),
+                    sub = L("Otevřít", "Open", "Öffnen"), cur = false, newBtn = false, onNew = {},
+                ) { Ui.open("groups") }
                 ModeCard(
-                    icon = { Icon24("players", C.gold, 30.dp) }, title = tr("Hráči"),
-                    desc = tr("Seznam hráčů, fotky, poznámky a statistiky."),
+                    icon = { Icon24("records", C.gold, 30.dp) }, title = tr("Hráči"),
+                    desc = L("Statistiky soupeřů, typy hráčů, poznámky a záznam hand.", "Opponent stats, player types, notes and hand history.", "Gegnerstatistiken, Spielertypen, Notizen und Hand-Verlauf."),
                     sub = tr("Otevřít"), cur = false, newBtn = false, onNew = {},
                 ) { Ui.hideMenu(); Ui.solo = true; Ui.goView("players") }
             }
+            Row(
+                Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap {
+                    O.stopPolling()
+                    if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.goView("table") } else Ui.openGameSetup()
+                }.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                T(L("Trénink proti počítači", "Practice vs computer", "Training gegen Computer"), 14.sp, C.ink, FontWeight.Bold)
+                T(if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Weiter · Hand #${gs!!.handNo}") + " ›" else L("Nová hra ›", "New game ›", "Neues Spiel ›"), 13.sp, C.gold, FontWeight.ExtraBold)
+                if (gOn) T(tr("+ Nová hra"), 12.sp, C.muted, FontWeight.Bold, modifier = Modifier.tap { O.stopPolling(); Ui.openGameSetup() })
+            }
         }
         Row(Modifier.align(Alignment.TopEnd).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap { Ui.hideMenu(); Ui.goView("table"); Ui.openSettings() }, contentAlignment = Alignment.Center) { Icon24("gear", C.ink) }
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap { Ui.openSettings() }, contentAlignment = Alignment.Center) { Icon24("gear", C.ink) }
             Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap { g.saveLocal(); onExit() }, contentAlignment = Alignment.Center) { Icon24("power", C.ink) }
         }
     }
@@ -327,10 +341,10 @@ private fun CardsIcon() {
 }
 
 @Composable
-private fun ModeCard(icon: @Composable () -> Unit, title: String, desc: String, sub: String, cur: Boolean, newBtn: Boolean, onNew: () -> Unit, onClick: () -> Unit) {
+private fun ModeCard(icon: @Composable () -> Unit, title: String, desc: String, sub: String, cur: Boolean, newBtn: Boolean, newLabel: String = tr("+ Nová hra"), onNew: () -> Unit, onClick: () -> Unit) {
     Column(Modifier.width(230.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Column(
-            Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1A2832), C.panel)))
+            Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1A2832), C.panel)))
                 .border(if (cur) 2.dp else 1.dp, if (cur) C.gold else C.line, RoundedCornerShape(16.dp)).tap(onClick).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -340,7 +354,7 @@ private fun ModeCard(icon: @Composable () -> Unit, title: String, desc: String, 
             T(sub + " ›", 13.sp, C.gold, FontWeight.ExtraBold)
         }
         if (newBtn) Box(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(10.dp)).border(1.dp, C.line, RoundedCornerShape(10.dp)).tap(onNew), contentAlignment = Alignment.Center) {
-            T(tr("+ Nová hra"), 13.sp, C.ink, FontWeight.Bold)
+            T(newLabel, 13.sp, C.ink, FontWeight.Bold)
         } else Spacer(Modifier.height(34.dp))
     }
 }

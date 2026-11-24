@@ -1,0 +1,779 @@
+-- =====================================================================
+-- Hold'em Chips&Fish — online server (Supabase / PostgreSQL)
+-- The whole game runs here: shuffling, dealing, betting, side pots,
+-- showdown. Clients only call the cf_* functions below; they can never
+-- read the deck or other players' cards. Safe to run again (idempotent).
+-- =====================================================================
+
+create table if not exists cf_tables (
+  code text primary key,
+  host uuid not null,
+  name text not null default '',
+  gid uuid,
+  cfg jsonb not null default '{}',
+  status text not null default 'lobby',
+  state jsonb not null,
+  ver int not null default 1,
+  created timestamptz not null default now(),
+  updated timestamptz not null default now()
+);
+
+create table if not exists cf_players (
+  code text not null references cf_tables(code) on delete cascade,
+  uid uuid not null,
+  name text not null default '',
+  img text not null default '',
+  joined timestamptz not null default now(),
+  seen timestamptz not null default now(),
+  pending boolean not null default false,
+  left_at timestamptz,
+  primary key (code, uid)
+);
+
+create table if not exists cf_secret (
+  code text primary key references cf_tables(code) on delete cascade,
+  hand int not null,
+  hole jsonb not null,   -- {"<seat index>": [c1, c2]}
+  board jsonb not null   -- [c1..c5], revealed street by street
+);
+
+create table if not exists cf_shows (
+  code text not null references cf_tables(code) on delete cascade,
+  uid uuid not null,
+  hand int not null,
+  cards jsonb not null,
+  primary key (code, uid, hand)
+);
+
+create table if not exists cf_groups (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  owner uuid not null,
+  created timestamptz not null default now()
+);
+
+create table if not exists cf_group_members (
+  gid uuid not null references cf_groups(id) on delete cascade,
+  uid uuid not null,
+  name text not null default '',
+  img text not null default '',
+  joined timestamptz not null default now(),
+  primary key (gid, uid)
+);
+
+create table if not exists cf_profiles (
+  uid uuid primary key,
+  name text not null default '',
+  img text not null default '',
+  t timestamptz not null default now()
+);
+
+create index if not exists cf_tables_gid on cf_tables(gid);
+create index if not exists cf_players_uid on cf_players(uid);
+create index if not exists cf_group_members_uid on cf_group_members(uid);
+
+-- Clients have no direct access to any table; everything goes through the functions.
+alter table cf_tables enable row level security;
+alter table cf_players enable row level security;
+alter table cf_secret enable row level security;
+alter table cf_shows enable row level security;
+alter table cf_groups enable row level security;
+alter table cf_group_members enable row level security;
+alter table cf_profiles enable row level security;
+revoke all on cf_tables, cf_players, cf_secret, cf_shows, cf_groups, cf_group_members, cf_profiles from anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- small helpers
+-- ---------------------------------------------------------------------
+create or replace function cf_now() returns bigint language sql volatile as
+$$ select (extract(epoch from clock_timestamp()) * 1000)::bigint $$;
+
+create or replace function cf_me() returns uuid language plpgsql stable as $$
+declare u uuid := auth.uid();
+begin
+  if u is null then raise exception 'not signed in'; end if;
+  return u;
+end $$;
+
+create or replace function cf_si(st jsonb, i int, k text) returns int language sql immutable as
+$$ select coalesce((st->'seats'->i->>k)::int, 0) $$;
+create or replace function cf_sb(st jsonb, i int, k text) returns boolean language sql immutable as
+$$ select coalesce((st->'seats'->i->>k)::boolean, false) $$;
+create or replace function cf_ss(st jsonb, i int, k text, v jsonb) returns jsonb language sql immutable as
+$$ select jsonb_set(st, array['seats', i::text, k], v) $$;
+create or replace function cf_gi(st jsonb, k text) returns int language sql immutable as
+$$ select coalesce((st->>k)::int, 0) $$;
+create or replace function cf_set(st jsonb, k text, v jsonb) returns jsonb language sql immutable as
+$$ select jsonb_set(st, array[k], v) $$;
+
+create or replace function cf_level(l int) returns int[] language sql immutable as $$
+  select array[a[k][1], a[k][2]] from (select array[[1,2],[2,4],[3,6],[4,8],[5,10],[10,20],[15,30],[20,40],[25,50],[50,100]] as a,
+    greatest(1, least(10, l + 1)) as k) z
+$$;
+
+-- ---------------------------------------------------------------------
+-- hand evaluator (port of the app's ev(): category << 20 | ranks)
+-- card = rank*4 + suit, rank 0 = "2" … 12 = "A"
+-- ---------------------------------------------------------------------
+create or replace function cf_straight_high(m int) returns int language plpgsql immutable as $$
+declare e int := (m << 1) | ((m >> 12) & 1); h int;
+begin
+  for h in reverse 13..4 loop
+    if ((e >> (h - 4)) & 31) = 31 then return h - 1; end if;
+  end loop;
+  return -1;
+end $$;
+
+create or replace function cf_kick(mask int, n int, sft int) returns int language plpgsql immutable as $$
+declare v int := 0; c int := 0; r int := 12;
+begin
+  while r >= 0 and c < n loop
+    if ((mask >> r) & 1) = 1 then v := v | (r << sft); sft := sft - 4; c := c + 1; end if;
+    r := r - 1;
+  end loop;
+  return v;
+end $$;
+
+create or replace function cf_ev(cs int[]) returns int language plpgsql immutable as $$
+declare
+  rc int[] := array_fill(0, array[13]); sc int[] := array_fill(0, array[4]); sm int[] := array_fill(0, array[4]);
+  mask int := 0; c int; r int; s int; sh int;
+  q int := -1; t1 int := -1; t2 int := -1; p1 int := -1; p2 int := -1;
+begin
+  foreach c in array cs loop
+    r := c >> 2; s := c & 3;
+    rc[r + 1] := rc[r + 1] + 1; sc[s + 1] := sc[s + 1] + 1;
+    sm[s + 1] := sm[s + 1] | (1 << r); mask := mask | (1 << r);
+  end loop;
+  for s in 0..3 loop
+    if sc[s + 1] >= 5 then
+      sh := cf_straight_high(sm[s + 1]);
+      if sh >= 0 then return (8 << 20) | (sh << 16); end if;
+      return (5 << 20) | cf_kick(sm[s + 1], 5, 16);
+    end if;
+  end loop;
+  for r in reverse 12..0 loop
+    if rc[r + 1] = 4 then q := r;
+    elsif rc[r + 1] = 3 then if t1 < 0 then t1 := r; elsif t2 < 0 then t2 := r; end if;
+    elsif rc[r + 1] = 2 then if p1 < 0 then p1 := r; elsif p2 < 0 then p2 := r; end if;
+    end if;
+  end loop;
+  if q >= 0 then return (7 << 20) | (q << 16) | cf_kick(mask & ~(1 << q), 1, 12); end if;
+  if t1 >= 0 and (t2 >= 0 or p1 >= 0) then return (6 << 20) | (t1 << 16) | (greatest(t2, p1) << 12); end if;
+  sh := cf_straight_high(mask);
+  if sh >= 0 then return (4 << 20) | (sh << 16); end if;
+  if t1 >= 0 then return (3 << 20) | (t1 << 16) | cf_kick(mask & ~(1 << t1), 2, 12); end if;
+  if p2 >= 0 then return (2 << 20) | (p1 << 16) | (p2 << 12) | cf_kick(mask & ~(1 << p1) & ~(1 << p2), 1, 8); end if;
+  if p1 >= 0 then return (1 << 20) | (p1 << 16) | cf_kick(mask & ~(1 << p1), 3, 12); end if;
+  return cf_kick(mask, 5, 16);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- engine (port of the app's Texas Hold'em rules)
+-- ---------------------------------------------------------------------
+create or replace function cf_nxt(st jsonb, i int) returns int language plpgsql immutable as $$
+declare n int := cf_gi(st, 'n'); k int; j int;
+begin
+  for k in 1..n loop
+    j := (i + k) % n;
+    if not cf_sb(st, j, 'out') then return j; end if;
+  end loop;
+  return (i + 1) % n;
+end $$;
+
+create or replace function cf_active(st jsonb) returns int language sql immutable as
+$$ select count(*)::int from jsonb_array_elements(st->'seats') s where not coalesce((s->>'out')::boolean, false) $$;
+create or replace function cf_live(st jsonb) returns int language sql immutable as
+$$ select count(*)::int from jsonb_array_elements(st->'seats') s where not coalesce((s->>'folded')::boolean, false) $$;
+create or replace function cf_live_free(st jsonb) returns int language sql immutable as
+$$ select count(*)::int from jsonb_array_elements(st->'seats') s where not coalesce((s->>'folded')::boolean, false) and not coalesce((s->>'allin')::boolean, false) $$;
+create or replace function cf_pot(st jsonb) returns int language sql immutable as
+$$ select coalesce(sum((s->>'total')::int), 0)::int from jsonb_array_elements(st->'seats') s $$;
+
+create or replace function cf_positions(st jsonb, out sb int, out bb int) language plpgsql immutable as $$
+declare d int := cf_gi(st, 'dealer');
+begin
+  if cf_active(st) = 2 then sb := d; bb := cf_nxt(st, d);
+  else sb := cf_nxt(st, d); bb := cf_nxt(st, sb); end if;
+end $$;
+
+create or replace function cf_put(inout st jsonb, i int, amt int, out paid int) language plpgsql immutable as $$
+declare stack int := cf_si(st, i, 'stack');
+begin
+  paid := greatest(0, least(amt, stack));
+  st := cf_ss(st, i, 'stack', to_jsonb(stack - paid));
+  st := cf_ss(st, i, 'bet', to_jsonb(cf_si(st, i, 'bet') + paid));
+  st := cf_ss(st, i, 'total', to_jsonb(cf_si(st, i, 'total') + paid));
+  if stack - paid = 0 then st := cf_ss(st, i, 'allin', 'true'); end if;
+end $$;
+
+create or replace function cf_needs(st jsonb, i int) returns boolean language sql immutable as $$
+  select not cf_sb(st, i, 'folded') and not cf_sb(st, i, 'allin')
+     and (not cf_sb(st, i, 'acted') or cf_si(st, i, 'bet') < cf_gi(st, 'curBet'))
+$$;
+
+create or replace function cf_next_to_act(st jsonb, frm int) returns int language plpgsql immutable as $$
+declare i int := frm; k int;
+begin
+  for k in 1..cf_gi(st, 'n') loop
+    i := cf_nxt(st, i);
+    if cf_needs(st, i) then return i; end if;
+  end loop;
+  return -1;
+end $$;
+
+create or replace function cf_start_street(st jsonb) returns jsonb language plpgsql volatile as $$
+declare n int := cf_gi(st, 'n'); i int;
+begin
+  for i in 0..n - 1 loop
+    st := cf_ss(st, i, 'bet', '0'); st := cf_ss(st, i, 'acted', 'false');
+  end loop;
+  st := st || jsonb_build_object('curBet', 0, 'lastRaise', cf_gi(st, 'bb'), 'turnAt', cf_now());
+  if cf_live(st) > 1 and cf_live_free(st) > 1 then
+    st := cf_set(st, 'turn', to_jsonb(cf_next_to_act(st, cf_gi(st, 'dealer'))));
+  else
+    st := cf_set(st, 'turn', '-1');
+  end if;
+  return st;
+end $$;
+
+-- deals a new hand; returns null when fewer than two players have chips
+create or replace function cf_start_hand(p_code text, st jsonb) returns jsonb language plpgsql volatile as $$
+declare
+  n int := cf_gi(st, 'n'); i int; lv int; lb int[]; sb int; bb int; paid int;
+  v_deck int[]; v_hole jsonb := '{}'; k int := 1;
+begin
+  for i in 0..n - 1 loop
+    if cf_si(st, i, 'stack') <= 0 then st := cf_ss(st, i, 'out', 'true'); end if;
+  end loop;
+  if cf_active(st) < 2 then return null; end if;
+  for i in 0..n - 1 loop
+    st := cf_ss(st, i, 'folded', to_jsonb(cf_sb(st, i, 'out')));
+    st := cf_ss(st, i, 'allin', 'false'); st := cf_ss(st, i, 'bet', '0'); st := cf_ss(st, i, 'total', '0');
+    st := cf_ss(st, i, 'acted', 'false'); st := cf_ss(st, i, 'actions', '[]');
+  end loop;
+  lv := cf_gi(st, 'level');
+  if cf_gi(st, 'blindHands') > 0 and cf_gi(st, 'handNo') > 0 and cf_gi(st, 'handNo') % cf_gi(st, 'blindHands') = 0 and lv < 9 then
+    lv := lv + 1;
+  end if;
+  lb := cf_level(lv);
+  st := st || jsonb_build_object('done', null, 'reveal', null, 'board', '[null,null,null,null,null]'::jsonb,
+    'betStreet', 0, 'curBet', 0, 'turn', -1, 'level', lv, 'curLevel', lv, 'sb', lb[1], 'bb', lb[2],
+    'lastRaise', lb[2], 'handNo', cf_gi(st, 'handNo') + 1, 'doneAt', 0);
+  select * into sb, bb from cf_positions(st);
+  select * into st, paid from cf_put(st, sb, lb[1]);
+  st := cf_ss(st, sb, 'actions', jsonb_build_array(jsonb_build_object('st', 0, 'a', 'sb', 'amt', paid)));
+  select * into st, paid from cf_put(st, bb, lb[2]);
+  st := cf_ss(st, bb, 'actions', jsonb_build_array(jsonb_build_object('st', 0, 'a', 'bb', 'amt', paid)));
+  st := cf_set(st, 'curBet', to_jsonb(greatest(cf_si(st, sb, 'bet'), cf_si(st, bb, 'bet'))));
+  st := cf_set(st, 'turn', to_jsonb(cf_next_to_act(st, bb)));
+  st := cf_set(st, 'turnAt', to_jsonb(cf_now()));
+  -- shuffle with the cryptographic UUID generator
+  select array_agg(c order by gen_random_uuid()) into v_deck from generate_series(0, 51) c;
+  for i in 0..n - 1 loop
+    if not cf_sb(st, i, 'out') then
+      v_hole := v_hole || jsonb_build_object(i::text, jsonb_build_array(v_deck[k], v_deck[k + 1]));
+      k := k + 2;
+    end if;
+  end loop;
+  insert into cf_secret(code, hand, hole, board)
+  values (p_code, cf_gi(st, 'handNo'), v_hole, to_jsonb(v_deck[k:k + 4]))
+  on conflict (code) do update set hand = excluded.hand, hole = excluded.hole, board = excluded.board;
+  return st;
+end $$;
+
+create or replace function cf_act(st jsonb, i int, typ text, p_to int) returns jsonb language plpgsql volatile as $$
+declare
+  pot_before int := cf_pot(st); bet int := cf_si(st, i, 'bet'); stack int := cf_si(st, i, 'stack');
+  cur int := cf_gi(st, 'curBet'); call_amt int := greatest(0, cur - bet);
+  rec jsonb := jsonb_build_object('st', cf_gi(st, 'betStreet'), 'a', typ);
+  paid int; tgt int := p_to; mx int; mn int; inc int; ratio float; j int; t int;
+begin
+  if typ = 'fold' then
+    st := cf_ss(st, i, 'folded', 'true');
+  elsif typ = 'check' and call_amt > 0 then
+    st := cf_ss(st, i, 'folded', 'true'); rec := rec || '{"a":"fold"}';
+  elsif typ = 'call' then
+    select * into st, paid from cf_put(st, i, call_amt);
+    rec := rec || jsonb_build_object('amt', paid);
+    if call_amt = 0 then rec := rec || '{"a":"check"}'; end if;
+  elsif typ in ('raise', 'bet', 'allin') then
+    mx := bet + stack;
+    mn := least(case when cur = 0 then cf_gi(st, 'bb') else cur + cf_gi(st, 'lastRaise') end, mx);
+    if typ = 'allin' then tgt := mx; else tgt := greatest(mn, least(mx, coalesce(tgt, mn))); end if;
+    select * into st, paid from cf_put(st, i, tgt - bet);
+    bet := cf_si(st, i, 'bet');
+    if bet > cur then
+      inc := bet - cur;
+      ratio := inc::float / greatest(1, pot_before + call_amt);
+      rec := rec || jsonb_build_object('sz', case when ratio <= 0.4 then 's' when ratio <= 0.75 then 'm' when ratio <= 1.1 then 'l' else 'o' end);
+      if inc >= cf_gi(st, 'lastRaise') then st := cf_set(st, 'lastRaise', to_jsonb(inc)); end if;
+      st := cf_set(st, 'curBet', to_jsonb(bet));
+      for j in 0..cf_gi(st, 'n') - 1 loop
+        if j <> i then st := cf_ss(st, j, 'acted', 'false'); end if;
+      end loop;
+      if typ <> 'allin' then rec := rec || jsonb_build_object('a', case when cur = 0 then 'bet' else 'raise' end); end if;
+    elsif typ = 'allin' then
+      rec := rec || '{"a":"call"}';
+    end if;
+    rec := rec || jsonb_build_object('amt', bet);
+    if cf_sb(st, i, 'allin') and typ <> 'allin' and rec->>'a' <> 'call' then rec := rec || '{"a":"allin"}'; end if;
+  end if;
+  st := cf_ss(st, i, 'acted', 'true');
+  st := cf_ss(st, i, 'actions', (st->'seats'->i->'actions') || jsonb_build_array(rec));
+  if cf_live(st) <= 1 then t := -1; else t := cf_next_to_act(st, i); end if;
+  if t >= 0 and cf_live_free(st) = 1 and cf_si(st, t, 'bet') >= cf_gi(st, 'curBet') then t := -1; end if;
+  st := st || jsonb_build_object('turn', t, 'turnAt', cf_now());
+  return st;
+end $$;
+
+-- settles the pot with side pots; hole cards stay private (only winners' categories are published)
+create or replace function cf_finish(st jsonb, hole jsonb) returns jsonb language plpgsql volatile as $$
+declare
+  n int := cf_gi(st, 'n'); win int[] := array_fill(0, array[n]); sc int[] := array_fill(null::int, array[n]);
+  bd int[]; i int; k int; lvls int[]; lvl int; prev int := 0; pot int; best int; ws int[]; sh int; rest int;
+  ord int[] := '{}'; cats jsonb := '{}'; wl jsonb := '[]'; al jsonb := '[]'; alive int := 0; sd boolean := false;
+begin
+  select coalesce(array_agg((x)::int) filter (where x is not null), '{}') into bd from jsonb_array_elements_text(st->'board') x;
+  if cf_live(st) = 1 then
+    for i in 0..n - 1 loop
+      if not cf_sb(st, i, 'folded') then win[i + 1] := cf_pot(st); end if;
+    end loop;
+  else
+    sd := true;
+    for i in 0..n - 1 loop
+      if not cf_sb(st, i, 'folded') then
+        sc[i + 1] := cf_ev(array[(hole->i::text->>0)::int, (hole->i::text->>1)::int] || bd);
+      end if;
+    end loop;
+    k := cf_gi(st, 'dealer');
+    for i in 1..n loop k := (k + 1) % n; ord := ord || k; end loop;
+    select array_agg(distinct (cf_si(st, g.x, 'total')) order by (cf_si(st, g.x, 'total'))) into lvls
+      from generate_series(0, n - 1) g(x) where not cf_sb(st, g.x, 'folded');
+    foreach lvl in array lvls loop
+      pot := 0;
+      for i in 0..n - 1 loop pot := pot + greatest(0, least(cf_si(st, i, 'total'), lvl) - prev); end loop;
+      best := null; ws := '{}';
+      foreach k in array ord loop
+        if sc[k + 1] is not null and cf_si(st, k, 'total') >= lvl then
+          if best is null or sc[k + 1] > best then best := sc[k + 1]; ws := array[k];
+          elsif sc[k + 1] = best then ws := ws || k; end if;
+        end if;
+      end loop;
+      sh := pot / array_length(ws, 1);
+      foreach k in array ws loop win[k + 1] := win[k + 1] + sh; end loop;
+      win[ws[1] + 1] := win[ws[1] + 1] + pot - sh * array_length(ws, 1);
+      prev := lvl;
+    end loop;
+    rest := 0;
+    for i in 0..n - 1 loop rest := rest + greatest(0, cf_si(st, i, 'total') - prev); end loop;
+    if rest > 0 then
+      best := null;
+      for i in 0..n - 1 loop if sc[i + 1] is not null and (best is null or sc[i + 1] > sc[best + 1]) then best := i; end if; end loop;
+      win[best + 1] := win[best + 1] + rest;
+    end if;
+  end if;
+  for i in 0..n - 1 loop
+    st := cf_ss(st, i, 'stack', to_jsonb(cf_si(st, i, 'stack') + win[i + 1]));
+    st := cf_ss(st, i, 'bet', '0');
+    al := al || to_jsonb(win[i + 1]);
+    if win[i + 1] > 0 then
+      wl := wl || to_jsonb(i);
+      if sc[i + 1] is not null then cats := cats || jsonb_build_object(i::text, sc[i + 1] >> 20); end if;
+    end if;
+    if cf_si(st, i, 'stack') > 0 then alive := alive + 1; end if;
+  end loop;
+  st := st || jsonb_build_object('done', jsonb_build_object('w', wl, 'amt', al, 'sd', sd, 'cat', cats, 'net', 0),
+                                 'turn', -1, 'doneAt', cf_now());
+  if alive <= 1 then st := cf_set(st, 'over', '{"win":true,"place":1}'); end if;
+  return st;
+end $$;
+
+-- runs the hand forward when nobody has to act: deals streets / settles
+create or replace function cf_advance(p_code text, st jsonb) returns jsonb language plpgsql volatile as $$
+declare sec cf_secret; n int; c int; i int; guard int := 0;
+begin
+  select * into sec from cf_secret where code = p_code;
+  loop
+    guard := guard + 1; exit when guard > 10;
+    exit when st->'done' is not null and st->>'done' is not null;
+    if cf_live(st) <= 1 then st := cf_finish(st, sec.hole); exit; end if;
+    exit when cf_gi(st, 'turn') >= 0;
+    select count(*) into n from jsonb_array_elements(st->'board') x where x <> 'null'::jsonb;
+    if n >= 5 then st := cf_finish(st, sec.hole); exit; end if;
+    c := case when n = 0 then 3 else 1 end;
+    for i in n..n + c - 1 loop
+      st := jsonb_set(st, array['board', i::text], sec.board->i);
+    end loop;
+    st := cf_set(st, 'betStreet', to_jsonb(case when n + c >= 5 then 3 when n + c = 4 then 2 else 1 end));
+    st := cf_start_street(st);
+  end loop;
+  return st;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- table lifecycle (called by the app)
+-- ---------------------------------------------------------------------
+create or replace function cf_save(p_code text, st jsonb) returns void language sql volatile as $$
+  update cf_tables set state = st, ver = ver + 1, updated = now(),
+    status = case when st->'over' is not null and st->>'over' is not null then 'over' when st->>'phase' = 'play' then 'play' else status end
+  where code = p_code
+$$;
+
+create or replace function cf_lock(p_code text) returns cf_tables language plpgsql volatile as $$
+declare t cf_tables;
+begin
+  select * into t from cf_tables where code = p_code for update;
+  if not found then raise exception 'table not found'; end if;
+  return t;
+end $$;
+
+create or replace function cf_profile(p_name text, p_img text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); nm text := left(coalesce(nullif(trim(p_name), ''), 'Hráč'), 24); im text := left(coalesce(p_img, ''), 60000);
+begin
+  insert into cf_profiles(uid, name, img, t) values (u, nm, im, now())
+  on conflict (uid) do update set name = excluded.name, img = excluded.img, t = now();
+  update cf_players set name = nm, img = im where uid = u;
+  update cf_group_members set name = nm, img = im where uid = u;
+end $$;
+
+create or replace function cf_create(p_name text, p_cfg jsonb, p_gid uuid default null) returns text
+language plpgsql security definer set search_path = public as $$
+declare
+  u uuid := cf_me(); v_code text; tries int := 0; alphabet text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  stack int := greatest(10, least(1000000, coalesce((p_cfg->>'stack')::int, 1000)));
+  lv int := greatest(0, least(9, coalesce((p_cfg->>'level')::int, 0)));
+  every int := greatest(0, least(100, coalesce((p_cfg->>'every')::int, 10)));
+  adv boolean := coalesce((p_cfg->>'advisor')::boolean, true);
+  lb int[] := cf_level(lv); pr cf_profiles; st jsonb;
+begin
+  if p_gid is not null and not exists (select 1 from cf_group_members where gid = p_gid and uid = u) then
+    raise exception 'not a group member';
+  end if;
+  loop
+    v_code := (select string_agg(substr(alphabet, 1 + floor(random() * 32)::int, 1), '') from generate_series(1, 6));
+    exit when not exists (select 1 from cf_tables t where t.code = v_code);
+    tries := tries + 1; if tries > 20 then raise exception 'no free code'; end if;
+  end loop;
+  select * into pr from cf_profiles where uid = u;
+  st := jsonb_build_object('mode', 'online', 'phase', 'setup', 'n', 1, 'dealer', 0, 'startLevel', lv, 'level', lv,
+    'curLevel', lv, 'sb', lb[1], 'bb', lb[2], 'startStack', stack, 'autoBlinds', true, 'blindHands', every,
+    'blindMin', 0, 'handNo', 0, 'board', '[null,null,null,null,null]'::jsonb, 'betStreet', 0, 'curBet', 0,
+    'lastRaise', lb[2], 'turn', -1, 'turnAt', 0, 'doneAt', 0,
+    'seats', jsonb_build_array(jsonb_build_object('pid', u, 'stack', stack, 'folded', false, 'allin', false,
+      'bet', 0, 'total', 0, 'acted', false, 'actions', '[]'::jsonb, 'out', false, 'mood', '[]'::jsonb)));
+  insert into cf_tables(code, host, name, gid, cfg, state)
+  values (v_code, u, left(coalesce(p_name, ''), 40), p_gid, jsonb_build_object('stack', stack, 'level', lv, 'every', every, 'advisor', adv), st);
+  insert into cf_players(code, uid, name, img) values (v_code, u, coalesce(pr.name, 'Hráč'), coalesce(pr.img, ''));
+  return v_code;
+end $$;
+
+create or replace function cf_seat_obj(u uuid, stack int) returns jsonb language sql immutable as $$
+  select jsonb_build_object('pid', u, 'stack', stack, 'folded', true, 'allin', false, 'bet', 0, 'total', 0,
+    'acted', false, 'actions', '[]'::jsonb, 'out', false, 'mood', '[]'::jsonb)
+$$;
+
+create or replace function cf_join(p_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; pr cf_profiles; st jsonb; seated boolean;
+begin
+  t := cf_lock(upper(p_code));
+  select * into pr from cf_profiles where uid = u;
+  st := t.state;
+  seated := exists (select 1 from jsonb_array_elements(st->'seats') s where s->>'pid' = u::text);
+  if exists (select 1 from cf_players where code = t.code and uid = u and left_at is null) then
+    return jsonb_build_object('ok', true, 'code', t.code);
+  end if;
+  if t.status = 'over' then raise exception 'game over'; end if;
+  if (select count(*) from cf_players where code = t.code and left_at is null) >= 10 then raise exception 'table full'; end if;
+  insert into cf_players(code, uid, name, img, pending)
+  values (t.code, u, coalesce(pr.name, 'Hráč'), coalesce(pr.img, ''), st->>'phase' = 'play' and not seated)
+  on conflict (code, uid) do update set left_at = null, pending = excluded.pending, seen = now(), name = excluded.name, img = excluded.img;
+  if st->>'phase' = 'setup' and not seated then
+    st := jsonb_set(st, '{seats}', (st->'seats') || jsonb_build_array(cf_seat_obj(u, cf_gi(st, 'startStack')) || '{"folded":false}'));
+    st := cf_set(st, 'n', to_jsonb(jsonb_array_length(st->'seats')));
+    perform cf_save(t.code, st);
+  end if;
+  return jsonb_build_object('ok', true, 'code', t.code);
+end $$;
+
+create or replace function cf_start(p_code text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; st jsonb;
+begin
+  t := cf_lock(p_code);
+  if t.host <> u then raise exception 'only the host can start'; end if;
+  st := t.state;
+  if st->>'phase' <> 'setup' then return; end if;
+  if jsonb_array_length(st->'seats') < 2 then raise exception 'need two players'; end if;
+  st := st || jsonb_build_object('phase', 'play', 'dealer', floor(random() * jsonb_array_length(st->'seats'))::int);
+  st := cf_start_hand(t.code, st);
+  perform cf_save(t.code, st);
+end $$;
+
+create or replace function cf_seat_of(st jsonb, u uuid) returns int language sql immutable as $$
+  select coalesce((select (o - 1)::int from jsonb_array_elements(st->'seats') with ordinality e(s, o) where s->>'pid' = u::text limit 1), -1)
+$$;
+
+create or replace function cf_move(p_code text, p_hand int, p_type text, p_to int default 0) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; st jsonb; i int;
+begin
+  if p_type not in ('fold', 'check', 'call', 'bet', 'raise', 'allin') then raise exception 'bad move'; end if;
+  t := cf_lock(p_code);
+  st := t.state;
+  if st->>'phase' <> 'play' or cf_gi(st, 'handNo') <> p_hand then return; end if;
+  i := cf_seat_of(st, u);
+  if i < 0 or cf_gi(st, 'turn') <> i then return; end if;
+  if p_type = 'bet' then p_type := 'raise'; end if;
+  st := cf_act(st, i, p_type, p_to);
+  st := cf_advance(t.code, st);
+  perform cf_save(t.code, st);
+end $$;
+
+-- anybody may push the game on when the player to act has been idle for 60 s
+create or replace function cf_timeout(p_code text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; st jsonb; i int;
+begin
+  t := cf_lock(p_code);
+  st := t.state;
+  i := cf_gi(st, 'turn');
+  if st->>'phase' <> 'play' or i < 0 or (st->>'done') is not null then return; end if;
+  if cf_now() < (st->>'turnAt')::bigint + 60000 then return; end if;
+  st := cf_act(st, i, case when cf_gi(st, 'curBet') > cf_si(st, i, 'bet') then 'fold' else 'call' end, 0);
+  st := cf_advance(t.code, st);
+  perform cf_save(t.code, st);
+  perform u;
+end $$;
+
+-- next hand: the host at any time, everyone else 6 s after the hand ended
+create or replace function cf_next(p_code text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; st jsonb; seats jsonb := '[]'; s jsonb; dpid text; d int; p record; nst jsonb;
+begin
+  t := cf_lock(p_code);
+  st := t.state;
+  if st->>'phase' <> 'play' or (st->>'done') is null or (st->>'over') is not null then return; end if;
+  if t.host <> u and cf_now() < (st->>'doneAt')::bigint + 6000 then return; end if;
+  dpid := st->'seats'->cf_gi(st, 'dealer')->>'pid';
+  -- drop players who left, add those who joined during the hand
+  for s in select x from jsonb_array_elements(st->'seats') x loop
+    if exists (select 1 from cf_players where code = t.code and uid = (s->>'pid')::uuid and left_at is null) then
+      seats := seats || jsonb_build_array(s);
+    end if;
+  end loop;
+  for p in select uid from cf_players where code = t.code and pending and left_at is null order by joined loop
+    seats := seats || jsonb_build_array(cf_seat_obj(p.uid, cf_gi(st, 'startStack')));
+  end loop;
+  update cf_players set pending = false where code = t.code and pending;
+  st := jsonb_set(st, '{seats}', seats);
+  st := cf_set(st, 'n', to_jsonb(jsonb_array_length(seats)));
+  d := coalesce((select (o - 1)::int from jsonb_array_elements(seats) with ordinality e(x, o) where x->>'pid' = dpid limit 1), 0);
+  st := cf_set(st, 'dealer', to_jsonb(d));
+  if jsonb_array_length(seats) < 2 then
+    st := cf_set(st, 'over', '{"win":true,"place":1}');
+    perform cf_save(t.code, st); return;
+  end if;
+  st := cf_set(st, 'dealer', to_jsonb(cf_nxt(st, d)));
+  nst := cf_start_hand(t.code, st);
+  if nst is null then st := cf_set(st, 'over', '{"win":true,"place":1}'); else st := nst; end if;
+  perform cf_save(t.code, st);
+end $$;
+
+create or replace function cf_show(p_code text, p_hand int) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; sec cf_secret; i int;
+begin
+  select * into t from cf_tables where code = p_code;
+  select * into sec from cf_secret where code = p_code;
+  if t is null or sec is null or sec.hand <> p_hand or (t.state->>'done') is null then return; end if;
+  i := cf_seat_of(t.state, u);
+  if i < 0 or sec.hole->(i::text) is null then return; end if;
+  insert into cf_shows(code, uid, hand, cards) values (p_code, u, p_hand, sec.hole->(i::text)) on conflict do nothing;
+  update cf_tables set ver = ver + 1 where code = p_code;
+end $$;
+
+create or replace function cf_leave(p_code text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; st jsonb; i int;
+begin
+  t := cf_lock(p_code);
+  st := t.state;
+  update cf_players set left_at = now() where code = t.code and uid = u;
+  i := cf_seat_of(st, u);
+  if i < 0 then return; end if;
+  if st->>'phase' = 'setup' then
+    st := jsonb_set(st, '{seats}', (st->'seats') - i);
+    st := cf_set(st, 'n', to_jsonb(jsonb_array_length(st->'seats')));
+    if t.host = u then
+      update cf_tables set host = coalesce((select uid from cf_players where code = t.code and left_at is null order by joined limit 1), host) where code = t.code;
+    end if;
+  elsif (st->>'done') is null and not cf_sb(st, i, 'folded') then
+    if cf_gi(st, 'turn') = i then st := cf_act(st, i, 'fold', 0);
+    else st := cf_ss(st, i, 'folded', 'true');
+      if cf_live(st) <= 1 then st := cf_set(st, 'turn', '-1'); end if;
+    end if;
+    st := cf_advance(t.code, st);
+  end if;
+  if t.host = u and st->>'phase' <> 'setup' then
+    update cf_tables set host = coalesce((select uid from cf_players where code = t.code and left_at is null order by joined limit 1), host) where code = t.code;
+  end if;
+  perform cf_save(t.code, st);
+end $$;
+
+create or replace function cf_set_advisor(p_code text, p_on boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  update cf_tables set cfg = cfg || jsonb_build_object('advisor', p_on), ver = ver + 1 where code = p_code and host = u;
+end $$;
+
+-- after the game is over the host can start again with the same players
+create or replace function cf_restart(p_code text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; st jsonb; seats jsonb := '[]'; p record;
+begin
+  t := cf_lock(p_code);
+  if t.host <> u then raise exception 'only the host can restart'; end if;
+  st := t.state;
+  for p in select uid from cf_players where code = t.code and left_at is null order by joined loop
+    seats := seats || jsonb_build_array(cf_seat_obj(p.uid, cf_gi(st, 'startStack')) || '{"folded":false}');
+  end loop;
+  update cf_players set pending = false where code = t.code;
+  st := st || jsonb_build_object('phase', 'setup', 'seats', seats, 'n', jsonb_array_length(seats), 'over', null, 'done', null,
+    'handNo', 0, 'level', cf_gi(st, 'startLevel'), 'curLevel', cf_gi(st, 'startLevel'), 'turn', -1,
+    'board', '[null,null,null,null,null]'::jsonb, 'betStreet', 0, 'curBet', 0);
+  update cf_tables set status = 'lobby' where code = t.code;
+  perform cf_save(t.code, st);
+end $$;
+
+-- everything a client needs, polled about once per second; state only when it changed
+create or replace function cf_view(p_code text, p_ver int default 0) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; sec cf_secret; i int; v_hole jsonb := null; v_hand int;
+begin
+  select * into t from cf_tables where code = upper(p_code);
+  if not found then return jsonb_build_object('ok', false, 'err', 'notfound'); end if;
+  update cf_players set seen = now() where code = t.code and uid = u;
+  v_hand := cf_gi(t.state, 'handNo');
+  i := cf_seat_of(t.state, u);
+  if i >= 0 then
+    select * into sec from cf_secret where code = t.code;
+    if sec.hand = v_hand then v_hole := sec.hole->(i::text); end if;
+  end if;
+  return jsonb_build_object(
+    'ok', true, 'code', t.code, 'ver', t.ver, 'now', cf_now(), 'host', t.host, 'name', t.name, 'gid', t.gid,
+    'cfg', t.cfg, 'status', t.status, 'me', u,
+    'state', case when t.ver <> p_ver then t.state else null end,
+    'hole', jsonb_build_object('hand', v_hand, 'cards', v_hole),
+    'players', (select coalesce(jsonb_agg(jsonb_build_object('uid', uid, 'name', name, 'img', case when p_ver = 0 or t.ver <> p_ver then img else null end,
+                  'on', seen > now() - interval '15 seconds', 'pending', pending, 'left', left_at is not null) order by joined), '[]')
+                from cf_players where code = t.code),
+    'shows', (select coalesce(jsonb_agg(jsonb_build_object('uid', s.uid, 'cards', s.cards)), '[]') from cf_shows s where s.code = t.code and s.hand = v_hand)
+  );
+end $$;
+
+-- ---------------------------------------------------------------------
+-- groups
+-- ---------------------------------------------------------------------
+create or replace function cf_group_create(p_name text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); g uuid; pr cf_profiles;
+begin
+  select * into pr from cf_profiles where uid = u;
+  insert into cf_groups(name, owner) values (left(coalesce(nullif(trim(p_name), ''), 'Poker'), 40), u) returning id into g;
+  insert into cf_group_members(gid, uid, name, img) values (g, u, coalesce(pr.name, 'Hráč'), coalesce(pr.img, ''));
+  return g;
+end $$;
+
+create or replace function cf_group_join(p_gid uuid) returns text
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); pr cf_profiles; nm text;
+begin
+  select name into nm from cf_groups where id = p_gid;
+  if nm is null then raise exception 'group not found'; end if;
+  select * into pr from cf_profiles where uid = u;
+  insert into cf_group_members(gid, uid, name, img) values (p_gid, u, coalesce(pr.name, 'Hráč'), coalesce(pr.img, ''))
+  on conflict do nothing;
+  return nm;
+end $$;
+
+create or replace function cf_group_leave(p_gid uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  delete from cf_group_members where gid = p_gid and uid = u;
+  delete from cf_groups g where g.id = p_gid and not exists (select 1 from cf_group_members m where m.gid = g.id);
+end $$;
+
+create or replace function cf_group_rename(p_gid uuid, p_name text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  update cf_groups set name = left(coalesce(nullif(trim(p_name), ''), name), 40) where id = p_gid and owner = u;
+end $$;
+
+-- my groups with members and the tables that are open right now
+create or replace function cf_groups() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'id', g.id, 'name', g.name, 'owner', g.owner,
+      'members', (select coalesce(jsonb_agg(jsonb_build_object('uid', m.uid, 'name', m.name, 'img', m.img) order by m.joined), '[]') from cf_group_members m where m.gid = g.id),
+      'tables', (select coalesce(jsonb_agg(jsonb_build_object('code', t.code, 'name', t.name, 'status', t.status,
+                    'players', (select count(*) from cf_players p where p.code = t.code and p.left_at is null)) order by t.updated desc), '[]')
+                 from cf_tables t where t.gid = g.id and t.status <> 'over' and t.updated > now() - interval '12 hours')
+    ) order by g.created), '[]')
+    from cf_groups g where exists (select 1 from cf_group_members m where m.gid = g.id and m.uid = u));
+end $$;
+
+-- my recent tables (to continue after closing the app)
+create or replace function cf_my_tables() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  return (select coalesce(jsonb_agg(jsonb_build_object('code', t.code, 'name', t.name, 'status', t.status, 'host', t.host = u,
+      'players', (select count(*) from cf_players q where q.code = t.code and q.left_at is null)) order by t.updated desc), '[]')
+    from cf_tables t join cf_players p on p.code = t.code and p.uid = u and p.left_at is null
+    where t.status <> 'over' and t.updated > now() - interval '24 hours');
+end $$;
+
+-- keep-alive: the app calls this every couple of days so the free project never pauses
+create table if not exists cf_ping_log (id int primary key, t timestamptz not null default now(), n bigint not null default 0);
+alter table cf_ping_log enable row level security;
+revoke all on cf_ping_log from anon, authenticated;
+create or replace function cf_ping() returns bigint
+language plpgsql security definer set search_path = public as $$
+declare v bigint;
+begin
+  insert into cf_ping_log(id, t, n) values (1, now(), 1) on conflict (id) do update set t = now(), n = cf_ping_log.n + 1 returning n into v;
+  delete from cf_tables where updated < now() - interval '7 days';
+  return v;
+end $$;
+
+-- housekeeping: forget tables nobody touched for a week
+create or replace function cf_cleanup() returns void language sql security definer set search_path = public as $$
+  delete from cf_tables where updated < now() - interval '7 days';
+$$;
+
+-- ---------------------------------------------------------------------
+-- permissions: only signed-in users may call the app's functions
+-- ---------------------------------------------------------------------
+do $$
+declare f record;
+begin
+  for f in select p.oid::regprocedure as sig, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname like 'cf\_%' loop
+    execute format('revoke all on function %s from public, anon', f.sig);
+    if f.proname in ('cf_profile','cf_create','cf_join','cf_start','cf_move','cf_timeout','cf_next','cf_show','cf_leave',
+                     'cf_set_advisor','cf_restart','cf_view','cf_group_create','cf_group_join','cf_group_leave',
+                     'cf_group_rename','cf_groups','cf_my_tables','cf_ping') then
+      execute format('grant execute on function %s to authenticated', f.sig);
+    else
+      execute format('revoke all on function %s from authenticated', f.sig);
+    end if;
+  end loop;
+end $$;

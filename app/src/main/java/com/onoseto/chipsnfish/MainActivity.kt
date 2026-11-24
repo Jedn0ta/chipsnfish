@@ -13,11 +13,20 @@ import com.onoseto.chipsnfish.ui.Sound
 import com.onoseto.chipsnfish.ui.Ui
 
 class MainActivity : ComponentActivity() {
+    private val notifPerm = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         I18n.load(this)
         Game.init(this)
         Game.onChipSound = { Sound.chip() }
+        com.onoseto.chipsnfish.online.Supa.init(this)
+        com.onoseto.chipsnfish.online.KeepAlive.schedule(this)
+        handleLink(intent)
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            notifPerm.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         hideBars()
         setContent {
@@ -28,6 +37,22 @@ class MainActivity : ComponentActivity() {
                     else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 },
             )
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleLink(intent)
+    }
+
+    /** https://onoseto.com/cf/?t=CODE · ?g=GROUP · chipsnfish://t/CODE · chipsnfish://g/GROUP */
+    private fun handleLink(i: android.content.Intent?) {
+        val u = i?.data ?: return
+        val t = u.getQueryParameter("t") ?: if (u.scheme == "chipsnfish" && u.host == "t") u.lastPathSegment else null
+        val g = u.getQueryParameter("g") ?: if (u.scheme == "chipsnfish" && u.host == "g") u.lastPathSegment else null
+        when {
+            !t.isNullOrBlank() -> Ui.deep = "t" to t.trim()
+            !g.isNullOrBlank() -> Ui.deep = "g" to g.trim()
         }
     }
 
@@ -47,10 +72,13 @@ class MainActivity : ComponentActivity() {
         Game.screenActive = false
         Game.gameTick()
         Game.saveLocal()
+        com.onoseto.chipsnfish.online.Online.stopPolling()
     }
 
     override fun onResume() {
         super.onResume()
         Ui.refreshActive()
+        com.onoseto.chipsnfish.online.KeepAlive.opened(this)
+        if (Game.online()) com.onoseto.chipsnfish.online.Online.startPolling()
     }
 }

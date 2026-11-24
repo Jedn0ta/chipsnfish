@@ -326,7 +326,7 @@ fun TableView() {
         Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(90.dp).zIndex(8f)) { ActBox() }
         if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 96.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
         // advisor
-        if (playing) {
+        if (playing && Game.advisorOn()) {
             Box(
                 Modifier.align(Alignment.BottomStart).padding(2.dp).size(40.dp).zIndex(7f).clip(RoundedCornerShape(10.dp))
                     .background(C.panel.copy(alpha = 0.92f)).border(1.dp, C.line, RoundedCornerShape(10.dp))
@@ -387,6 +387,8 @@ private fun Center(geo: Geo) {
                 }
                 if (Game.gm()) GameResult()
             }
+        } else if (Game.online()) {
+            OnlineLobbyCenter()
         } else {
             val msg = if (st.phase == "ready") {
                 L("Hand #1", "Hand #1", "Hand #1") to L("Hráči sedí, blindy ${Cards.lvlStr(st.level)}. Až budete připraveni, dej START.", "Players are seated, blinds ${Cards.lvlStr(st.level)}. When you're ready, press START.", "Spieler sitzen, Blinds ${Cards.lvlStr(st.level)}. Wenn ihr bereit seid, START drücken.")
@@ -494,7 +496,8 @@ private fun SeatView(
                 Box(Modifier.size((50 * sc).dp)) {
                     if (isTurn) Box(Modifier.fillMaxSize().graphicsLayer(scaleX = 1.18f, scaleY = 1.18f).clip(CircleShape).background(C.gold.copy(alpha = pulse.value * 0.55f)))
                     if (drop) Box(Modifier.fillMaxSize().graphicsLayer(scaleX = 1.2f, scaleY = 1.2f).clip(CircleShape).background(C.gold.copy(alpha = 0.7f)))
-                    Avatar(p, (50 * sc).dp, ring = if (isTurn) C.gold else null, border = (3 * sc).dp, dim = folded)
+                    Avatar(p, (50 * sc).dp, ring = if (isTurn || (k == 0 && g.online())) C.gold else null, border = (3 * sc).dp, dim = folded)
+                    if (g.online() && com.onoseto.chipsnfish.online.Online.players.any { it.uid == s.pid && (!it.on || it.left) }) Box(Modifier.align(Alignment.BottomStart).size((12 * sc).dp).clip(CircleShape).background(C.lose).border(1.5.dp, Color.Black, CircleShape))
                     if (tag != null) {
                         Box(
                             Modifier.align(Alignment.TopEnd).offset((7 * sc).dp, (-5 * sc).dp).clip(RoundedCornerShape(8.dp))
@@ -517,7 +520,7 @@ private fun SeatView(
                     val rv = st.reveal?.get(k)
                     if (g.gm() && rv != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { rv.forEach { CardView(it, (25 * sc).dp) } }
-                    } else if (k > 0 && !s.folded && !s.out) {
+                    } else if (k > 0 && !s.folded && !s.out && g.advisorOn()) {
                         val b = Reads.seatBluff(st, g.P, s)
                         val (_, ci) = Reads.lvl(b.v)
                         Text2("${(b.v * 100).roundToInt()}%", (16 * sc), C.lvl(ci), underline = b.act)
@@ -691,12 +694,13 @@ private fun ActBox() {
             ColBtn(tr("Zpět k přípravě"), BK.DARK) { st.phase = "setup"; g.update() }
             return@Column
         }
+        if (g.online()) { if (OnlineBox()) return@Column }
         if (!g.playing()) { SetupBench(); return@Column }
         val hc: @Composable () -> Unit = { MyCards() }
-        if (g.gm()) {
-            hc()
+        if (g.bot()) {
             val over = st.over
             if (over != null) {
+                hc()
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (over.win) C.win.copy(alpha = 0.2f) else C.panel).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     T(tr(if (over.win) "Vyhrál jsi celou hru!" else "Vypadl jsi"), 13.sp, if (over.win) C.win else C.ink, FontWeight.ExtraBold, align = TextAlign.Center)
                     T(if (over.win) "🏆" else L("${over.place}. místo", "${over.place}th place", "${over.place}. Platz"), 16.sp, C.gold, num = true)
@@ -706,10 +710,14 @@ private fun ActBox() {
                 return@Column
             }
             if (st.done != null) {
+                hc()
                 ColBtn(tr("Další hand") + " ▶", BK.CALL, h = 64.dp) { if (g.gameNext()) Ui.openGameSetup() }
                 return@Column
             }
+        }
+        if (g.gm()) {
             if (st.turn != 0) {
+                hc()
                 TurnWho(st.turn)
                 ColBtn(if (st.curBet > 0) "RAISE" else "BET", BK.RAISE, enabled = false) {}
                 ColBtn(if (st.curBet > st.seats[0].bet) "CALL" else "CHECK", BK.CALL, enabled = false) {}
@@ -743,7 +751,7 @@ private fun ActBox() {
         val (_, mx) = g.minMax(s)
         var ring: Color? = null
         val e = g.eq
-        if (k == 0 && toCall > 0 && e != null && !e.allFolded && !st.hero.contains(null)) {
+        if (k == 0 && g.advisorOn() && toCall > 0 && e != null && !e.allFolded && !st.hero.contains(null)) {
             val need = toCall.toDouble() / (g.potTotal() + toCall)
             ring = if (e.eq >= need) C.win else C.lose
         }
@@ -800,7 +808,7 @@ private fun MyCards() {
         val c = Cards.cat(sc)
         var e = ""
         val eq = g.eq
-        if (eq != null && !folded) e = " · ${((if (eq.allFolded) 1.0 else eq.eq) * 100).roundToInt()} %"
+        if (eq != null && !folded && g.advisorOn()) e = " · ${((if (eq.allFolded) 1.0 else eq.eq) * 100).roundToInt()} %"
         I18n.cat(Cards.CAT[c] + " " + Cards.rl((sc shr 16) and 15)) + e
     } else if (st.hero.any { it != null }) tr("vyber druhou kartu") else tr("vyber své karty")
     Box(Modifier.fillMaxWidth().height(86.dp), contentAlignment = Alignment.TopEnd) {
@@ -947,3 +955,82 @@ private fun RaisePop() {
     }
 }
 
+
+// ---------------- online table ----------------
+
+fun share(ctx: android.content.Context, text: String) {
+    val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text)
+    ctx.startActivity(android.content.Intent.createChooser(i, L("Pozvat přátele", "Invite friends", "Freunde einladen")))
+}
+
+@Composable
+private fun OnlineLobbyCenter() {
+    val O = com.onoseto.chipsnfish.online.Online
+    val code = O.code ?: ""
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (O.name.isNotBlank()) T(O.name, 16.sp, Color.White.copy(alpha = 0.85f), FontWeight.ExtraBold)
+        T(L("KÓD STOLU", "TABLE CODE", "TISCHCODE"), 11.sp, Color.White.copy(alpha = 0.6f), FontWeight.ExtraBold, letter = 2.sp)
+        T(code, 40.sp, C.gold, num = true, letter = 6.sp)
+        T(L("Čekáme na hráče · u stolu ${Game.st.seats.size}", "Waiting for players · ${Game.st.seats.size} at the table", "Warten auf Spieler · ${Game.st.seats.size} am Tisch"), 13.sp, Color.White.copy(alpha = 0.75f), FontWeight.SemiBold)
+        T(L("Pošli přátelům pozvánku tlačítkem vpravo.", "Send your friends an invite with the button on the right.", "Schick deinen Freunden eine Einladung mit dem Knopf rechts."), 12.sp, Color.White.copy(alpha = 0.55f), align = TextAlign.Center)
+        if (!O.connected) T(L("Připojuji…", "Connecting…", "Verbinde…"), 12.sp, C.lose, FontWeight.Bold)
+    }
+}
+
+/** Right column for an online table outside of my own betting turn. Returns true when it drew the column. */
+@Composable
+private fun OnlineBox(): Boolean {
+    val g = Game
+    val st = g.st
+    val O = com.onoseto.chipsnfish.online.Online
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val seated = st.seats.isNotEmpty() && st.seats[0].pid == O.me
+    val leave = {
+        Ui.confirm(L("Opustit stůl?", "Leave the table?", "Tisch verlassen?"),
+            L("Pokud právě hraješ, tvoje karty se zahodí. Ke stolu se můžeš vrátit stejným kódem.", "If you're in a hand, your cards are folded. You can come back with the same code.", "Wenn du in einer Hand bist, wird gefoldet. Mit demselben Code kannst du zurück."),
+            L("Opustit", "Leave", "Verlassen")) { O.leave { Ui.showMenu() } }
+    }
+    if (st.phase == "setup") {
+        ColBtn(L("Pozvat přátele", "Invite friends", "Freunde einladen"), BK.CALL, h = 56.dp) { share(ctx, O.inviteText()) }
+        if (O.isHost) ColBtn(tr("▶ START"), BK.RAISE, h = 64.dp, enabled = st.seats.size >= 2 && !O.busy) { O.start() }
+        else Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(10.dp)).padding(6.dp)) {
+            T(L("Hru spustí zakladatel stolu.", "The host starts the game.", "Der Gastgeber startet das Spiel."), 11.sp, C.muted, align = TextAlign.Center)
+        }
+        ColBtn(L("Opustit stůl", "Leave table", "Tisch verlassen"), BK.DARK, h = 40.dp) { leave() }
+        return true
+    }
+    if (!seated) {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).border(1.dp, C.gold.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp)) {
+            T(L("Přisedneš od další handy.", "You'll be dealt in next hand.", "Du spielst ab der nächsten Hand mit."), 12.sp, C.gold, FontWeight.Bold, align = TextAlign.Center)
+        }
+        ColBtn(L("Pozvat přátele", "Invite friends", "Freunde einladen"), BK.CALL) { share(ctx, O.inviteText()) }
+        ColBtn(L("Opustit stůl", "Leave table", "Tisch verlassen"), BK.DARK, h = 40.dp) { leave() }
+        return true
+    }
+    if (st.over != null) {
+        val w = st.seats.maxByOrNull { it.stack }
+        val wn = w?.let { if (it.pid == O.me) tr("Ty") else g.pl(it).name } ?: ""
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.win.copy(alpha = 0.2f)).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            T("🏆", 20.sp)
+            T(wn, 15.sp, C.gold, num = true, maxLines = 1)
+            T(L("vyhrává hru", "wins the game", "gewinnt das Spiel"), 11.sp, C.ink, FontWeight.Bold)
+        }
+        if (O.isHost) ColBtn(L("Hrát znovu", "Play again", "Nochmal"), BK.CALL) { O.restart() }
+        ColBtn(L("Opustit stůl", "Leave table", "Tisch verlassen"), BK.DARK) { leave() }
+        return true
+    }
+    if (st.done != null) {
+        MyCards()
+        val inHand = !st.seats[0].out && !st.hero.contains(null)
+        if (inHand && !O.didShow()) {
+            ColBtn(L("Ukázat karty", "Show cards", "Karten zeigen"), BK.CALL, h = 46.dp) { O.show() }
+            ColBtn(L("Zahodit", "Muck", "Wegwerfen"), BK.DARK, h = 40.dp) { O.muck() }
+        }
+        if (O.isHost) ColBtn(tr("Další hand") + " ▶", BK.RAISE, h = 52.dp, enabled = !O.busy) { O.next() }
+        else Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).padding(6.dp)) {
+            T(L("Další hand za chvíli…", "Next hand in a moment…", "Nächste Hand gleich…"), 11.sp, C.muted, align = TextAlign.Center)
+        }
+        return true
+    }
+    return false
+}

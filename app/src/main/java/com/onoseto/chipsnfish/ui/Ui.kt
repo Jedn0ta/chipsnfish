@@ -39,6 +39,8 @@ object Ui {
     var bye by mutableStateOf(false)
     var peek by mutableStateOf(false)
     var exitRequest by mutableIntStateOf(0)
+    /** Pending invite from a link: "t" table code or "g" group id. */
+    var deep by mutableStateOf<Pair<String, String>?>(null)
 
     fun open(kind: String, arg: Any? = null, ret: Sheet? = null) { sheet = Sheet(kind, arg, ret); sheetRev++; refreshActive() }
     fun close() { sheet = sheet?.ret; sheetRev++; refreshActive() }
@@ -58,7 +60,7 @@ object Ui {
 
     fun openSettings() {
         val s = Game.st
-        open("settings", SettingsArg(level = s.startLevel, startStack = s.startStack, autoBlinds = s.autoBlinds, dealer = s.dealer))
+        open("settings", SettingsArg(tab = if (Game.gm() && !menu) "game" else "table", level = s.startLevel, startStack = s.startStack, autoBlinds = s.autoBlinds, dealer = s.dealer))
     }
 
     fun openGameSetup() = open("gamesetup", Game.gameCfg.copy())

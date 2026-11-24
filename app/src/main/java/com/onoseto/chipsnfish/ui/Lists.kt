@@ -50,7 +50,8 @@ fun PlayersView() {
     val st = g.st
     val inGame = st.phase != "setup"
     fun seatIdx(id: String) = st.seats.indexOfFirst { it.pid == id }
-    val list = g.P.values.filter { it.id != "hero" && it.stored }.sortedWith { a, b ->
+    val meId = com.onoseto.chipsnfish.online.Online.me
+    val list = g.P.values.filter { it.id != "hero" && it.stored && it.id != meId }.sortedWith { a, b ->
         if (inGame) {
             val ia = seatIdx(a.id); val ib = seatIdx(b.id)
             if ((ia >= 0) != (ib >= 0)) return@sortedWith if (ia >= 0) -1 else 1

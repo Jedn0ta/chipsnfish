@@ -76,7 +76,11 @@ object Game {
     var raiseTo = 0
     var screenActive = true // false when menu / sheet / splash blocks the table (pauses bots)
 
-    fun gm() = mode == "game"
+    /** Game-like table (vs computer or online): real dealt cards, no manual entry. */
+    fun gm() = mode == "game" || mode == "online"
+    fun bot() = mode == "game"
+    fun online() = mode == "online"
+    fun advisorOn() = if (online()) com.onoseto.chipsnfish.online.Online.advisor else true
     fun playing() = st.phase == "play"
 
     // ================= persistence =================
@@ -116,8 +120,10 @@ object Game {
     fun stValid(x: GState?): Boolean = x != null && x.seats.isNotEmpty() && x.seats.drop(1).all { P[it.pid] != null }
 
     fun saveLocal() {
-        setS(if (gm()) "hr6-game" else "hr4-state", json.encodeToString(st))
-        setS("hr-mode", "\"$mode\"")
+        if (!online()) {
+            setS(if (bot()) "hr6-game" else "hr4-state", json.encodeToString(st))
+            setS("hr-mode", "\"$mode\"")
+        }
         setS("hr3-players", json.encodeToString(P.toMap()))
         setS("hr3-hands", json.encodeToString(H.take(400)))
     }
@@ -244,8 +250,8 @@ object Game {
 
     fun startHand() {
         clearHand()
-        if (!gm()) st.seats.forEach { if (it.stack <= 0) it.stack = st.startStack }
-        if (gm() && st.blindHands > 0 && st.handNo > 0 && st.handNo % st.blindHands == 0 && st.level < Cards.LEVELS.size - 1) {
+        if (!bot()) st.seats.forEach { if (it.stack <= 0) it.stack = st.startStack }
+        if (bot() && st.blindHands > 0 && st.handNo > 0 && st.handNo % st.blindHands == 0 && st.level < Cards.LEVELS.size - 1) {
             st.level++
             val l = Cards.lvlStr(st.level)
             scope.launch { delay(300); toast(L("Blindy rostou na $l", "Blinds go up to $l", "Blinds steigen auf $l")) }
@@ -261,7 +267,7 @@ object Game {
             st.curBet = max(st.seats[sb].bet, st.seats[bb].bet)
         }
         st.turn = nextToAct(bb)
-        if (gm()) gameDeal()
+        if (bot()) gameDeal()
     }
 
     fun startStreet() {
@@ -479,7 +485,7 @@ object Game {
     }
 
     fun gameSaved(): GState? {
-        val g = if (gm()) st else loadState("hr6-game")
+        val g = if (bot()) st else loadState("hr6-game")
         return if (stValid(g) && g!!.mode == "game") g else null
     }
 
@@ -627,7 +633,7 @@ object Game {
 
     fun gameTick() {
         gameJob?.cancel(); gameJob = null
-        if (!gm() || !playing() || st.done != null || !screenActive) return
+        if (!bot() || !playing() || st.done != null || !screenActive) return
         val sp = st.speed
         val bd = boardKnown().size
         val fin: () -> Unit = { finishHand() }
@@ -644,14 +650,14 @@ object Game {
 
     fun botMove() {
         val k = st.turn
-        if (!gm() || !playing() || k <= 0 || st.done != null) return
+        if (!bot() || !playing() || k <= 0 || st.done != null) return
         val d = botDecide(k)
         if (d.t == "raise") act(k, "raise", d.to) else act(k, d.t)
         update()
     }
 
     fun dealNext() {
-        if (!gm() || !playing() || st.turn >= 0 || live().size <= 1 || st.done != null) return
+        if (!bot() || !playing() || st.turn >= 0 || live().size <= 1 || st.done != null) return
         val n = boardKnown().size
         if (n >= 5) return
         val c = if (n == 0) 3 else 1
@@ -660,7 +666,7 @@ object Game {
     }
 
     fun finishHand() {
-        if (!gm() || !playing() || st.done != null) return
+        if (!bot() || !playing() || st.done != null) return
         val lv = live()
         val win = IntArray(st.n)
         val sc = LinkedHashMap<Int, Int>()
@@ -730,7 +736,7 @@ object Game {
 
     /** Returns true when the game is over and setup should open instead. */
     fun gameNext(): Boolean {
-        if (!gm()) return false
+        if (!bot()) return false
         if (st.over != null) return true
         st.seats.forEach { if (it.stack <= 0) it.out = true }
         st.dealer = nxt(st.dealer)
@@ -739,6 +745,39 @@ object Game {
         eq = null; raiseOpen = false
         update()
         return false
+    }
+
+    private var preOnlineMode = "coach"
+
+    fun enterOnline() {
+        gameJob?.cancel()
+        if (!online()) { saveLocal(); preOnlineMode = mode }
+        mode = "online"
+        st = freshState().apply { mode = "online"; phase = "setup"; n = 1 }
+        st.seats = mutableListOf(seatObj(com.onoseto.chipsnfish.online.Supa.uid.ifEmpty { "hero" }, 0))
+        if (P[st.seats[0].pid] == null) P[st.seats[0].pid] = P.getValue("hero").copy(id = st.seats[0].pid, stored = false)
+        eq = null; raiseOpen = false; undoStack.clear()
+        bump()
+    }
+
+    fun setOnlineView(v: GState) {
+        if (!online()) return
+        val turnChanged = v.turn != st.turn || v.handNo != st.handNo
+        st = v
+        nextCache = null
+        if (turnChanged && v.turn != 0) raiseOpen = false
+        recalc()
+        bump()
+    }
+
+    fun leaveOnline() {
+        if (!online()) return
+        mode = preOnlineMode.takeIf { it != "online" } ?: "coach"
+        val x = loadState(if (mode == "game") "hr6-game" else "hr4-state")
+        if (stValid(x)) st = x!! else { mode = "coach"; st = freshState(); st.seats = mutableListOf(seatObj("hero", st.startStack)) }
+        if (mode == "coach") syncSeats()
+        eq = null; raiseOpen = false
+        bump()
     }
 
     fun endGameVsComputer() {
@@ -759,6 +798,16 @@ object Game {
             raiseOpen = !raiseOpen
             if (raiseOpen) raiseTo = minMax(s).first
             bump(); return
+        }
+        if (online()) {
+            val s0 = st.seats[0]
+            val tc = max(0, st.curBet - s0.bet)
+            when (type) {
+                "fold" -> com.onoseto.chipsnfish.online.Online.move("fold")
+                "call" -> com.onoseto.chipsnfish.online.Online.move(if (tc >= s0.stack && tc > 0) "allin" else "call")
+                "raise" -> { val (mn, mx) = minMax(s0); val to = raiseTo.coerceIn(mn, mx); com.onoseto.chipsnfish.online.Online.move(if (to >= mx) "allin" else "raise", to) }
+            }
+            raiseOpen = false; bump(); return
         }
         snapshot()
         when (type) {
@@ -782,6 +831,15 @@ object Game {
         val s = st.seats[0]
         val (mn, mx) = minMax(s)
         val tc = max(0, st.curBet - s.bet)
+        if (online()) {
+            val O = com.onoseto.chipsnfish.online.Online
+            when (kind) {
+                "fold" -> O.move(if (tc == 0) "call" else "fold")
+                "check", "call" -> O.move(if (tc >= s.stack && tc > 0) "allin" else "call")
+                else -> { val to = amt.coerceIn(mn, mx); O.move(if (to >= mx) "allin" else "raise", to) }
+            }
+            raiseOpen = false; bump(); return
+        }
         snapshot()
         when (kind) {
             "fold" -> act(0, if (tc == 0) "call" else "fold")
