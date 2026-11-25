@@ -73,6 +73,7 @@ const val DH = 360f
 
 @Composable
 fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
+    watch()
     @Suppress("UNUSED_VARIABLE") val rev = Game.rev
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
         val scale = min(constraints.maxWidth / DW, constraints.maxHeight / DH)
@@ -120,6 +121,7 @@ fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
 
 @Composable
 private fun MainLayout() {
+    watch()
     Column(Modifier.fillMaxSize()) {
         TopBar()
         Box(Modifier.fillMaxWidth().weight(1f)) {
@@ -139,6 +141,7 @@ private val peoplePath by lazy { PathParser().parsePathString("M2.5 20c.8-3.6 3.
 
 @Composable
 fun Icon24(kind: String, col: Color, size: Dp = 20.dp) {
+    watch()
     Canvas(Modifier.size(size)) {
         val s = this.size.minDimension / 24f
         scale(s, s, Offset.Zero) {
@@ -168,6 +171,7 @@ fun Icon24(kind: String, col: Color, size: Dp = 20.dp) {
 
 @Composable
 private fun TopBar() {
+    watch()
     val g = Game
     val st = g.st
     val playing = g.playing()
@@ -232,6 +236,7 @@ private fun TopBar() {
 
 @Composable
 private fun BlindGroup() {
+    watch()
     val g = Game
     val st = g.st
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -282,6 +287,7 @@ private fun BlindGroup() {
 
 @Composable
 private fun MenuScreen(onExit: () -> Unit) {
+    watch()
     val g = Game
     val O = com.onoseto.chipsnfish.online.Online
     val gs = g.gameSaved()
@@ -334,6 +340,7 @@ private fun MenuScreen(onExit: () -> Unit) {
 
 @Composable
 private fun CardsIcon() {
+    watch()
     Box(Modifier.size(34.dp)) {
         CardBack(16.dp, modifier = Modifier.align(Alignment.CenterStart).graphicsLayer(rotationZ = -10f))
         CardView(47, 16.dp, modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(rotationZ = 8f))
@@ -342,6 +349,7 @@ private fun CardsIcon() {
 
 @Composable
 private fun ModeCard(icon: @Composable () -> Unit, title: String, desc: String, sub: String, cur: Boolean, newBtn: Boolean, newLabel: String = tr("+ Nová hra"), onNew: () -> Unit, onClick: () -> Unit) {
+    watch()
     Column(Modifier.width(230.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Column(
             Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1A2832), C.panel)))
@@ -361,6 +369,7 @@ private fun ModeCard(icon: @Composable () -> Unit, title: String, desc: String, 
 
 @Composable
 private fun Splash() {
+    watch()
     var ready by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(1100); ready = true }
     val spin = rememberInfiniteTransition(label = "s").animateFloat(0f, 360f, infiniteRepeatable(tween(6000, easing = LinearEasing)), label = "r")
@@ -383,6 +392,7 @@ private fun Splash() {
 
 @Composable
 private fun TipOverlay() {
+    watch()
     val t = Ui.tip ?: return
     Box(Modifier.fillMaxSize().zIndex(60f).background(Color.Black.copy(alpha = 0.35f)).tap { Ui.tip = null }, contentAlignment = Alignment.Center) {
         Column(
@@ -399,6 +409,7 @@ private fun TipOverlay() {
 
 @Composable
 private fun ToastView() {
+    watch()
     val msg = Game.toastMsg ?: return
     val id = Game.toastId
     var vis by remember(id) { mutableStateOf(true) }

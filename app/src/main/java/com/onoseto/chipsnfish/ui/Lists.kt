@@ -44,6 +44,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun PlayersView() {
+    watch()
     @Suppress("UNUSED_VARIABLE") val rev = Game.rev
     @Suppress("UNUSED_VARIABLE") val r2 = Ui.sheetRev
     val g = Game
@@ -114,6 +115,7 @@ fun PlayersView() {
 
 @Composable
 fun RecordsView() {
+    watch()
     @Suppress("UNUSED_VARIABLE") val rev = Game.rev
     val g = Game
     val h = g.H
@@ -141,6 +143,7 @@ fun RecordsView() {
 
 @Composable
 private fun Stat3(v: String, l: String, col: Color, modifier: Modifier) {
+    watch()
     Column(modifier.clip(RoundedCornerShape(12.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp)) {
         T(v, 28.sp, col, num = true); T(l.uppercase(), 11.sp, C.muted, FontWeight.Bold)
     }
@@ -148,6 +151,7 @@ private fun Stat3(v: String, l: String, col: Color, modifier: Modifier) {
 
 @Composable
 private fun RecCard(r: HandRec) {
+    watch()
     val g = Game
     var open by remember { mutableStateOf(false) }
     val when_ = java.text.SimpleDateFormat("d.M. HH:mm", I18n.locale).format(java.util.Date(r.t))

@@ -206,6 +206,7 @@ private class Drag(val k: Int, val start: Offset) {
 
 @Composable
 fun TableView() {
+    watch()
     @Suppress("UNUSED_VARIABLE") val rev = Game.rev
     val st = Game.st
     val playing = Game.playing()
@@ -345,6 +346,7 @@ private val bulbPath by lazy { androidx.compose.ui.graphics.vector.PathParser().
 
 @Composable
 fun BulbIcon(col: Color, size: Dp) {
+    watch()
     Canvas(Modifier.size(size)) {
         val s = this.size.minDimension / 24f
         scale(s, s, Offset.Zero) {
@@ -357,6 +359,7 @@ fun BulbIcon(col: Color, size: Dp) {
 
 @Composable
 private fun Center(geo: Geo) {
+    watch()
     val st = Game.st
     val cw = geo.cw.dp
     Box(Modifier.offset((geo.cx - 200).dp, (geo.cy - 80).dp).size(400.dp, 160.dp).zIndex(1f), contentAlignment = Alignment.Center) {
@@ -416,6 +419,7 @@ fun openCardSlot(i: Int) {
 
 @Composable
 private fun GameResult() {
+    watch()
     val d = Game.st.done ?: return
     val st = Game.st
     fun nm(k: Int) = if (k == 0) tr("Ty") else Game.pl(st.seats[k]).name
@@ -444,6 +448,7 @@ private fun SeatView(
     k: Int, pt: Offset, geo: Geo, sb: Int, bb: Int, lead: Int, leadCnt: Int, moving: Boolean, drop: Boolean,
     onDragStart: () -> Unit, onDrag: (Offset) -> Unit, onDragEnd: () -> Unit,
 ) {
+    watch()
     val g = Game
     val st = g.st
     val s = st.seats[k]
@@ -557,6 +562,7 @@ private fun SeatView(
 
 @Composable
 private fun Text2(t: String, size: Float, col: Color, underline: Boolean) {
+    watch()
     androidx.compose.material3.Text(
         t, color = col, fontSize = size.sp, fontFamily = F.num, fontWeight = FontWeight.ExtraBold,
         style = TextStyle(textDecoration = if (underline) TextDecoration.Underline else null, shadow = androidx.compose.ui.graphics.Shadow(Color.Black, Offset(0f, 1f), 4f)),
@@ -565,6 +571,7 @@ private fun Text2(t: String, size: Float, col: Color, underline: Boolean) {
 
 @Composable
 fun StackChip(text: String, allin: Boolean, crit: Boolean, size: Dp) {
+    watch()
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = this.size.minDimension / 2
@@ -584,6 +591,7 @@ fun StackChip(text: String, allin: Boolean, crit: Boolean, size: Dp) {
 
 @Composable
 fun Crown(modifier: Modifier) {
+    watch()
     Canvas(modifier) {
         val sx = size.width / 24f; val sy = size.height / 16f
         val p = androidx.compose.ui.graphics.Path().apply {
@@ -598,6 +606,7 @@ fun Crown(modifier: Modifier) {
 
 @Composable
 private fun MoodPop(geo: Geo, w: Float, h: Float) {
+    watch()
     val k = Ui.moodSeat
     val s = Game.st.seats.getOrNull(k) ?: return
     val p = geo.pt(Game.st.pos!![k])
@@ -626,6 +635,7 @@ private fun toggleMood(k: Int, m: String) {
 
 @Composable
 private fun MoodBtn(t: String, on: Boolean, onClick: () -> Unit) {
+    watch()
     Box(
         Modifier.padding(1.dp).size(36.dp).clip(RoundedCornerShape(8.dp)).background(if (on) C.gold.copy(alpha = 0.3f) else C.panel2).tap(onClick),
         contentAlignment = Alignment.Center,
@@ -634,6 +644,7 @@ private fun MoodBtn(t: String, on: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun FishFx(geo: Geo, w: Float, h: Float) {
+    watch()
     // speech bubble
     val txt = Ui.fishText
     if (txt != null) {
@@ -677,6 +688,7 @@ private fun FishFx(geo: Geo, w: Float, h: Float) {
 
 @Composable
 private fun ActBox() {
+    watch()
     val g = Game
     val st = g.st
     @Suppress("UNUSED_VARIABLE") val rev = g.rev
@@ -776,6 +788,7 @@ private fun ActBox() {
 
 @Composable
 private fun ColBtn(text: String, kind: BK, h: Dp = 50.dp, enabled: Boolean = true, onClick: () -> Unit) {
+    watch()
     GBtn(kind, Modifier.fillMaxWidth().height(h), enabled = enabled, onClick = onClick) {
         T(text.uppercase(), if (text.length > 12) 11.sp else 14.sp, btnInk(kind), num = true, align = TextAlign.Center, maxLines = 3, lineHeight = 13.sp)
     }
@@ -783,6 +796,7 @@ private fun ColBtn(text: String, kind: BK, h: Dp = 50.dp, enabled: Boolean = tru
 
 @Composable
 private fun TurnWho(k: Int) {
+    watch()
     val me = k == 0
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (me) C.gold.copy(alpha = 0.08f) else C.panel)
@@ -797,6 +811,7 @@ private fun TurnWho(k: Int) {
 
 @Composable
 private fun MyCards() {
+    watch()
     val g = Game
     val st = g.st
     val cw = 56.dp
@@ -844,6 +859,7 @@ private fun MyCards() {
 
 @Composable
 private fun SetupBench() {
+    watch()
     val g = Game
     val st = g.st
     ColBtn(tr("Nastavení"), BK.DARK, h = 40.dp) { Ui.openSettings() }
@@ -887,6 +903,7 @@ private fun seatFromBench(pid: String) {
 
 @Composable
 private fun BenchItem(p: com.onoseto.chipsnfish.game.Player?, sat: Boolean = false, onClick: () -> Unit) {
+    watch()
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (sat) Color.Transparent else C.panel2).alpha(if (sat) 0.5f else 1f).tap(onClick).padding(3.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -906,6 +923,7 @@ private fun BenchItem(p: com.onoseto.chipsnfish.game.Player?, sat: Boolean = fal
 
 @Composable
 private fun RaisePop() {
+    watch()
     val g = Game
     val st = g.st
     val k = st.turn
@@ -965,6 +983,7 @@ fun share(ctx: android.content.Context, text: String) {
 
 @Composable
 private fun OnlineLobbyCenter() {
+    watch()
     val O = com.onoseto.chipsnfish.online.Online
     val code = O.code ?: ""
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -980,6 +999,7 @@ private fun OnlineLobbyCenter() {
 /** Right column for an online table outside of my own betting turn. Returns true when it drew the column. */
 @Composable
 private fun OnlineBox(): Boolean {
+    watch()
     val g = Game
     val st = g.st
     val O = com.onoseto.chipsnfish.online.Online

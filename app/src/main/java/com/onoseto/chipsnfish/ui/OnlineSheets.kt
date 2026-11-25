@@ -45,6 +45,7 @@ class GroupArg(val id: String)
 
 @Composable
 private fun NotConfigured() {
+    watch()
     BoxPanel {
         T(L("Online server zatím není připojený", "The online server isn't connected yet", "Der Online-Server ist noch nicht verbunden"), 16.sp, C.gold, FontWeight.ExtraBold)
         Note(L("Aplikace ještě nemá adresu serveru Supabase. Jakmile ji doplníme, půjde zakládat stoly a zvát přátele.",
@@ -60,6 +61,7 @@ fun goTable() {
 
 @Composable
 fun ProfileRow() {
+    watch()
     val me = Game.P.getValue("hero")
     var name by remember { mutableStateOf(if (me.name == "Ty") "" else me.name) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -73,6 +75,7 @@ fun ProfileRow() {
 
 @Composable
 fun OnlineSheet(a: OnlineArg) {
+    watch()
     val O = Online
     SheetHead(L("Hrát s přáteli", "Play with friends", "Mit Freunden spielen")) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -147,6 +150,7 @@ fun OnlineSheet(a: OnlineArg) {
 
 @Composable
 private fun TableRow(code: String, name: String, players: Int, status: String, onClick: () -> Unit) {
+    watch()
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel2).tap(onClick).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -160,6 +164,7 @@ private fun TableRow(code: String, name: String, players: Int, status: String, o
 
 @Composable
 fun GroupsSheet() {
+    watch()
     val O = Online
     SheetHead(L("Skupiny", "Groups", "Gruppen"))
     if (!SupaCfg.configured) { NotConfigured(); return }
@@ -195,6 +200,7 @@ fun GroupsSheet() {
 
 @Composable
 fun GroupSheet(a: GroupArg) {
+    watch()
     val O = Online
     val ctx = LocalContext.current
     val g: OGroup? = O.groups?.find { it.id == a.id }
@@ -227,6 +233,7 @@ fun GroupSheet(a: GroupArg) {
 /** Settings → game tab while sitting at an online table. */
 @Composable
 fun OnlineSettingsGame() {
+    watch()
     val O = Online
     val st = Game.st
     val ctx = LocalContext.current

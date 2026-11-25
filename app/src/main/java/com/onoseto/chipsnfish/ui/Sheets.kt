@@ -84,6 +84,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun SheetHost() {
+    watch()
     val sh = Ui.sheet ?: return
     @Suppress("UNUSED_VARIABLE") val r1 = Ui.sheetRev
     @Suppress("UNUSED_VARIABLE") val r2 = Game.rev
@@ -122,6 +123,7 @@ fun SheetHost() {
 
 @Composable
 fun SheetHead(title: String, extra: @Composable () -> Unit = {}) {
+    watch()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         T(title.uppercase(), 24.sp, C.ink, num = true, letter = 0.8.sp, modifier = Modifier.weight(1f, fill = false), maxLines = 1)
         Box(Modifier.weight(1f)) { extra() }
@@ -131,11 +133,13 @@ fun SheetHead(title: String, extra: @Composable () -> Unit = {}) {
 
 @Composable
 fun CloseX() {
+    watch()
     Box(Modifier.size(38.dp).clip(CircleShape).background(C.panel2).tap { Ui.close() }, contentAlignment = Alignment.Center) { T("✕", 16.sp) }
 }
 
 @Composable
 fun Field(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, number: Boolean = false, placeholder: String = "", minH: Dp = 44.dp, single: Boolean = true, big: Boolean = false, readOnly: Boolean = false) {
+    watch()
     Box(modifier.heightIn(min = minH).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 10.dp)) {
         if (value.isEmpty() && placeholder.isNotEmpty()) T(placeholder, 15.sp, C.muted)
         BasicTextField(
@@ -149,6 +153,7 @@ fun Field(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifi
 
 @Composable
 fun Seg(options: List<Pair<String, String>>, cur: String, colorFor: (String) -> Color? = { null }, onPick: (String) -> Unit) {
+    watch()
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, C.line, RoundedCornerShape(10.dp))) {
         options.forEachIndexed { i, (v, l) ->
             val on = v == cur
@@ -163,6 +168,7 @@ fun Seg(options: List<Pair<String, String>>, cur: String, colorFor: (String) -> 
 
 @Composable
 fun Picks(items: List<Pair<String, String>>, cur: String, onPick: (String) -> Unit) {
+    watch()
     FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         items.forEach { (v, l) -> Pill(l, v == cur) { onPick(v) } }
     }
@@ -172,6 +178,7 @@ fun Picks(items: List<Pair<String, String>>, cur: String, onPick: (String) -> Un
 
 @Composable
 private fun CardSheet(a: CardArg) {
+    watch()
     val g = Game
     val cur = a.slot
     val grp = g.slotGroup(cur)
@@ -229,6 +236,7 @@ private fun CardSheet(a: CardArg) {
 
 @Composable
 private fun AnalysisSheet() {
+    watch()
     val g = Game
     val st = g.st
     SheetHead(tr("Rádce"))
@@ -354,6 +362,7 @@ private fun AnalysisSheet() {
 
 @Composable
 private fun Legend(c: Color, t: String) {
+    watch()
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(9.dp).clip(CircleShape).background(c)); Spacer(Modifier.width(5.dp)); T(t, 13.sp)
     }
@@ -361,6 +370,7 @@ private fun Legend(c: Color, t: String) {
 
 @Composable
 private fun CoachBox() {
+    watch()
     val a = Advisor.advise() ?: return
     val col = when (a.tone) { "g" -> C.win; "r" -> C.lose; else -> C.gold }
     BoxPanel(Modifier.border(1.dp, col.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
@@ -381,6 +391,7 @@ private fun CoachBox() {
 
 @Composable
 private fun HeadWho(p: Player, name: String, onName: (String) -> Unit) {
+    watch()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         Avatar(p, 60.dp)
         Column(Modifier.weight(1f)) {
@@ -395,6 +406,7 @@ private fun HeadWho(p: Player, name: String, onName: (String) -> Unit) {
 
 @Composable
 private fun ActionChips(actions: List<com.onoseto.chipsnfish.game.Act>) {
+    watch()
     FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         actions.forEach { a ->
             val ag = Reads.agg(a.a); val fo = a.a == "fold"
@@ -407,6 +419,7 @@ private fun ActionChips(actions: List<com.onoseto.chipsnfish.game.Act>) {
 
 @Composable
 private fun SeatSheet(k: Int) {
+    watch()
     val g = Game
     val st = g.st
     val s = st.seats.getOrNull(k) ?: run { Ui.close(); return }
@@ -494,6 +507,7 @@ private fun savePlayer(p: Player, name: String, notes: String, type: String) {
 
 @Composable
 private fun PlayerSheet(a: PlayerArg) {
+    watch()
     val g = Game
     val p = g.P[a.id] ?: run { Ui.close(); return }
     var name by remember(p.id) { mutableStateOf(p.name) }
@@ -511,6 +525,7 @@ private fun PlayerSheet(a: PlayerArg) {
 
 @Composable
 fun StatCell(p: Player, k: String, modifier: Modifier = Modifier) {
+    watch()
     Column(
         modifier.clip(RoundedCornerShape(10.dp)).background(C.panel2)
             .combinedClickable(remember { MutableInteractionSource() }, null, onLongClick = { Ui.tip = Game.statTip(p, k) }, onClick = { Ui.tip = Game.statTip(p, k) })
@@ -523,6 +538,7 @@ fun StatCell(p: Player, k: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PlayerBlock(p: Player, notes: androidx.compose.runtime.MutableState<String>, type: androidx.compose.runtime.MutableState<String>) {
+    watch()
     val g = Game
     PhotoButtons(p)
     if (p.id != "hero") {
@@ -545,6 +561,7 @@ private fun PlayerBlock(p: Player, notes: androidx.compose.runtime.MutableState<
 
 @Composable
 private fun MoodTable(pid: String) {
+    watch()
     val rows = Game.moodStats(pid)
     if (rows.isEmpty()) return
     Label(tr("Pod vlivem"))
@@ -576,6 +593,7 @@ fun loadImg(ctx: Context, uri: Uri): String? = runCatching {
 
 @Composable
 private fun PhotoButtons(p: Player) {
+    watch()
     val ctx = LocalContext.current
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -596,6 +614,7 @@ private fun PhotoButtons(p: Player) {
 
 @Composable
 private fun EndSheet(e: EndState) {
+    watch()
     val g = Game
     val st = g.st
     val lv = g.liveOpps()
@@ -650,6 +669,7 @@ private fun EndSheet(e: EndState) {
 
 @Composable
 private fun HandsSheet() {
+    watch()
     SheetHead(tr("Výherní kombinace"))
     val hx = listOf(
         Triple("Královská postupka", listOf(48, 44, 40, 36, 32), "A, K, Q, J, 10 ve stejné barvě"),
@@ -677,6 +697,7 @@ private fun HandsSheet() {
 
 @Composable
 private fun BlindsSheet(a: BlindsArg) {
+    watch()
     val g = Game
     val st = g.st
     val cur = st.curLevel
@@ -700,6 +721,7 @@ private fun BlindsSheet(a: BlindsArg) {
 
 @Composable
 private fun LevelGrid(sel: Int, cur: Int = -1, rec: Int = -1, minLevel: Int = 0, count: Int = Cards.LEVELS.size, onPick: (Int) -> Unit) {
+    watch()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         (0 until count).chunked(5).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -728,6 +750,7 @@ private fun LevelGrid(sel: Int, cur: Int = -1, rec: Int = -1, minLevel: Int = 0,
 
 @Composable
 private fun SettingsSheet(d: SettingsArg) {
+    watch()
     val g = Game
     val st = g.st
     val ctx = LocalContext.current
@@ -928,6 +951,7 @@ private fun askRestore(txt: String) {
 
 @Composable
 private fun LookBtn(on: Boolean, label: String, onClick: () -> Unit, preview: @Composable () -> Unit) {
+    watch()
     Column(
         Modifier.clip(RoundedCornerShape(10.dp)).background(C.panel2).border(2.dp, if (on) C.gold else C.line, RoundedCornerShape(10.dp)).tap(onClick).padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -936,6 +960,7 @@ private fun LookBtn(on: Boolean, label: String, onClick: () -> Unit, preview: @C
 
 @Composable
 private fun Summary(items: List<Pair<String, String>>) {
+    watch()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         items.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -953,6 +978,7 @@ private fun Summary(items: List<Pair<String, String>>) {
 
 @Composable
 private fun GameSetupSheet(c: GameCfg) {
+    watch()
     SheetHead(tr("Nová hra · Texas Hold'em"))
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -994,6 +1020,7 @@ private fun GameSetupSheet(c: GameCfg) {
 
 @Composable
 private fun AboutSheet() {
+    watch()
     val g = Game
     SheetHead(tr("O aplikaci"))
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1027,6 +1054,7 @@ private fun AboutSheet() {
 
 @Composable
 private fun ConfirmSheet(a: ConfirmArg) {
+    watch()
     SheetHead(a.title)
     T(a.text, 14.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

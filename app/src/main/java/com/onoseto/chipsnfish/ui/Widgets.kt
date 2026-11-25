@@ -93,6 +93,7 @@ fun T(
     letter: TextUnit = TextUnit.Unspecified,
     lineHeight: TextUnit = TextUnit.Unspecified,
 ) {
+    watch()
     Text(
         text, modifier = modifier, color = color, fontSize = size, fontWeight = if (num) FontWeight.Bold else weight,
         fontFamily = if (num) F.num else F.body, textAlign = align, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
@@ -120,6 +121,7 @@ private fun suitColor(s: Int, face: String): Color = when {
 
 @Composable
 fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = false, modifier: Modifier = Modifier) {
+    watch()
     val r = c shr 2
     val s = c and 3
     val col = suitColor(s, face)
@@ -151,6 +153,7 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
 
 @Composable
 fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifier) {
+    watch()
     val shape = RoundedCornerShape(cw * 0.13f)
     Box(modifier.size(cw, cw * 1.4f).clip(shape).background(Color.White).padding(maxOf(1.dp, cw * 0.045f)).clip(RoundedCornerShape(cw * 0.1f))) {
         if (back == "fish") {
@@ -178,6 +181,7 @@ fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifie
 
 @Composable
 fun CardSlot(cw: Dp, label: String = "+", next: Boolean = false, locked: Boolean = false, modifier: Modifier = Modifier) {
+    watch()
     val shape = RoundedCornerShape(cw * 0.13f)
     val col = if (next) C.gold else Color.White.copy(alpha = if (locked) 0.28f else 0.5f)
     Box(
@@ -200,6 +204,7 @@ fun CardSlot(cw: Dp, label: String = "+", next: Boolean = false, locked: Boolean
 
 @Composable
 fun ChipIcon(c: ChipDef, size: Dp = 22.dp) {
+    watch()
     if (c.k == "bill") {
         Box(Modifier.size(size * 1.5f, size * 0.8f).clip(RoundedCornerShape(3.dp)).background(Brush.verticalGradient(listOf(Color(0xFFEFE4BF), Color(0xFFD3C088)))).border(1.dp, Color(0xFF8F7D45), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
             T(c.v.toString(), (size.value * 0.5f).sp, Color(0xFF3D4A20), num = true)
@@ -209,6 +214,7 @@ fun ChipIcon(c: ChipDef, size: Dp = 22.dp) {
 
 @Composable
 fun ChipDisc(col: Color, size: Dp) {
+    watch()
     Canvas(Modifier.size(size)) {
         val r = this.size.minDimension / 2
         drawCircle(Color.Black.copy(alpha = 0.55f), r, center.copy(y = center.y + 1.5f))
@@ -222,6 +228,7 @@ fun ChipDisc(col: Color, size: Dp) {
 /** Stacked chip piles like the original chipPile(). */
 @Composable
 fun ChipPile(amt: Int, maxTypes: Int = 3, chip: Dp = 16.dp) {
+    watch()
     if (amt <= 0) return
     val parts = Game.chipBreak(amt).take(maxTypes)
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -268,6 +275,7 @@ fun initials(n: String): String {
 
 @Composable
 fun Avatar(p: Player, size: Dp, ring: Color? = null, shape: Shape = CircleShape, border: Dp = 3.dp, dim: Boolean = false, overlay: @Composable BoxScope.() -> Unit = {}) {
+    watch()
     val rc = ring ?: if (p.id == "hero") C.gold else C.type(Reads.effType(p))
     val img = decodeImg(p.img)
     Box(Modifier.size(size)) {
@@ -291,6 +299,7 @@ private val fishPath by lazy { PathParser().parsePathString("M10.5 20c2.6-4.2 6.
 
 @Composable
 fun FishLogo(modifier: Modifier = Modifier) {
+    watch()
     Canvas(modifier) {
         val s = size.minDimension / 40f
         translate((size.width - 40 * s) / 2, (size.height - 40 * s) / 2) {
@@ -320,6 +329,7 @@ fun GBtn(
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    watch()
     val shape = RoundedCornerShape(11.dp)
     val bg: Brush = when (kind) {
         BK.FOLD -> Brush.verticalGradient(listOf(Color(0xFFD9483A), C.fold))
@@ -353,6 +363,7 @@ fun btnInk(kind: BK): Color = when (kind) {
 
 @Composable
 fun Btn(text: String, kind: BK = BK.GOLD, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 44.dp, onClick: () -> Unit) {
+    watch()
     GBtn(kind, modifier.heightIn(min = height), enabled, onClick = onClick) {
         T(text, 14.5.sp, btnInk(kind), FontWeight.ExtraBold, align = TextAlign.Center, maxLines = 2)
     }
@@ -360,6 +371,7 @@ fun Btn(text: String, kind: BK = BK.GOLD, modifier: Modifier = Modifier, enabled
 
 @Composable
 fun Pill(text: String, on: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    watch()
     val shape = RoundedCornerShape(99.dp)
     Box(
         Modifier.alpha(if (enabled) 1f else 0.5f).clip(shape)
@@ -372,7 +384,18 @@ fun Pill(text: String, on: Boolean, enabled: Boolean = true, onClick: () -> Unit
 
 @Composable
 fun BoxPanel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    watch()
     Column(modifier.clip(RoundedCornerShape(12.dp)).background(C.panel2).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
 }
 
 val numStyle = TextStyle(fontFamily = F.num, fontWeight = FontWeight.ExtraBold)
+
+/**
+ * Subscribes the calling composable to every app-level change counter. The game data itself is plain
+ * (not snapshot state), so each screen part reads these counters to redraw when anything changes.
+ */
+fun watch() {
+    Game.rev
+    Ui.sheetRev
+    com.onoseto.chipsnfish.online.Online.rev
+}
