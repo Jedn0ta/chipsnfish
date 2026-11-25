@@ -57,6 +57,13 @@ rpc "$B" cf_group_join "{\"p_gid\":\"$G\"}" >/dev/null
 [ "$(rpc "$B" cf_groups '{}' | jq '.[0].members | length')" = 2 ] || { echo "groups failed"; exit 1; }
 rpc "$A" cf_group_leave "{\"p_gid\":\"$G\"}" >/dev/null; rpc "$B" cf_group_leave "{\"p_gid\":\"$G\"}" >/dev/null
 echo "✓ groups"
+UB=$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}" | jq -r .me)
+[ "$(rpc "$A" cf_friend_add "{\"p_uid\":\"$UB\"}")" = "true" ] || { echo "friend add failed"; exit 1; }
+[ "$(rpc "$A" cf_friends '{}' | jq -r '.[0].table')" = "$CODE" ] || { echo "friend status failed"; exit 1; }
+rpc "$A" cf_invite "{\"p_uid\":\"$UB\",\"p_code\":\"$CODE\"}" >/dev/null
+[ "$(rpc "$B" cf_inbox '{}' | jq -r '.[0].from')" = "Test A" ] || { echo "invite failed"; exit 1; }
+rpc "$A" cf_friend_remove "{\"p_uid\":\"$UB\"}" >/dev/null
+echo "✓ friends and invites"
 rpc "$A" cf_ping '{}' >/dev/null; echo "✓ keep-alive ping"
 rpc "$B" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null; rpc "$A" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null
 echo "ALL SERVER TESTS PASSED"

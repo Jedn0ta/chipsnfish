@@ -36,6 +36,8 @@ import kotlin.math.max
 
 class OPlayer(val uid: String, val name: String, val img: String?, val on: Boolean, val pending: Boolean, val left: Boolean)
 class OTable(val code: String, val name: String, val status: String, val players: Int, val host: Boolean = false)
+class OFriend(val uid: String, val name: String, val img: String, val online: Boolean, val table: String?)
+class OInvite(val id: Long, val code: String, val from: String, val name: String)
 class OGroup(val id: String, val name: String, val owner: String, val members: List<OPlayer>, val tables: List<OTable>)
 
 /** The online table session: polls the server about once a second and turns its state into the local view. */
@@ -379,6 +381,75 @@ object Online {
     }
 
     fun leaveGroup(id: String) = Game.scope.launch { runCatching { Supa.rpc("cf_group_leave", args("p_gid" to id)) }; loadLists() }
+
+    // ---------------- friends & invites ----------------
+
+    var friends by mutableStateOf<List<OFriend>?>(null)
+    var inbox by mutableStateOf<List<OInvite>>(emptyList())
+    private var inboxJob: Job? = null
+    private val dismissed = HashSet<Long>()
+
+    fun isFriend(uid: String) = friends?.any { it.uid == uid } == true
+
+    fun loadFriends() {
+        if (!SupaCfg.configured) return
+        Game.scope.launch {
+            try {
+                friends = (Supa.rpc("cf_friends") as JsonArray).map { e ->
+                    val o = e.jsonObject
+                    OFriend(o["uid"]!!.jsonPrimitive.content, o["name"]?.jsonPrimitive?.contentOrNull ?: "?", o["img"]?.jsonPrimitive?.contentOrNull ?: "",
+                        o["online"]?.jsonPrimitive?.booleanOrNull ?: false, o["table"]?.jsonPrimitive?.contentOrNull)
+                }
+            } catch (e: Exception) { if (friends == null) friends = emptyList() }
+        }
+    }
+
+    fun addFriend(uid: String, name: String) {
+        Game.scope.launch {
+            try {
+                syncProfile()
+                Supa.rpc("cf_friend_add", args("p_uid" to uid))
+                Game.toast(L("$name je v přátelích", "$name added to friends", "$name ist jetzt dein Freund"))
+                loadFriends()
+            } catch (e: Exception) { Game.toast(err(e)) }
+        }
+    }
+
+    fun removeFriend(uid: String) = Game.scope.launch { runCatching { Supa.rpc("cf_friend_remove", args("p_uid" to uid)) }; loadFriends() }
+
+    fun inviteFriend(f: OFriend) {
+        val c = code ?: run { Game.toast(L("Nejdřív si sedni ke stolu.", "Sit at a table first.", "Setz dich zuerst an einen Tisch.")); return }
+        Game.scope.launch {
+            try {
+                Supa.rpc("cf_invite", args("p_uid" to f.uid, "p_code" to c))
+                Game.toast(L("Pozvánka pro ${f.name} odeslána", "Invite sent to ${f.name}", "Einladung an ${f.name} gesendet"))
+            } catch (e: Exception) { Game.toast(err(e)) }
+        }
+    }
+
+    fun dismissInvite(i: OInvite) {
+        dismissed.add(i.id)
+        inbox = inbox.filter { it.id != i.id }
+        Game.scope.launch { runCatching { Supa.rpc("cf_inbox_dismiss", buildJsonObject { put("p_id", i.id) }) } }
+    }
+
+    /** Checks for table invites from friends every 15 s while the app is open. */
+    fun startInbox() {
+        if (!SupaCfg.configured || inboxJob?.isActive == true) return
+        inboxJob = Game.scope.launch {
+            while (isActive) {
+                try {
+                    inbox = (Supa.rpc("cf_inbox") as JsonArray).map { e ->
+                        val o = e.jsonObject
+                        OInvite(o["id"]!!.jsonPrimitive.long, o["code"]!!.jsonPrimitive.content, o["from"]?.jsonPrimitive?.contentOrNull ?: "?", o["name"]?.jsonPrimitive?.contentOrNull ?: "")
+                    }.filter { it.id !in dismissed && it.code != code }
+                } catch (_: Exception) { }
+                delay(15000)
+            }
+        }
+    }
+
+    fun stopInbox() { inboxJob?.cancel(); inboxJob = null }
 
     // ---------------- invites ----------------
 

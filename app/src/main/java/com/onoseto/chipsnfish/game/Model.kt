@@ -143,6 +143,7 @@ data class GameCfg(
     var every: Int = 10,
     var style: String = "mix",
     var speed: Double = 1.0,
+    var coach: Boolean = false,
 )
 
 /** End-of-hand dialog state for the live advisor mode. */

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -187,9 +188,20 @@ private fun TableRow(code: String, name: String, players: Int, status: String, o
 fun GroupsSheet() {
     watch()
     val O = Online
-    SheetHead(L("Skupiny", "Groups", "Gruppen"))
+    var tab by remember { mutableStateOf("friends") }
+    SheetHead(L("Přátelé a skupiny", "Friends & groups", "Freunde & Gruppen")) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("friends" to L("Přátelé", "Friends", "Freunde"), "groups" to L("Skupiny", "Groups", "Gruppen")).forEach { (k, l) ->
+                val on = tab == k
+                Box(Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) C.ink else Color.Transparent).border(1.dp, if (on) C.ink else C.line, RoundedCornerShape(99.dp)).tap { tab = k }.padding(horizontal = 12.dp, vertical = 5.dp)) {
+                    T(l, 13.sp, if (on) C.room else C.muted, FontWeight.Bold)
+                }
+            }
+        }
+    }
     if (!SupaCfg.configured) { NotConfigured(); return }
-    LaunchedEffect(Unit) { O.loadLists() }
+    LaunchedEffect(Unit) { O.loadLists(); O.loadFriends() }
+    if (tab == "friends") { FriendsTab(); return }
     Note(L("Skupina je parta, se kterou hraješ pravidelně. Pošli členům pozvánku a pak ve skupině uvidí každý rozehraný stůl.",
         "A group is the crew you play with regularly. Send members an invite, then everyone sees the running tables in the group.",
         "Eine Gruppe ist die Runde, mit der du regelmäßig spielst. Schick eine Einladung, dann sehen alle die laufenden Tische der Gruppe."))
@@ -288,5 +300,67 @@ fun OnlineSettingsGame() {
                 O.leave { Ui.showMenu() }
             }
         }
+    }
+}
+
+
+@Composable
+private fun FriendsTab() {
+    watch()
+    val O = Online
+    val fs = O.friends
+    if (O.code != null) Note(L("Sedíš u stolu <b>${O.code}</b>. Klepni u přítele na <b>Pozvat</b> a jemu se v aplikaci ukáže pozvánka.",
+        "You're at table <b>${O.code}</b>. Tap <b>Invite</b> next to a friend and they'll see the invite in the app.",
+        "Du sitzt an Tisch <b>${O.code}</b>. Tippe bei einem Freund auf <b>Einladen</b>, er sieht die Einladung in der App."))
+    if (fs == null) { Note(L("Načítám…", "Loading…", "Lade…")); return }
+    if (fs.isEmpty()) {
+        BoxPanel {
+            T(L("Zatím nemáš žádné přátele", "No friends yet", "Noch keine Freunde"), 15.sp, weight = FontWeight.ExtraBold)
+            Note(L("Přátele přidáš u stolu: klepni na hráče a dej <b>Přidat do přátel</b>. Pak tu uvidíš, kdo je zrovna v aplikaci a u kterého stolu sedí.",
+                "Add friends at the table: tap a player and choose <b>Add to friends</b>. Then you'll see who's online and where they're playing.",
+                "Freunde fügst du am Tisch hinzu: Spieler antippen und <b>Zu Freunden</b> wählen. Dann siehst du, wer online ist und wo er spielt."))
+        }
+        return
+    }
+    fs.forEach { f ->
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Avatar(Player(f.uid, f.name, img = f.img), 40.dp, ring = if (f.online) C.win else C.line) {
+                Box(Modifier.align(Alignment.BottomEnd).size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (f.online) C.win else Color(0xFF55646E)).border(2.dp, C.panel2, androidx.compose.foundation.shape.CircleShape))
+            }
+            Column(Modifier.weight(1f)) {
+                T(f.name, 15.sp, weight = FontWeight.Bold, maxLines = 1)
+                T(when {
+                    f.table != null -> L("hraje u stolu ${f.table}", "playing at table ${f.table}", "spielt an Tisch ${f.table}")
+                    f.online -> L("je v aplikaci", "in the app", "in der App")
+                    else -> L("není připojený", "offline", "offline")
+                }, 12.sp, if (f.table != null || f.online) C.win else C.muted)
+            }
+            if (f.table != null && f.table != O.code) Btn(L("Přisednout", "Join", "Beitreten"), BK.CALL, height = 36.dp) { O.join(f.table) { goTable() } }
+            if (O.code != null && f.table != O.code) Btn(L("Pozvat", "Invite", "Einladen"), BK.GOLD, height = 36.dp) { O.inviteFriend(f) }
+            T("✕", 14.sp, C.muted, modifier = Modifier.tap {
+                Ui.confirm(L("Odebrat z přátel?", "Remove friend?", "Freund entfernen?"), f.name, L("Odebrat", "Remove", "Entfernen")) { O.removeFriend(f.uid); Ui.open("groups") }
+            }.padding(6.dp))
+        }
+    }
+}
+
+/** Invites from friends, shown on top of the menu and the table. */
+@Composable
+fun InboxBanner(modifier: Modifier = Modifier) {
+    watch()
+    val inv = Online.inbox.firstOrNull { it.code != Online.code } ?: return
+    Row(
+        modifier.widthIn(max = 520.dp).clip(RoundedCornerShape(14.dp))
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF223B2C), Color(0xFF15281D))))
+            .border(1.dp, C.win.copy(alpha = 0.7f), RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        T("✉", 18.sp, C.win)
+        T(L("${inv.from} tě zve ke stolu ${inv.code}", "${inv.from} invites you to table ${inv.code}", "${inv.from} lädt dich an Tisch ${inv.code} ein") + if (inv.name.isNotBlank()) " · ${inv.name}" else "", 14.sp, C.ink, FontWeight.Bold, modifier = Modifier.weight(1f, fill = false), maxLines = 1)
+        Btn(L("Přisednout", "Join", "Beitreten"), BK.CALL, height = 34.dp) { Online.dismissInvite(inv); Online.join(inv.code) { goTable() } }
+        T("✕", 14.sp, C.muted, modifier = Modifier.tap { Online.dismissInvite(inv) }.padding(4.dp))
     }
 }

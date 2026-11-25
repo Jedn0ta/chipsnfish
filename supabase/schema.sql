@@ -657,6 +657,7 @@ begin
   select * into t from cf_tables where code = upper(p_code);
   if not found then return jsonb_build_object('ok', false, 'err', 'notfound'); end if;
   update cf_players set seen = now() where code = t.code and uid = u;
+  update cf_profiles set seen = now() where uid = u;
   v_hand := cf_gi(t.state, 'handNo');
   i := cf_seat_of(t.state, u);
   if i >= 0 then
@@ -741,6 +742,80 @@ begin
     where t.status <> 'over' and t.updated > now() - interval '24 hours');
 end $$;
 
+
+-- ---------------------------------------------------------------------
+-- friends and table invites
+-- ---------------------------------------------------------------------
+alter table cf_profiles add column if not exists seen timestamptz not null default now();
+create table if not exists cf_friends (uid uuid not null, fid uuid not null, t timestamptz not null default now(), primary key (uid, fid));
+create table if not exists cf_invites (id bigserial primary key, to_uid uuid not null, from_uid uuid not null, code text not null, t timestamptz not null default now());
+create index if not exists cf_invites_to on cf_invites(to_uid);
+alter table cf_friends enable row level security;
+alter table cf_invites enable row level security;
+revoke all on cf_friends, cf_invites from anon, authenticated;
+
+create or replace function cf_touch() returns void language sql security definer set search_path = public as $$
+  update cf_profiles set seen = now() where uid = auth.uid()
+$$;
+
+create or replace function cf_friend_add(p_uid uuid) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  if p_uid = u or not exists (select 1 from cf_profiles where uid = p_uid) then return false; end if;
+  insert into cf_friends(uid, fid) values (u, p_uid) on conflict do nothing;
+  return true;
+end $$;
+
+create or replace function cf_friend_remove(p_uid uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from cf_friends where uid = cf_me() and fid = p_uid;
+end $$;
+
+-- my friends: online status and the table they sit at right now
+create or replace function cf_friends() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  perform cf_touch();
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'uid', p.uid, 'name', p.name, 'img', p.img, 'online', p.seen > now() - interval '3 minutes',
+      'table', (select t.code from cf_tables t join cf_players q on q.code = t.code
+                where q.uid = p.uid and q.left_at is null and q.seen > now() - interval '2 minutes' and t.status <> 'over'
+                order by q.seen desc limit 1)
+    ) order by (p.seen > now() - interval '3 minutes') desc, p.name), '[]')
+    from cf_friends f join cf_profiles p on p.uid = f.fid where f.uid = u);
+end $$;
+
+create or replace function cf_invite(p_uid uuid, p_code text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  if not exists (select 1 from cf_tables where code = p_code) then raise exception 'table not found'; end if;
+  delete from cf_invites where to_uid = p_uid and from_uid = u;
+  insert into cf_invites(to_uid, from_uid, code) values (p_uid, u, p_code);
+end $$;
+
+-- invites for me from the last 30 minutes
+create or replace function cf_inbox() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  perform cf_touch();
+  delete from cf_invites where t < now() - interval '30 minutes';
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', i.id, 'code', i.code, 'from', coalesce(p.name, '?'), 'name', coalesce(t.name, ''))
+      order by i.t desc), '[]')
+    from cf_invites i left join cf_profiles p on p.uid = i.from_uid left join cf_tables t on t.code = i.code
+    where i.to_uid = u and coalesce(t.status, 'over') <> 'over');
+end $$;
+
+create or replace function cf_inbox_dismiss(p_id bigint) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from cf_invites where id = p_id and to_uid = cf_me();
+end $$;
+
 -- keep-alive: the app calls this every couple of days so the free project never pauses
 create table if not exists cf_ping_log (id int primary key, t timestamptz not null default now(), n bigint not null default 0);
 alter table cf_ping_log enable row level security;
@@ -770,7 +845,8 @@ begin
     execute format('revoke all on function %s from public, anon', f.sig);
     if f.proname in ('cf_profile','cf_create','cf_join','cf_start','cf_move','cf_timeout','cf_next','cf_show','cf_leave',
                      'cf_set_advisor','cf_restart','cf_view','cf_group_create','cf_group_join','cf_group_leave',
-                     'cf_group_rename','cf_groups','cf_my_tables','cf_ping') then
+                     'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
+                     'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

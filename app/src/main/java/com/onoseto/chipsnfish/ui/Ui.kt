@@ -39,6 +39,7 @@ object Ui {
     var bye by mutableStateOf(false)
     var peek by mutableStateOf(false)
     var exitRequest by mutableIntStateOf(0)
+    var coachMin by mutableStateOf(false)
     /** Pending invite from a link: "t" table code or "g" group id. */
     var deep by mutableStateOf<Pair<String, String>?>(null)
 

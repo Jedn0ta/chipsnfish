@@ -89,19 +89,24 @@ fun SheetHost() {
     val sh = Ui.sheet ?: return
     @Suppress("UNUSED_VARIABLE") val r1 = Ui.sheetRev
     @Suppress("UNUSED_VARIABLE") val r2 = Game.rev
-    val wide = sh.kind == "card" || sh.kind == "settings" || sh.kind == "gamesetup" || sh.kind == "online"
+    val wide = sh.kind == "card" || sh.kind == "settings" || sh.kind == "gamesetup" || sh.kind == "online" || sh.kind == "groups"
+    val compact = sh.kind == "confirm"
     Box(
         Modifier.fillMaxSize().zIndex(40f).background(Color.Black.copy(alpha = 0.65f)).tap { Ui.close() }.padding(8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            Modifier.widthIn(max = if (wide) 780.dp else 600.dp).fillMaxWidth().heightIn(max = 344.dp)
+        Box(
+            Modifier.widthIn(max = if (wide) 780.dp else if (compact) 480.dp else 620.dp).fillMaxWidth()
+                .then(if (compact) Modifier.heightIn(max = 344.dp) else Modifier.height(344.dp))
                 .shadow(20.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF17242D), C.panel, Color(0xFF0F181E))))
                 .border(1.dp, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(C.gold.copy(alpha = 0.45f), C.line, C.line)), RoundedCornerShape(18.dp))
-                .tap { }
+                .tap { },
+        ) {
+        Column(
+            Modifier.fillMaxWidth()
                 .then(if (sh.kind == "card") Modifier else Modifier.verticalScroll(rememberScrollState()))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             when (sh.kind) {
@@ -121,6 +126,8 @@ fun SheetHost() {
                 "group" -> GroupSheet(sh.arg as GroupArg)
             }
         }
+        Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) { CloseX() }
+        }
     }
 }
 
@@ -130,7 +137,7 @@ fun SheetHead(title: String, extra: @Composable () -> Unit = {}) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         T(title.uppercase(), 24.sp, C.ink, num = true, letter = 0.8.sp, modifier = Modifier.weight(1f, fill = false), maxLines = 1)
         Box(Modifier.weight(1f)) { extra() }
-        CloseX()
+        Spacer(Modifier.width(36.dp))
     }
 }
 
@@ -204,6 +211,7 @@ private fun CardSheet(a: CardArg) {
         Spacer(Modifier.weight(1f))
         if (curV != null) Btn(tr("Odebrat"), BK.GHOST, height = 40.dp) { g.setSlot(cur, null); g.update(); Ui.redraw() }
         Btn(tr("Hotovo"), height = 40.dp) { Ui.close() }
+        Spacer(Modifier.width(36.dp))
     }
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         for (su in 0..3) {
@@ -403,7 +411,7 @@ private fun HeadWho(p: Player, name: String, onName: (String) -> Unit) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(C.line))
             T(if (p.id == "hero") tr("To jsi ty") else Reads.typeLine(p), 12.5.sp, C.muted)
         }
-        CloseX()
+        Spacer(Modifier.width(36.dp))
     }
 }
 
@@ -472,6 +480,11 @@ private fun SeatSheet(k: Int) {
             }
             T(L("Podle preflopu hraje zhruba top ${(m.w * 100).roundToInt()} % startovních rukou.", "Based on preflop he plays roughly the top ${(m.w * 100).roundToInt()} % of starting hands.", "Laut Preflop spielt er etwa die Top ${(m.w * 100).roundToInt()} % der Starthände."), 12.5.sp, C.muted)
         }
+    }
+    if (g.online() && k != 0 && com.onoseto.chipsnfish.online.SupaCfg.configured) {
+        val O = com.onoseto.chipsnfish.online.Online
+        if (O.isFriend(p.id)) Note("<b>★ " + L("V přátelích", "In your friends", "In deinen Freunden") + "</b>")
+        else Btn(L("★ Přidat do přátel", "★ Add to friends", "★ Zu Freunden"), BK.GOLD, Modifier.fillMaxWidth()) { O.addFriend(p.id, p.name) }
     }
     val notes = remember(p.id) { mutableStateOf(p.notes) }
     val type = remember(p.id) { mutableStateOf(p.override) }
@@ -767,7 +780,7 @@ private fun SettingsSheet(d: SettingsArg) {
                 }
             }
         }
-        CloseX()
+        Spacer(Modifier.width(36.dp))
     }
     when (d.tab) {
         "game" -> {
@@ -785,6 +798,7 @@ private fun SettingsSheet(d: SettingsArg) {
                         Ui.confirm(tr("Ukončit hru?"), tr("Hra proti počítači skončí a aplikace se zavře."), tr("Ukončit hru")) { g.endGameVsComputer(); Ui.exitRequest++ }
                     }
                 }
+                CoachSwitch(g.gameCfg.coach) { g.gameCfg.coach = it; g.saveCfg(); Ui.coachMin = false; g.bump() }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Btn(tr("Nová hra proti počítači"), BK.GHOST, Modifier.weight(1f)) { Ui.openGameSetup() }
                     Btn(tr("♠ Výherní kombinace"), BK.GHOST, Modifier.weight(1f)) { Ui.open("hands", null, Ui.sheet) }
@@ -972,6 +986,18 @@ private fun UpdateTab() {
         "Beim ersten Update fragt Android nach der Erlaubnis, Apps aus Chips&Fish zu installieren. Erlauben und erneut Installieren tippen."))
 }
 
+@Composable
+fun CoachSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
+    watch()
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        androidx.compose.material3.Switch(on, onChange, colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = C.goldInk, checkedTrackColor = C.gold))
+        Column {
+            T("🎓 " + L("Rádce pro začátečníky", "Beginner coach", "Anfänger-Berater"), 14.sp, weight = FontWeight.Bold)
+            T(L("Vysvětluje průběh hry, pojmy (s výslovností), co máš v ruce a co hrát.", "Explains the flow of the game, terms, your hand and what to play.", "Erklärt Spielablauf, Begriffe, deine Hand und was zu spielen ist."), 11.5.sp, C.muted)
+        }
+    }
+}
+
 private fun askRestore(txt: String) {
     val b = Game.parseBackup(txt)
     if (b == null) { Game.toast(tr("Tohle není platná záloha")); return }
@@ -1039,6 +1065,7 @@ private fun GameSetupSheet(c: GameCfg) {
             Picks(listOf("0" to tr("Nikdy"), "5" to "5 hand", "10" to "10 hand", "15" to "15 hand", "20" to "20 hand").map { it.first to if (it.first == "0") it.second else L(it.second, it.first + " hands", it.first + " Hände") }, c.every.toString()) { c.every = it.toInt(); Ui.redraw() }
         }
     }
+    CoachSwitch(c.coach) { c.coach = it; Ui.redraw() }
     val saved = Game.gameSaved()
     if (saved != null && saved.over == null) Note(tr("Rozehraná hra proti počítači skončí."))
     Btn(tr("▶ Rozdat karty"), modifier = Modifier.fillMaxWidth()) {

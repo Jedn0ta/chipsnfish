@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.verticalScroll
 import com.onoseto.chipsnfish.L
 import com.onoseto.chipsnfish.game.Cards
 import com.onoseto.chipsnfish.game.Game
@@ -83,6 +84,7 @@ fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
             ) {
                 if (!Ui.splash) MainLayout()
                 if (Ui.menu && !Ui.splash) MenuScreen(onExit)
+                if (!Ui.splash) Box(Modifier.fillMaxWidth().padding(top = 40.dp).zIndex(35f), contentAlignment = Alignment.TopCenter) { InboxBanner() }
                 SheetHost()
                 TipOverlay()
                 ToastView()
@@ -299,14 +301,18 @@ private fun MenuScreen(onExit: () -> Unit) {
     val gs = g.gameSaved()
     val gOn = gs != null && gs.over == null
     Box(Modifier.fillMaxSize().zIndex(30f).background(Brush.radialGradient(listOf(C.room2, C.room))).tap { }, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FishLogo(Modifier.size(50.dp))
+        Column(
+            Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FishLogo(Modifier.size(40.dp))
                 Row {
-                    T("HOLD'EM ", 32.sp, C.ink, num = true, letter = 1.sp)
-                    GoldTitle("CHIPS&FISH", 32f)
+                    T("HOLD'EM ", 28.sp, C.ink, num = true, letter = 1.sp)
+                    GoldTitle("CHIPS&FISH", 28f)
                 }
             }
+            NameBar()
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ModeCard(
                     icon = { CardsIcon() }, title = L("Hrát s přáteli", "Play with friends", "Mit Freunden"),
@@ -315,9 +321,9 @@ private fun MenuScreen(onExit: () -> Unit) {
                     cur = O.code != null, newBtn = O.code != null, newLabel = L("+ Jiný stůl", "+ Other table", "+ Anderer Tisch"), onNew = { Ui.open("online", OnlineArg()) },
                 ) { if (O.code != null) goTable() else Ui.open("online", OnlineArg()) }
                 ModeCard(
-                    icon = { Icon24("players", C.gold, 30.dp) }, title = L("Skupiny", "Groups", "Gruppen"),
-                    desc = L("Parta, se kterou hraješ pravidelně. Pozvánku do skupiny pošleš odkazem.", "The crew you play with regularly. Send a group invite as a link.", "Deine feste Runde. Die Gruppeneinladung verschickst du als Link."),
-                    sub = L("Otevřít", "Open", "Öffnen"), cur = false, newBtn = false, onNew = {},
+                    icon = { Icon24("players", C.gold, 30.dp) }, title = L("Přátelé", "Friends", "Freunde"),
+                    desc = L("Kdo z přátel je v aplikaci a kde hraje. Pozvánky ke stolu a do skupin.", "Which friends are online and where they play. Table and group invites.", "Welche Freunde online sind und wo sie spielen. Tisch- und Gruppeneinladungen."),
+                    sub = O.friends?.count { it.online }?.takeIf { it > 0 }?.let { L("$it online", "$it online", "$it online") } ?: L("Otevřít", "Open", "Öffnen"), cur = false, newBtn = false, onNew = {},
                 ) { Ui.open("groups") }
                 ModeCard(
                     icon = { Icon24("records", C.gold, 30.dp) }, title = tr("Hráči"),
@@ -382,7 +388,7 @@ private fun ModeCard(icon: @Composable () -> Unit, title: String, desc: String, 
     watch()
     Column(Modifier.width(230.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Column(
-            Modifier.fillMaxWidth().height(170.dp).shadow(if (cur) 14.dp else 8.dp, RoundedCornerShape(16.dp), spotColor = if (cur) C.gold else Color.Black)
+            Modifier.fillMaxWidth().height(150.dp).shadow(if (cur) 14.dp else 8.dp, RoundedCornerShape(16.dp), spotColor = if (cur) C.gold else Color.Black)
                 .clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFF223442), Color(0xFF16222B), C.panel)))
                 .border(if (cur) 2.dp else 1.dp, if (cur) Brush.linearGradient(listOf(Color(0xFFFFE9A8), C.gold2)) else Brush.verticalGradient(listOf(Color(0xFF3A4F5C), C.line)), RoundedCornerShape(16.dp)).tap(onClick).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -467,4 +473,36 @@ fun GoldTitle(t: String, size: Float) {
             shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 3f), 8f),
         ),
     )
+}
+
+
+/** "You play as: [name]" right on the start screen. */
+@Composable
+private fun NameBar() {
+    watch()
+    val me = Game.P.getValue("hero")
+    var name by remember { mutableStateOf(if (me.name == "Ty") "" else me.name) }
+    LaunchedEffect(name) {
+        delay(900)
+        if (com.onoseto.chipsnfish.online.SupaCfg.configured && name.isNotBlank()) runCatching { com.onoseto.chipsnfish.online.Online.syncProfile() }
+    }
+    val empty = name.isBlank()
+    Row(
+        Modifier.clip(RoundedCornerShape(99.dp)).background(C.panel2.copy(alpha = 0.85f))
+            .border(1.dp, if (empty) C.gold else C.line, RoundedCornerShape(99.dp)).padding(start = 4.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Avatar(me, 30.dp, border = 2.dp)
+        T(if (empty) L("Jak ti máme říkat?", "What's your name?", "Wie heißt du?") else L("Hraješ jako", "Playing as", "Du spielst als"), 13.sp, if (empty) C.gold else C.muted, FontWeight.Bold)
+        Box(Modifier.width(170.dp)) {
+            if (name.isEmpty()) T(L("Zadej jméno", "Enter your name", "Name eingeben"), 16.sp, C.muted.copy(alpha = 0.7f))
+            androidx.compose.foundation.text.BasicTextField(
+                name, { v -> name = v.take(24); me.name = v.trim().ifEmpty { "Ty" }; Game.saveLocal(); Game.bump() },
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = C.ink, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(C.gold), modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        T("✎", 14.sp, C.muted)
+    }
 }

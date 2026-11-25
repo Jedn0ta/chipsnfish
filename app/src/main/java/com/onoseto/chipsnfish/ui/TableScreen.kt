@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
@@ -313,6 +314,8 @@ fun TableView() {
         // right column
         Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(90.dp).zIndex(8f)) { ActBox() }
         if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 96.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
+        // beginner coach (practice game)
+        if (playing && Game.bot() && Game.gameCfg.coach) Box(Modifier.align(Alignment.BottomStart).padding(start = 46.dp, bottom = 2.dp).zIndex(7f)) { CoachPanel() }
         // advisor
         if (playing && Game.advisorOn()) {
             Box(
@@ -1134,5 +1137,38 @@ fun TurnTimer(turnAt: Long, modifier: Modifier) {
         val w = 3.dp.toPx()
         drawArc(Color.Black.copy(alpha = 0.35f), 0f, 360f, false, style = Stroke(w), topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w))
         drawArc(col, -90f, 360f * f, false, style = Stroke(w, cap = StrokeCap.Round), topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w))
+    }
+}
+
+
+@Composable
+private fun CoachPanel() {
+    watch()
+    val m = com.onoseto.chipsnfish.game.Coach.message() ?: return
+    val shape = RoundedCornerShape(12.dp)
+    if (Ui.coachMin) {
+        Box(Modifier.clip(shape).background(C.panel.copy(alpha = 0.92f)).border(1.dp, C.gold.copy(alpha = 0.6f), shape).tap { Ui.coachMin = false }.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            T("🎓 " + m.title, 12.sp, C.gold, FontWeight.ExtraBold, maxLines = 1)
+        }
+        return
+    }
+    Column(
+        Modifier.width(300.dp).heightIn(max = 210.dp).shadow(10.dp, shape).clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xF01B2A34), Color(0xF0101920))))
+            .border(1.dp, C.gold.copy(alpha = 0.55f), shape).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            T("🎓 " + m.title, 13.sp, C.gold, FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f))
+            T("–", 18.sp, C.muted, FontWeight.Bold, modifier = Modifier.tap { Ui.coachMin = true }.padding(horizontal = 6.dp))
+        }
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            m.lines.forEach { l -> androidx.compose.material3.Text(rich(l), color = C.ink, fontSize = 12.5.sp, lineHeight = 16.sp) }
+        }
+        if (m.act.isNotEmpty() && Game.st.turn == 0) {
+            GBtn(BK.GOLD, Modifier.fillMaxWidth().height(34.dp), onClick = { Game.doCoach(m.act, m.amt) }) {
+                T(L("Zahrát: ", "Play: ", "Spielen: ") + m.label, 13.sp, C.goldInk, FontWeight.ExtraBold, maxLines = 1)
+            }
+        }
     }
 }

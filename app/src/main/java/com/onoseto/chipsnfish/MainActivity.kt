@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
         Game.saveLocal()
         com.onoseto.chipsnfish.online.Online.stopPolling()
         com.onoseto.chipsnfish.online.Nearby.stop()
+        com.onoseto.chipsnfish.online.Online.stopInbox()
     }
 
     override fun onResume() {
@@ -81,7 +82,11 @@ class MainActivity : ComponentActivity() {
         Ui.refreshActive()
         com.onoseto.chipsnfish.online.KeepAlive.opened(this)
         Updater.check(this, quiet = true)
-        if (com.onoseto.chipsnfish.online.SupaCfg.configured) com.onoseto.chipsnfish.online.Nearby.start(this)
+        if (com.onoseto.chipsnfish.online.SupaCfg.configured) {
+            com.onoseto.chipsnfish.online.Nearby.start(this)
+            com.onoseto.chipsnfish.online.Online.startInbox()
+            com.onoseto.chipsnfish.online.Online.loadFriends()
+        }
         if (Game.online()) com.onoseto.chipsnfish.online.Online.startPolling()
     }
 }
