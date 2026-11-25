@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -221,33 +222,19 @@ fun TableView() {
             repeat(4) { for (k in 1 until st.n) pos[k] = geo.clampS(k, pos[k]) }
             Game.bump()
         }
-        val felt = C.FELTS[Game.look.felt] ?: C.FELTS.getValue("green")
+        val felt = C.FELTS[Game.look.felt] ?: C.FELTS.getValue("blue")
+        val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+        val myTurn = playing && st.turn == 0 && st.done == null && Game.gm()
+        LaunchedEffect(myTurn, st.handNo, st.betStreet) {
+            if (myTurn && Game.online()) { Sound.turn(); haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) }
+        }
         val sc = geo.sc
-        // rail & felt
-        Canvas(Modifier.fillMaxSize()) {
-            val dp = density
-            val rp = 10 * Game.zoom.toFloat() * 0.8f
-            val l = (geo.x0 - rp) * dp; val t = (geo.y0 - rp) * dp
-            val rw = (geo.x1 - geo.x0 + rp * 2) * dp; val rh = (geo.y1 - geo.y0 + rp * 2) * dp
-            drawRoundRect(Color.Black.copy(alpha = 0.55f), Offset(l, t + 14 * dp), Size(rw, rh), CornerRadius((geo.r + rp) * dp))
-            drawRoundRect(Brush.linearGradient(listOf(C.leatherHi, C.leather, C.leather2), Offset(l, t), Offset(l + rw * 0.3f, t + rh)), Offset(l, t), Size(rw, rh), CornerRadius((geo.r + rp) * dp))
-            drawRoundRect(C.stitch, Offset(l + 6 * dp, t + 6 * dp), Size(rw - 12 * dp, rh - 12 * dp), CornerRadius((geo.r + rp - 6) * dp),
-                style = Stroke(1.5f * dp, pathEffect = PathEffect.dashPathEffect(floatArrayOf(5 * dp, 4 * dp))))
-            val fl = (geo.x0 + 4) * dp; val ft = (geo.y0 + 4) * dp
-            val fw = (geo.x1 - geo.x0 - 8) * dp; val fh = (geo.y1 - geo.y0 - 8) * dp
-            drawRoundRect(
-                Brush.radialGradient(listOf(Color(felt[0]), Color(felt[1]), Color(felt[2])), Offset(fl + fw / 2, ft + fh * 0.45f), max(fw, fh) * 0.6f),
-                Offset(fl, ft), Size(fw, fh), CornerRadius(max(4f, geo.r - 4) * dp),
-            )
-            drawRoundRect(Color(felt[3]), Offset(fl, ft), Size(fw, fh), CornerRadius(max(4f, geo.r - 4) * dp), style = Stroke(3 * dp))
-            // felt dots
-            val step = 4 * dp
-            var y = ft + step
-            while (y < ft + fh) {
-                var x = fl + step
-                while (x < fl + fw) { drawCircle(Color.White.copy(alpha = 0.03f), 0.6f * dp, Offset(x, y)); x += step * 2 }
-                y += step * 2
-            }
+        // rail & velvet felt
+        val noise = remember { velvetNoise() }
+        Canvas(Modifier.fillMaxSize()) { drawVelvetTable(geo, felt, noise) }
+        // watermark on the felt
+        Box(Modifier.offset((geo.cx - 150).dp, (geo.cy + geo.cw * 0.7f + 30).dp).width(300.dp), contentAlignment = Alignment.Center) {
+            T("CHIPS & FISH", 15.sp, Color.White.copy(alpha = 0.07f), num = true, letter = 6.sp)
         }
         // center
         Center(geo)
@@ -380,7 +367,7 @@ private fun Center(geo: Geo) {
                     for (i in 2..6) {
                         val v = Game.slotVal(i)
                         if (Game.gm()) {
-                            if (v == null) CardSlot(cw, "", locked = true) else CardView(v, cw)
+                            if (v == null) CardSlot(cw, "", locked = true) else DealIn("${Game.st.handNo}-$i-$v") { CardView(v, cw) }
                         } else if (v == null && !Game.slotOpen(i)) {
                             CardSlot(cw, if (i < 5) "FLOP" else if (i == 5) "TURN" else "RIVER", locked = true, modifier = Modifier.tap { Game.toast(Game.lockMsg(i)) })
                         } else if (v == null) {
@@ -500,6 +487,7 @@ private fun SeatView(
                 // avatar
                 Box(Modifier.size((50 * sc).dp)) {
                     if (isTurn) Box(Modifier.fillMaxSize().graphicsLayer(scaleX = 1.18f, scaleY = 1.18f).clip(CircleShape).background(C.gold.copy(alpha = pulse.value * 0.55f)))
+                    if (isTurn && g.online()) TurnTimer(st.turnAt, Modifier.fillMaxSize().graphicsLayer(scaleX = 1.3f, scaleY = 1.3f))
                     if (drop) Box(Modifier.fillMaxSize().graphicsLayer(scaleX = 1.2f, scaleY = 1.2f).clip(CircleShape).background(C.gold.copy(alpha = 0.7f)))
                     Avatar(p, (50 * sc).dp, ring = if (isTurn || (k == 0 && g.online())) C.gold else null, border = (3 * sc).dp, dim = folded)
                     if (g.online() && com.onoseto.chipsnfish.online.Online.players.any { it.uid == s.pid && (!it.on || it.left) }) Box(Modifier.align(Alignment.BottomStart).size((12 * sc).dp).clip(CircleShape).background(C.lose).border(1.5.dp, Color.Black, CircleShape))
@@ -782,7 +770,12 @@ private fun ActBox() {
                 }
             }
         }
-        GBtn(BK.FOLD, Modifier.fillMaxWidth().height(46.dp), onClick = { g.heroAction("fold") }) { T("FOLD", 15.sp, Color.White, num = true) }
+        var foldArm by remember(st.handNo, st.betStreet, st.turn) { mutableStateOf(false) }
+        LaunchedEffect(foldArm) { if (foldArm) { delay(2500); foldArm = false } }
+        GBtn(BK.FOLD, Modifier.fillMaxWidth().height(46.dp), onClick = {
+            if (toCall == 0 && !foldArm) { foldArm = true; g.toast(L("Check je zdarma. Klepni znovu, pokud opravdu chceš složit.", "Checking is free. Tap again if you really want to fold.", "Check ist gratis. Nochmal tippen, um wirklich zu folden.")) }
+            else g.heroAction("fold")
+        }) { T(if (foldArm) L("OPRAVDU?", "SURE?", "SICHER?") else "FOLD", 15.sp, Color.White, num = true) }
     }
 }
 
@@ -806,6 +799,10 @@ private fun TurnWho(k: Int) {
         T(tr(if (me) "Na tahu jsi" else "Na tahu").uppercase(), 9.5.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp, maxLines = 1)
         if (k >= 0) T(if (me) tr("Ty").uppercase() else Game.pl(Game.st.seats[k]).name, 17.sp, C.gold, num = true, maxLines = 1)
         else T("…", 17.sp, C.gold, num = true)
+        if (k >= 0 && Game.online()) {
+            val left = secondsLeft(Game.st.turnAt)
+            if (left <= 30) T(L("zbývá ${left}s", "${left}s left", "noch ${left}s"), 11.sp, if (left <= 10) C.lose else C.muted, FontWeight.Bold)
+        }
     }
 }
 
@@ -841,7 +838,7 @@ private fun MyCards() {
                     val c = st.hero[i]
                     when {
                         c == null -> CardSlot(cw, "+", next = nx == i, modifier = Modifier.tap { openCardSlot(i) })
-                        g.gm() -> CardView(c, cw, glow = true)
+                        g.gm() -> DealIn("${st.handNo}-h$i-$c") { CardView(c, cw, glow = true) }
                         else -> {
                             Box(Modifier.pointerInput(i) {
                                 detectTapGestures(
@@ -1053,4 +1050,89 @@ private fun OnlineBox(): Boolean {
         return true
     }
     return false
+}
+
+// ---------------- velvet table drawing ----------------
+
+fun velvetNoise(): androidx.compose.ui.graphics.ImageBitmap {
+    val n = 160
+    val bmp = android.graphics.Bitmap.createBitmap(n, n, android.graphics.Bitmap.Config.ARGB_8888)
+    val r = java.util.Random(11)
+    val px = IntArray(n * n)
+    for (i in px.indices) {
+        val light = r.nextBoolean()
+        val a = r.nextInt(22)
+        px[i] = (a shl 24) or (if (light) 0xFFFFFF else 0x000000)
+    }
+    // soft fibres: short diagonal strokes like velvet pile
+    repeat(900) {
+        val x0 = r.nextInt(n); val y0 = r.nextInt(n); val len = 2 + r.nextInt(4)
+        val a = 10 + r.nextInt(16)
+        for (k in 0 until len) {
+            val x = (x0 + k) % n; val y = (y0 + k) % n
+            px[y * n + x] = (a shl 24) or 0xFFFFFF
+        }
+    }
+    bmp.setPixels(px, 0, n, 0, 0, n, n)
+    return bmp.asImageBitmap()
+}
+
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVelvetTable(geo: Geo, felt: List<Long>, noise: androidx.compose.ui.graphics.ImageBitmap) {
+    val dp = density
+    val rp = 14 * Game.zoom.toFloat() * 0.8f
+    val l = (geo.x0 - rp) * dp; val t = (geo.y0 - rp) * dp
+    val rw = (geo.x1 - geo.x0 + rp * 2) * dp; val rh = (geo.y1 - geo.y0 + rp * 2) * dp
+    val rr = (geo.r + rp) * dp
+    // soft shadow on the floor (stacked translucent layers)
+    for (i in 0 until 7) {
+        val g = i * 2.5f * dp
+        drawRoundRect(Color.Black.copy(alpha = 0.09f), Offset(l - g, t + 10 * dp + g * 0.6f), Size(rw + g * 2, rh + g * 1.2f), CornerRadius(rr + g))
+    }
+    // padded leather rail
+    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF6B3F26), C.leather, Color(0xFF2A160D), C.leather2), t, t + rh), Offset(l, t), Size(rw, rh), CornerRadius(rr))
+    drawRoundRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.04f), Color.Transparent), t, t + rh * 0.45f), Offset(l + 2 * dp, t + 1.5f * dp), Size(rw - 4 * dp, rh * 0.5f), CornerRadius(rr))
+    drawRoundRect(Color.Black.copy(alpha = 0.5f), Offset(l, t), Size(rw, rh), CornerRadius(rr), style = Stroke(1.2f * dp))
+    // double stitching
+    val st1 = rp * 0.28f * dp
+    drawRoundRect(C.stitch, Offset(l + st1, t + st1), Size(rw - st1 * 2, rh - st1 * 2), CornerRadius(rr - st1),
+        style = Stroke(1.3f * dp, pathEffect = PathEffect.dashPathEffect(floatArrayOf(5 * dp, 4 * dp))))
+    // felt geometry
+    val fl = (geo.x0 + 2) * dp; val ft = (geo.y0 + 2) * dp
+    val fw = (geo.x1 - geo.x0 - 4) * dp; val fh = (geo.y1 - geo.y0 - 4) * dp
+    val fr = CornerRadius(max(4f, geo.r - 2) * dp)
+    // brass trim between rail and felt
+    drawRoundRect(Brush.linearGradient(listOf(Color(0xFFF7DC8B), C.gold2, Color(0xFFFFE9A8), C.gold2, Color(0xFFF7DC8B)), Offset(fl, ft), Offset(fl + fw, ft + fh)),
+        Offset(fl - 2.5f * dp, ft - 2.5f * dp), Size(fw + 5 * dp, fh + 5 * dp), CornerRadius(fr.x + 2.5f * dp), style = Stroke(2.2f * dp))
+    // velvet base colour with lamp light from above
+    drawRoundRect(Brush.radialGradient(listOf(Color(felt[0]), Color(felt[1]), Color(felt[2])), Offset(fl + fw / 2, ft + fh * 0.42f), max(fw, fh) * 0.62f), Offset(fl, ft), Size(fw, fh), fr)
+    // velvet pile texture
+    drawRoundRect(androidx.compose.ui.graphics.ShaderBrush(androidx.compose.ui.graphics.ImageShader(noise, androidx.compose.ui.graphics.TileMode.Repeated, androidx.compose.ui.graphics.TileMode.Repeated)),
+        Offset(fl, ft), Size(fw, fh), fr, alpha = 0.9f)
+    // soft sheen of the lamp
+    drawRoundRect(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent), Offset(fl + fw / 2, ft + fh * 0.36f), max(fw, fh) * 0.38f), Offset(fl, ft), Size(fw, fh), fr)
+    // vignette towards the rail
+    drawRoundRect(Brush.radialGradient(listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.38f)), Offset(fl + fw / 2, ft + fh / 2), max(fw, fh) * 0.62f), Offset(fl, ft), Size(fw, fh), fr)
+    // inner shadow under the rail
+    for (i in 1..3) drawRoundRect(Color.Black.copy(alpha = 0.16f), Offset(fl + i * dp, ft + i * dp), Size(fw - i * 2 * dp, fh - i * 2 * dp), CornerRadius(fr.x - i * dp), style = Stroke(2.2f * dp))
+    // betting line
+    val bi = min(fw, fh) * 0.13f
+    drawRoundRect(C.gold.copy(alpha = 0.16f), Offset(fl + bi, ft + bi), Size(fw - bi * 2, fh - bi * 2), CornerRadius(max(2f, fr.x - bi)), style = Stroke(1.3f * dp))
+}
+
+
+fun secondsLeft(turnAt: Long): Int = (((turnAt + 60000) - com.onoseto.chipsnfish.online.Online.serverNow()) / 1000).toInt().coerceAtLeast(0)
+
+/** Draining ring around the player to act (60 s per move online). */
+@Composable
+fun TurnTimer(turnAt: Long, modifier: Modifier) {
+    watch()
+    var now by remember { mutableStateOf(com.onoseto.chipsnfish.online.Online.serverNow()) }
+    LaunchedEffect(turnAt) { while (true) { now = com.onoseto.chipsnfish.online.Online.serverNow(); delay(200) } }
+    val f = (1f - (now - turnAt) / 60000f).coerceIn(0f, 1f)
+    val col = if (f > 0.5f) C.gold else if (f > 0.2f) Color(0xFFFF9A3C) else C.lose
+    Canvas(modifier) {
+        val w = 3.dp.toPx()
+        drawArc(Color.Black.copy(alpha = 0.35f), 0f, 360f, false, style = Stroke(w), topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w))
+        drawArc(col, -90f, 360f * f, false, style = Stroke(w, cap = StrokeCap.Round), topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w))
+    }
 }

@@ -40,15 +40,16 @@ object C {
     fun lvl(i: Int) = when (i) { 0 -> win; 1 -> gold; else -> lose }
     fun eqCol(e: Double) = if (e >= 0.5) win else if (e >= 0.3) gold else lose
 
+    /** Velvet colours: light (lamp), mid, dark, edge. */
     val FELTS = linkedMapOf(
-        "green" to listOf(0xFF2A9A62, 0xFF1E7F4F, 0xFF0F5233, 0xFF0B3B25),
-        "red" to listOf(0xFFB23A3A, 0xFF8E2323, 0xFF541010, 0xFF3D0A0A),
-        "blue" to listOf(0xFF2F6FB5, 0xFF1F5590, 0xFF0F2F55, 0xFF0A2240),
-        "purple" to listOf(0xFF7A4BB0, 0xFF5C338C, 0xFF341B55, 0xFF25123E),
-        "gold" to listOf(0xFFC99A3A, 0xFFA8781F, 0xFF5E420C, 0xFF3F2C07),
-        "black" to listOf(0xFF3A3F44, 0xFF26292D, 0xFF121416, 0xFF000000),
+        "blue" to listOf(0xFF3F82D4, 0xFF1D5799, 0xFF0B2B57, 0xFF061A36),
+        "green" to listOf(0xFF33A86E, 0xFF187A49, 0xFF0A4A2A, 0xFF05301B),
+        "red" to listOf(0xFFB8364D, 0xFF861A30, 0xFF4D0A18, 0xFF32060F),
+        "purple" to listOf(0xFF8A57C4, 0xFF5E3496, 0xFF33195A, 0xFF22103D),
+        "gold" to listOf(0xFFC9A04A, 0xFF9C7425, 0xFF5A400E, 0xFF3C2A08),
+        "black" to listOf(0xFF44494F, 0xFF26292D, 0xFF121416, 0xFF050607),
     )
-    val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Rudá", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
+    val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Vínová", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
     val BACKS = linkedMapOf("red" to "Rudý", "blue" to "Modrý", "black" to "Černý", "fish" to "Rybí")
     val FACES = linkedMapOf("classic" to "Klasický", "jumbo" to "Velké znaky", "four" to "Čtyřbarevný", "picture" to "Obrázkový")
 }

@@ -96,7 +96,9 @@ fun SheetHost() {
     ) {
         Column(
             Modifier.widthIn(max = if (wide) 780.dp else 600.dp).fillMaxWidth().heightIn(max = 344.dp)
-                .shadow(20.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(18.dp))
+                .shadow(20.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF17242D), C.panel, Color(0xFF0F181E))))
+                .border(1.dp, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(C.gold.copy(alpha = 0.45f), C.line, C.line)), RoundedCornerShape(18.dp))
                 .tap { }
                 .then(if (sh.kind == "card") Modifier else Modifier.verticalScroll(rememberScrollState()))
                 .padding(horizontal = 16.dp, vertical = 12.dp),

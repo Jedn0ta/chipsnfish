@@ -196,6 +196,12 @@ private fun TopBar() {
                     }
                 })
         )
+        if (g.online()) {
+            val ok = com.onoseto.chipsnfish.online.Online.connected
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (ok) C.win else C.lose).tap {
+                g.toast(if (ok) L("Spojení se serverem je v pořádku", "Connected to the server", "Mit dem Server verbunden") else L("Spojení se serverem vypadlo, zkouším znovu…", "Lost connection to the server, retrying…", "Verbindung zum Server verloren, versuche erneut…"))
+            })
+        }
         if (Ui.solo) {
             Box(Modifier.height(32.dp).clip(RoundedCornerShape(9.dp)).border(1.dp, C.line, RoundedCornerShape(9.dp)).tap { Ui.solo = false; Ui.goView("table"); Ui.showMenu() }.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
                 T(tr("‹ Menu"), 13.sp, C.gold, FontWeight.ExtraBold)
@@ -298,7 +304,7 @@ private fun MenuScreen(onExit: () -> Unit) {
                 FishLogo(Modifier.size(50.dp))
                 Row {
                     T("HOLD'EM ", 32.sp, C.ink, num = true, letter = 1.sp)
-                    T("CHIPS&FISH", 32.sp, C.gold, num = true, letter = 1.sp)
+                    GoldTitle("CHIPS&FISH", 32f)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -376,8 +382,9 @@ private fun ModeCard(icon: @Composable () -> Unit, title: String, desc: String, 
     watch()
     Column(Modifier.width(230.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Column(
-            Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1A2832), C.panel)))
-                .border(if (cur) 2.dp else 1.dp, if (cur) C.gold else C.line, RoundedCornerShape(16.dp)).tap(onClick).padding(14.dp),
+            Modifier.fillMaxWidth().height(170.dp).shadow(if (cur) 14.dp else 8.dp, RoundedCornerShape(16.dp), spotColor = if (cur) C.gold else Color.Black)
+                .clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFF223442), Color(0xFF16222B), C.panel)))
+                .border(if (cur) 2.dp else 1.dp, if (cur) Brush.linearGradient(listOf(Color(0xFFFFE9A8), C.gold2)) else Brush.verticalGradient(listOf(Color(0xFF3A4F5C), C.line)), RoundedCornerShape(16.dp)).tap(onClick).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(C.gold.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) { icon() }
@@ -404,7 +411,7 @@ private fun Splash() {
             FishLogo(Modifier.size(120.dp).graphicsLayer(rotationZ = spin.value))
             Row {
                 T("HOLD'EM ", 40.sp, C.ink, num = true, letter = 1.sp)
-                T("CHIPS&FISH", 40.sp, C.gold, num = true, letter = 1.sp)
+                GoldTitle("CHIPS&FISH", 40f)
             }
             T(tr("Klepni pro pokračování"), 14.sp, C.muted, FontWeight.Bold, modifier = Modifier.alpha(if (ready) 1f else 0f))
         }
@@ -448,3 +455,16 @@ private fun ToastView() {
 
 @Suppress("unused")
 private val circle = CircleShape
+
+
+@Composable
+fun GoldTitle(t: String, size: Float) {
+    watch()
+    androidx.compose.material3.Text(
+        t, fontFamily = F.num, fontWeight = FontWeight.ExtraBold, fontSize = size.sp, letterSpacing = 1.sp,
+        style = androidx.compose.ui.text.TextStyle(
+            brush = Brush.verticalGradient(listOf(Color(0xFFFFEDB0), C.gold, C.gold2)),
+            shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 3f), 8f),
+        ),
+    )
+}

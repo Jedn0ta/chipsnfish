@@ -24,6 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -130,9 +134,10 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
     Box(
         modifier
             .size(cw, cw * 1.4f)
-            .then(if (glow) Modifier.border(2.dp, C.gold.copy(alpha = 0.75f), shape) else Modifier)
+            .shadow(cw * 0.1f, shape, ambientColor = Color.Black, spotColor = Color.Black)
+            .then(if (glow) Modifier.border(2.dp, C.gold.copy(alpha = 0.8f), shape) else Modifier.border(0.6.dp, Color(0xFFCFCAC0), shape))
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF3F1EC))))
+            .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F3EC), Color(0xFFEDE8DD))))
     ) {
         val jumbo = face == "jumbo"
         val pic = face == "picture" && r >= 9
@@ -167,13 +172,20 @@ fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifie
                 else -> Color(0xFF9C1C26) to Color(0xFF7C1119)
             }
             Canvas(Modifier.fillMaxSize()) {
-                drawRect(b)
-                val step = 6.dp.toPx()
+                drawRect(Brush.radialGradient(listOf(a, b), center, size.maxDimension * 0.7f))
+                val step = 5.dp.toPx()
                 var x = -size.height
                 while (x < size.width + size.height) {
-                    drawLine(a, Offset(x, size.height), Offset(x + size.height, 0f), strokeWidth = 3.dp.toPx() / 1.414f)
-                    x += step / 1.414f * 1.414f
+                    drawLine(Color.White.copy(alpha = 0.09f), Offset(x, size.height), Offset(x + size.height, 0f), strokeWidth = 1.dp.toPx())
+                    drawLine(Color.White.copy(alpha = 0.09f), Offset(x, 0f), Offset(x + size.height, size.height), strokeWidth = 1.dp.toPx())
+                    x += step
                 }
+                val ins = size.minDimension * 0.09f
+                drawRect(Color(0xFFE8C56A).copy(alpha = 0.85f), Offset(ins, ins), androidx.compose.ui.geometry.Size(size.width - ins * 2, size.height - ins * 2), style = Stroke(maxOf(1f, size.minDimension * 0.035f)))
+                val c = center; val d = size.minDimension * 0.22f
+                val dia = androidx.compose.ui.graphics.Path().apply { moveTo(c.x, c.y - d * 1.3f); lineTo(c.x + d, c.y); lineTo(c.x, c.y + d * 1.3f); lineTo(c.x - d, c.y); close() }
+                drawPath(dia, Color(0xFFE8C56A).copy(alpha = 0.9f))
+                drawPath(dia, Color.Black.copy(alpha = 0.25f), style = Stroke(1f))
             }
         }
     }
@@ -217,11 +229,14 @@ fun ChipDisc(col: Color, size: Dp) {
     watch()
     Canvas(Modifier.size(size)) {
         val r = this.size.minDimension / 2
-        drawCircle(Color.Black.copy(alpha = 0.55f), r, center.copy(y = center.y + 1.5f))
+        drawCircle(Color.Black.copy(alpha = 0.55f), r, center.copy(y = center.y + 1.6f))
         drawCircle(col, r)
-        val sw = r * 0.33f
-        drawCircle(Color.White.copy(alpha = 0.9f), r - sw / 2, style = Stroke(sw, pathEffect = PathEffect.dashPathEffect(floatArrayOf(r * 0.55f, r * 0.42f))))
-        drawCircle(col, r * 0.5f)
+        val sw = r * 0.3f
+        drawCircle(Color.White.copy(alpha = 0.92f), r - sw / 2, style = Stroke(sw, pathEffect = PathEffect.dashPathEffect(floatArrayOf(r * 0.52f, r * 0.45f))))
+        drawCircle(Color.White.copy(alpha = 0.55f), r * 0.6f, style = Stroke(r * 0.07f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(r * 0.12f, r * 0.1f))))
+        drawCircle(col, r * 0.52f)
+        drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.45f), Color.Transparent), Offset(center.x - r * 0.35f, center.y - r * 0.4f), r * 0.9f), r)
+        drawCircle(Color.Black.copy(alpha = 0.35f), r - 0.5f, style = Stroke(1f))
     }
 }
 
@@ -331,27 +346,46 @@ fun GBtn(
 ) {
     watch()
     val shape = RoundedCornerShape(11.dp)
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.95f else 1f, label = "press")
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val bg: Brush = when (kind) {
-        BK.FOLD -> Brush.verticalGradient(listOf(Color(0xFFD9483A), C.fold))
-        BK.CALL -> Brush.verticalGradient(listOf(Color(0xFF2FBF6D), C.call))
-        BK.RAISE, BK.GOLD -> Brush.verticalGradient(listOf(C.gold, C.gold2))
-        BK.DARK -> Brush.verticalGradient(listOf(Color(0xFF46545E), Color(0xFF2C363E)))
-        BK.GHOST -> Brush.verticalGradient(listOf(C.panel2, C.panel2))
+        BK.FOLD -> Brush.verticalGradient(listOf(Color(0xFFE25A4B), C.fold, Color(0xFF8E2418)))
+        BK.CALL -> Brush.verticalGradient(listOf(Color(0xFF3CCB7A), C.call, Color(0xFF16733F)))
+        BK.RAISE, BK.GOLD -> Brush.verticalGradient(listOf(Color(0xFFFFD976), C.gold, C.gold2))
+        BK.DARK -> Brush.verticalGradient(listOf(Color(0xFF4E5C66), Color(0xFF2C363E), Color(0xFF1E262C)))
+        BK.GHOST -> Brush.verticalGradient(listOf(Color(0xFF213240), C.panel2))
         BK.DANGER -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
     }
+    val flat = kind == BK.GHOST || kind == BK.DANGER
     Box(
         modifier
+            .graphicsLayer(scaleX = sc, scaleY = sc)
             .alpha(if (enabled) 1f else 0.4f)
+            .then(if (!flat && enabled) Modifier.shadow(if (pressed) 1.dp else 4.dp, shape) else Modifier)
             .then(if (ring != null) Modifier.border(3.dp, ring, shape) else Modifier)
             .clip(shape)
             .background(bg)
             .then(if (on) Modifier.border(3.dp, Color.White, shape) else Modifier)
             .then(if (kind == BK.GHOST) Modifier.border(1.dp, C.line, shape) else Modifier)
             .then(if (kind == BK.DANGER) Modifier.border(1.dp, C.lose, shape) else Modifier)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(src, null, enabled = enabled) { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); onClick() }
+            .drawBehind {
+                if (!flat) drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.28f), Color.White.copy(alpha = 0.04f)), 0f, size.height * 0.5f), size = size.copy(height = size.height * 0.5f))
+            }
             .padding(horizontal = 6.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) { content() }
+}
+
+/** Cards fly in when they appear on the table. */
+@Composable
+fun DealIn(key: Any?, content: @Composable () -> Unit) {
+    watch()
+    val a = remember(key) { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(key) { a.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 420f)) }
+    Box(Modifier.graphicsLayer(alpha = a.value.coerceIn(0f, 1f), scaleX = 0.6f + 0.4f * a.value, scaleY = 0.6f + 0.4f * a.value, translationY = (1 - a.value) * -40f, rotationZ = (1 - a.value) * -8f)) { content() }
 }
 
 fun btnInk(kind: BK): Color = when (kind) {

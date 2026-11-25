@@ -111,10 +111,25 @@ object Sound {
         return ShortArray(total) { (buf[it] / peak * 0.8f * Short.MAX_VALUE).toInt().toShort() }
     }
 
-    fun chip() {
+    private val chime: ShortArray by lazy {
+        val n = (RATE * 0.45).toInt()
+        ShortArray(n) { i ->
+            val t = i.toDouble() / RATE
+            val e1 = kotlin.math.exp(-t * 9) * (if (t < 0.18) 1.0 else 0.0)
+            val e2 = if (t >= 0.12) kotlin.math.exp(-(t - 0.12) * 7) else 0.0
+            val v = 0.35 * e1 * sin(2 * PI * 880 * t) + 0.35 * e2 * sin(2 * PI * 1318.5 * t)
+            (v * Short.MAX_VALUE).toInt().toShort()
+        }
+    }
+
+    /** Soft two-note chime: it's your turn. */
+    fun turn() = play(chime)
+
+    fun chip() = play(pcm)
+
+    private fun play(data: ShortArray) {
         thread(isDaemon = true) {
             runCatching {
-                val data = pcm
                 val track = AudioTrack.Builder()
                     .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
                     .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
