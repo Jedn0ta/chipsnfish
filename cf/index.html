@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chips&amp;Fish – pozvánka ke stolu</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+         background: radial-gradient(110% 90% at 40% 35%, #15222b 0%, #080d12 75%); color: #f1f4f2;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { width: 100%; max-width: 420px; text-align: center; }
+  .logo { width: 84px; height: 84px; margin: 0 auto 12px; }
+  h1 { margin: 0; font: 800 30px/1.1 "Arial Narrow", system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+  h1 b { color: #f2c14e; }
+  p { color: #9aabb3; margin: 10px 0 0; }
+  .code { margin: 22px 0 6px; font: 800 44px/1 "Arial Narrow", system-ui, sans-serif; letter-spacing: .18em; color: #f2c14e; }
+  .lbl { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #9aabb3; }
+  a.btn { display: block; margin-top: 18px; padding: 15px 18px; border-radius: 14px; font-weight: 800; text-decoration: none;
+          background: linear-gradient(180deg, #2fbf6d, #22a35a); color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,.45); }
+  a.btn.ghost { background: #1a2832; border: 1px solid #2b3d49; box-shadow: none; color: #f1f4f2; font-weight: 700; }
+  .small { font-size: 13px; margin-top: 22px; }
+</style>
+</head>
+<body>
+<main>
+  <svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18.5" fill="#c8901d"/><circle cx="20" cy="20" r="18.5" fill="none" stroke="#fff" stroke-width="3.5" stroke-dasharray="6.2 5.4"/><circle cx="20" cy="20" r="12.5" fill="#f2c14e"/><path d="M10.5 20c2.6-4.2 6.4-5.6 10.2-4.6 2.2.6 3.9 2 5 3.4l3.3-2.6v7.6l-3.3-2.6c-1.1 1.4-2.8 2.8-5 3.4-3.8 1-7.6-.4-10.2-4.6z" fill="#1d4f7a"/><circle cx="14.6" cy="19.2" r="1.2" fill="#fff"/></svg>
+  <h1>Hold'em <b>Chips&amp;Fish</b></h1>
+  <p id="lead">Pozvánka k pokerovému stolu.</p>
+  <div id="codebox" hidden><div class="code" id="code"></div><div class="lbl" id="codelbl">kód stolu</div></div>
+  <a class="btn" id="open" href="#">Otevřít v aplikaci</a>
+  <a class="btn ghost" href="https://github.com/Jedn0ta/chipsnfish/releases/download/latest/ChipsNFish.apk">Stáhnout aplikaci (Android)</a>
+  <p class="small" id="hint">Když aplikaci ještě nemáš, stáhni ji, nainstaluj a pak klepni na odkaz v pozvánce znovu. Ke stolu se dá připojit i zadáním kódu.</p>
+  <p class="small">Onoseto Studio</p>
+</main>
+<script>
+  var q = new URLSearchParams(location.search), t = (q.get('t') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(),
+      g = (q.get('g') || '').replace(/[^A-Za-z0-9-]/g, '');
+  var path = t ? 't/' + t : g ? 'g/' + g : '';
+  var en = !/^cs|^sk/i.test(navigator.language || '');
+  if (en) {
+    document.documentElement.lang = 'en';
+    document.getElementById('lead').textContent = g ? 'An invitation to a poker group.' : 'An invitation to a poker table.';
+    document.getElementById('codelbl').textContent = 'table code';
+    document.getElementById('open').textContent = 'Open in the app';
+    document.querySelector('a.ghost').textContent = 'Download the app (Android)';
+    document.getElementById('hint').textContent = "If you don't have the app yet, download and install it, then tap the invite link again. You can also join by entering the table code.";
+  } else if (g) document.getElementById('lead').textContent = 'Pozvánka do pokerové skupiny.';
+  if (t) { document.getElementById('code').textContent = t; document.getElementById('codebox').hidden = false; }
+  var a = document.getElementById('open');
+  if (path) {
+    var back = location.href + (location.search ? '&' : '?') + 'nf=1';
+    a.href = 'intent://' + path + '#Intent;scheme=chipsnfish;package=com.onoseto.chipsnfish;S.browser_fallback_url=' + encodeURIComponent(back) + ';end';
+    if (/Android/i.test(navigator.userAgent) && !q.get('nf')) setTimeout(function () { location.href = a.href; }, 300);
+  } else a.hidden = true;
+</script>
+</body>
+</html>

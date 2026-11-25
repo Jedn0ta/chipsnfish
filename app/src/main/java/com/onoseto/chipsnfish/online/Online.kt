@@ -378,7 +378,7 @@ object Online {
 
     // ---------------- invites ----------------
 
-    const val WEB = "https://onoseto.com/cf/"
+    const val WEB = "https://jedn0ta.github.io/chipsnfish/cf/"
     fun tableLink(c: String) = "${WEB}?t=$c"
     fun groupLink(id: String) = "${WEB}?g=$id"
 
