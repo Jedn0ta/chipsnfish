@@ -1041,7 +1041,10 @@ private fun OnlineBox(): Boolean {
             T("🏆", 20.sp)
             T(wn, 15.sp, C.gold, num = true, maxLines = 1)
             T(L("vyhrává hru", "wins the game", "gewinnt das Spiel"), 11.sp, C.ink, FontWeight.Bold)
+            val tier = com.onoseto.chipsnfish.online.Fame.tierFor(st.n)
+            T(com.onoseto.chipsnfish.online.Fame.cupIcon(tier) + " " + com.onoseto.chipsnfish.online.Fame.cupName(tier), 10.sp, C.gold, FontWeight.Bold, align = TextAlign.Center)
         }
+        ColBtn("🏆 " + L("Síň slávy", "Hall of fame", "Ruhmeshalle"), BK.DARK, h = 40.dp) { Ui.open("fame") }
         if (O.isHost) ColBtn(L("Hrát znovu", "Play again", "Nochmal"), BK.CALL) { O.restart() }
         ColBtn(L("Opustit stůl", "Leave table", "Tisch verlassen"), BK.DARK) { leave() }
         return true

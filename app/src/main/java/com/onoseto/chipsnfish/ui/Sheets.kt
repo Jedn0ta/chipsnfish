@@ -89,7 +89,7 @@ fun SheetHost() {
     val sh = Ui.sheet ?: return
     @Suppress("UNUSED_VARIABLE") val r1 = Ui.sheetRev
     @Suppress("UNUSED_VARIABLE") val r2 = Game.rev
-    val wide = sh.kind in setOf("card", "settings", "gamesetup", "online", "groups", "analysis", "seat", "player")
+    val wide = sh.kind in setOf("card", "settings", "gamesetup", "online", "groups", "analysis", "seat", "player", "fame")
     val compact = sh.kind == "confirm"
     Box(
         Modifier.fillMaxSize().zIndex(40f).background(Color.Black.copy(alpha = 0.65f)).tap { Ui.close() }.padding(8.dp),
@@ -123,6 +123,7 @@ fun SheetHost() {
                 "confirm" -> ConfirmSheet(sh.arg as ConfirmArg)
                 "online" -> OnlineSheet(sh.arg as? OnlineArg ?: OnlineArg())
                 "groups" -> GroupsSheet()
+                "fame" -> FameSheet()
                 "group" -> GroupSheet(sh.arg as GroupArg)
             }
         }

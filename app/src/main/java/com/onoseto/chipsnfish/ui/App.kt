@@ -312,7 +312,10 @@ private fun MenuScreen(onExit: () -> Unit) {
                     GoldTitle("CHIPS&FISH", 28f)
                 }
             }
-            NameBar()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NameBar()
+                WalletBadge()
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ModeCard(
                     icon = { CardsIcon() }, title = L("Hrát s přáteli", "Play with friends", "Mit Freunden"),
@@ -355,6 +358,16 @@ private fun MenuScreen(onExit: () -> Unit) {
                     T(L("Přisednout ›", "Join ›", "Beitreten ›"), 13.sp, C.win, FontWeight.ExtraBold)
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, C.gold.copy(alpha = 0.6f), RoundedCornerShape(12.dp)).background(C.gold.copy(alpha = 0.08f))
+                    .tap { Ui.open("fame") }.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                T("🏆", 15.sp)
+                T(L("Síň slávy", "Hall of fame", "Ruhmeshalle"), 14.sp, C.ink, FontWeight.Bold)
+                T("›", 14.sp, C.gold, FontWeight.ExtraBold)
+            }
             Row(
                 Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap {
                     O.stopPolling()
@@ -365,6 +378,7 @@ private fun MenuScreen(onExit: () -> Unit) {
                 T(L("Trénink proti počítači", "Practice vs computer", "Training gegen Computer"), 14.sp, C.ink, FontWeight.Bold)
                 T(if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Weiter · Hand #${gs!!.handNo}") + " ›" else L("Nová hra ›", "New game ›", "Neues Spiel ›"), 13.sp, C.gold, FontWeight.ExtraBold)
                 if (gOn) T(tr("+ Nová hra"), 12.sp, C.muted, FontWeight.Bold, modifier = Modifier.tap { O.stopPolling(); Ui.openGameSetup() })
+            }
             }
         }
         Row(Modifier.align(Alignment.TopEnd).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

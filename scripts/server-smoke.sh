@@ -70,6 +70,10 @@ rpc "$A" cf_drink "{\"p_code\":\"$CODE\",\"p_to\":\"$UB\",\"p_kind\":\"beer\"}" 
 VS=$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}")
 [ "$(echo "$VS" | jq -r '.chat[-1].m')" = "0,4,21" ] && [ "$(echo "$VS" | jq -r '.drinks[-1].kind')" = "beer" ] || { echo "emoji/drinks failed: $(echo "$VS" | jq -c '{chat,drinks}')"; exit 1; }
 echo "✓ emoji chat, wallet and drinks"
+[ "$(rpc "$A" cf_earn '{"p_amount":25}' | jq -r .added)" = "25" ] || { echo "practice earnings failed"; exit 1; }
+F=$(rpc "$A" cf_fame '{"p_period":"week","p_scope":"all"}')
+[ "$(echo "$F" | jq '.top | length')" -ge 1 ] || { echo "hall of fame failed: $F"; exit 1; }
+echo "✓ practice earnings and hall of fame (honor points from the test hand: $(echo "$F" | jq -c '[.top[] | select(.name | startswith("Test")) | .pts]'))"
 rpc "$A" cf_ping '{}' >/dev/null; echo "✓ keep-alive ping"
 rpc "$B" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null; rpc "$A" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null
 echo "ALL SERVER TESTS PASSED"

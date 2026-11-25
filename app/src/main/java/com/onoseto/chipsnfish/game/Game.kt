@@ -709,6 +709,7 @@ object Game {
         val alive = st.seats.filter { it.stack > 0 }
         if (st.seats[0].stack <= 0) st.over = Over(false, alive.size + 1)
         else if (alive.size == 1) st.over = Over(true, 1)
+        if (bot()) com.onoseto.chipsnfish.online.Fame.practiceHand(win[0] - st.seats[0].total, st.bb, st.over?.win == true, st.n - 1)
         val stats = st.stats ?: GStats().also { st.stats = it }
         stats.hands++
         if (win[0] > 0) stats.won++

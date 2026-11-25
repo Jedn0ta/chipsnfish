@@ -856,18 +856,6 @@ create or replace function cf_drink_price(k text) returns int language sql immut
                 when 'cocktail' then 120 when 'whisky' then 150 when 'champagne' then 400 end
 $$;
 
--- my wallet; the first call of each day adds a bonus of 200
-create or replace function cf_wallet() returns jsonb
-language plpgsql security definer set search_path = public as $$
-declare u uuid := cf_me(); b int; bonus int := 0;
-begin
-  insert into cf_profiles(uid) values (u) on conflict do nothing;
-  update cf_profiles set bank = bank + 200, bonus_day = current_date
-    where uid = u and (bonus_day is null or bonus_day < current_date) returning bank into b;
-  if found then bonus := 200; else select bank into b from cf_profiles where uid = u; end if;
-  return jsonb_build_object('bank', b, 'bonus', bonus);
-end $$;
-
 -- an emoji message: up to 5 indexes into the app's emoji set, e.g. '3,17,5'
 create or replace function cf_say(p_code text, p_msg text) returns void
 language plpgsql security definer set search_path = public as $$
@@ -937,6 +925,117 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- rewards: chips for practice wins (wallet), honor points and cups for
+-- online games with friends, hall of fame
+-- ---------------------------------------------------------------------
+alter table cf_profiles add column if not exists earn_day date;
+alter table cf_profiles add column if not exists earned int not null default 0;
+create table if not exists cf_honor (
+  id bigserial primary key, uid uuid not null, pts int not null, kind text not null, code text,
+  t timestamptz not null default now());
+create index if not exists cf_honor_t on cf_honor(t);
+create index if not exists cf_honor_uid on cf_honor(uid, t);
+create table if not exists cf_trophies (
+  id bigserial primary key, uid uuid not null, code text, name text not null default '', players int not null,
+  tier text not null, t timestamptz not null default now());
+create index if not exists cf_trophies_uid on cf_trophies(uid);
+alter table cf_honor enable row level security;
+alter table cf_trophies enable row level security;
+revoke all on cf_honor, cf_trophies from anon, authenticated;
+
+-- wallet + my honor summary; the first call of each day adds a bonus of 200
+create or replace function cf_wallet() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); b int; bonus int := 0;
+begin
+  insert into cf_profiles(uid) values (u) on conflict do nothing;
+  update cf_profiles set bank = bank + 200, bonus_day = current_date
+    where uid = u and (bonus_day is null or bonus_day < current_date) returning bank into b;
+  if found then bonus := 200; else select bank into b from cf_profiles where uid = u; end if;
+  return jsonb_build_object('bank', b, 'bonus', bonus,
+    'honor', (select coalesce(sum(h.pts), 0) from cf_honor h where h.uid = u),
+    'cups', (select count(*) from cf_trophies x where x.uid = u));
+end $$;
+
+-- chips won in practice games vs the computer go to the wallet (at most 300 a call, 1500 a day)
+create or replace function cf_earn(p_amount int) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); w jsonb; a int := least(greatest(coalesce(p_amount, 0), 0), 300); b int;
+begin
+  w := cf_wallet();
+  update cf_profiles set earned = case when earn_day = current_date then earned else 0 end, earn_day = current_date where uid = u;
+  select greatest(0, least(a, 1500 - earned)) into a from cf_profiles where uid = u;
+  update cf_profiles set bank = bank + a, earned = earned + a where uid = u returning bank into b;
+  return jsonb_build_object('bank', b, 'added', a, 'bonus', w->'bonus', 'honor', w->'honor', 'cups', w->'cups');
+end $$;
+
+-- after every online hand: +1 per pot won; a player who busts gets 10 per player behind him;
+-- the last one standing gets 10 per opponent + 10 and a cup (bronze 2–3, silver 4–6, gold 7–10 players)
+create or replace function cf_award() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare st jsonb := new.state; n int; alive int := 0; busted uuid[] := '{}'; s jsonb; place int; w uuid;
+begin
+  if st->'done' is null or jsonb_typeof(st->'done') = 'null' then return new; end if;
+  if old.state->'done' is not null and jsonb_typeof(old.state->'done') <> 'null'
+     and old.state->>'handNo' = st->>'handNo' then return new; end if;
+  n := jsonb_array_length(st->'seats');
+  if n < 2 then return new; end if;
+  insert into cf_honor(uid, pts, kind, code)
+    select (st->'seats'->(x::int)->>'pid')::uuid, 1, 'hand', new.code from jsonb_array_elements_text(st->'done'->'w') x;
+  for s in select x from jsonb_array_elements(st->'seats') x loop
+    if coalesce((s->>'out')::boolean, false) then continue; end if;
+    if coalesce((s->>'stack')::int, 0) > 0 then alive := alive + 1; else busted := busted || (s->>'pid')::uuid; end if;
+  end loop;
+  place := alive + 1;
+  if n - place > 0 then
+    insert into cf_honor(uid, pts, kind, code) select b, (n - place) * 10, 'place', new.code from unnest(busted) b;
+  end if;
+  if alive = 1 then
+    select (x->>'pid')::uuid into w from jsonb_array_elements(st->'seats') x
+      where not coalesce((x->>'out')::boolean, false) and coalesce((x->>'stack')::int, 0) > 0;
+    insert into cf_honor(uid, pts, kind, code) values (w, (n - 1) * 10 + 10, 'win', new.code);
+    insert into cf_trophies(uid, code, name, players, tier)
+      values (w, new.code, new.name, n, case when n >= 7 then 'gold' when n >= 4 then 'silver' else 'bronze' end);
+  end if;
+  return new;
+end $$;
+drop trigger if exists cf_tables_award on cf_tables;
+create trigger cf_tables_award after update of state on cf_tables for each row execute function cf_award();
+
+-- hall of fame: p_period week | month | all, p_scope all | friends
+create or replace function cf_fame(p_period text, p_scope text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); since timestamptz; prev timestamptz; mine int; r int; sc uuid[]; fr boolean := p_scope = 'friends';
+begin
+  since := case p_period when 'week' then date_trunc('week', now()) when 'month' then date_trunc('month', now()) else '-infinity'::timestamptz end;
+  prev := case p_period when 'week' then since - interval '1 week' when 'month' then since - interval '1 month' else null end;
+  sc := array(select fid from cf_friends where cf_friends.uid = u) || u;
+  select coalesce(sum(h.pts), 0) into mine from cf_honor h where h.uid = u and h.t >= since;
+  select count(*) + 1 into r from (select h.uid from cf_honor h where h.t >= since
+      and (not fr or h.uid = any(sc))
+      group by h.uid having sum(h.pts) > mine) q;
+  return jsonb_build_object(
+    'top', (select coalesce(jsonb_agg(q.o order by q.p desc, q.n), '[]') from (
+        select sum(h.pts) p, coalesce(max(pr.name), '?') n,
+          jsonb_build_object('uid', h.uid, 'name', coalesce(max(pr.name), '?'), 'img', coalesce(max(pr.img), ''), 'pts', sum(h.pts),
+            'hands', count(*) filter (where h.kind = 'hand'), 'wins', count(*) filter (where h.kind = 'win')) o
+        from cf_honor h left join cf_profiles pr on pr.uid = h.uid
+        where h.t >= since and (not fr or h.uid = any(sc))
+        group by h.uid order by sum(h.pts) desc limit 30) q),
+    'me', jsonb_build_object('pts', mine, 'rank', case when mine > 0 then r else null end),
+    'champ', case when prev is null then null else (
+        select jsonb_build_object('name', coalesce(max(pr.name), '?'), 'pts', sum(h.pts))
+        from cf_honor h left join cf_profiles pr on pr.uid = h.uid
+        where h.t >= prev and h.t < since and (not fr or h.uid = any(sc))
+        group by h.uid order by sum(h.pts) desc limit 1) end,
+    'cups', (select coalesce(jsonb_agg(jsonb_build_object('name', x.name, 'players', x.players, 'tier', x.tier,
+               't', (extract(epoch from x.t) * 1000)::bigint) order by x.t desc), '[]')
+             from (select * from cf_trophies where cf_trophies.uid = u order by t desc limit 24) x),
+    'total', (select coalesce(sum(h.pts), 0) from cf_honor h where h.uid = u)
+  );
+end $$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -949,7 +1048,7 @@ begin
                      'cf_set_advisor','cf_restart','cf_view','cf_group_create','cf_group_join','cf_group_leave',
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
-                     'cf_wallet','cf_say','cf_drink') then
+                     'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

@@ -134,10 +134,8 @@ object Social {
         Game.scope.launch {
             try {
                 Supa.ensureAuth()
-                val o = Supa.rpc("cf_wallet").jsonObject
-                bank = o["bank"]!!.jsonPrimitive.int
-                val bonus = o["bonus"]?.jsonPrimitive?.intOrNull ?: 0
-                if (bonus > 0) Game.toast(L("Denní bonus 🎁 +$bonus žetonů do peněženky", "Daily bonus 🎁 +$bonus chips to your wallet", "Tagesbonus 🎁 +$bonus Chips in die Geldbörse"))
+                Fame.applyWallet(Supa.rpc("cf_wallet").jsonObject)
+                Fame.flush()
             } catch (_: Exception) { }
         }
     }

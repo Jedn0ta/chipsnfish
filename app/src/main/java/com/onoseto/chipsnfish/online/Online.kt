@@ -66,6 +66,7 @@ object Online {
     private val learned = HashSet<Int>()
     private val learnedShows = HashSet<String>()
     var shownHand by mutableIntStateOf(0)
+    private var overSeen = false
 
     val me get() = Supa.uid
     val isHost get() = host == me && me.isNotEmpty()
@@ -216,6 +217,7 @@ object Online {
         }
         for (st in v.seats) if (Game.P[st.pid] == null) Game.P[st.pid] = Player(st.pid, "?", stored = st.pid != me)
         Game.setOnlineView(v)
+        if (s.over != null && !overSeen) { overSeen = true; Social.loadBank() } else if (s.over == null) overSeen = false
         learn(v, s)
         rev++
     }
