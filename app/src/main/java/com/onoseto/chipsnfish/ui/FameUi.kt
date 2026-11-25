@@ -21,6 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -173,7 +177,7 @@ fun WalletBadge() {
 fun CupSheet() {
     watch()
     val O = Online
-    var name by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(O.name.ifBlank { L("Turnaj o pohár", "Cup tournament", "Pokalturnier") }) }
+    var name by remember { mutableStateOf(O.name.ifBlank { L("Turnaj o pohár", "Cup tournament", "Pokalturnier") }) }
     val n = O.players.count { !it.left }
     val tier = Fame.tierFor(n)
     SheetHead("🏆 " + L("Turnaj o pohár", "Cup tournament", "Pokalturnier"))
