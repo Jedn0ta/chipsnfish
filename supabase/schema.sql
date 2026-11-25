@@ -1097,6 +1097,29 @@ create or replace function cf_social(p_code text) returns jsonb language sql sta
 $$;
 
 -- ---------------------------------------------------------------------
+-- delete my online profile and everything tied to it (Google Play requirement)
+-- ---------------------------------------------------------------------
+create or replace function cf_delete_me() returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); c record;
+begin
+  for c in select code from cf_players where uid = u and left_at is null loop
+    begin perform cf_leave(c.code); exception when others then null; end;
+  end loop;
+  update cf_players set name = '', img = '' where uid = u;
+  delete from cf_group_members where uid = u;
+  delete from cf_groups g where g.owner = u and not exists (select 1 from cf_group_members m where m.gid = g.id);
+  delete from cf_friends where uid = u or fid = u;
+  delete from cf_invites where to_uid = u or from_uid = u;
+  delete from cf_honor where uid = u;
+  delete from cf_trophies where uid = u;
+  delete from cf_chat where uid = u;
+  delete from cf_drinks where from_uid = u or to_uid = u;
+  delete from cf_cup_votes where uid = u;
+  delete from cf_profiles where uid = u;
+end $$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -1109,7 +1132,7 @@ begin
                      'cf_set_advisor','cf_restart','cf_view','cf_group_create','cf_group_join','cf_group_leave',
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
-                     'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote') then
+                     'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

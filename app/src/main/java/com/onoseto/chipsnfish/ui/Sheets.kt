@@ -779,7 +779,7 @@ private fun SettingsSheet(d: SettingsArg) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         T(tr("Nastavení").uppercase(), 24.sp, num = true)
         Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk", "update" to "Aktualizace").filter { it.first != "game" || g.gm() }.forEach { (k, l) ->
+            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk", "update" to "Aktualizace").filter { (it.first != "game" || g.gm()) && (it.first != "update" || com.onoseto.chipsnfish.BuildConfig.SELF_UPDATE) }.forEach { (k, l) ->
                 val on = d.tab == k
                 Box(Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) C.ink else Color.Transparent).border(1.dp, if (on) C.ink else C.line, RoundedCornerShape(99.dp)).tap { d.tab = k; Ui.redraw() }.padding(horizontal = 11.dp, vertical = 5.dp)) {
                     T(tr(l), 12.5.sp, if (on) C.room else C.muted, FontWeight.Bold)
@@ -917,6 +917,16 @@ private fun SettingsSheet(d: SettingsArg) {
                 Field(name, { name = it; me.name = it.trim().ifEmpty { "Ty" }; g.saveLocal(); g.bump() }, Modifier.weight(1f), big = true)
             }
             PhotoButtons(me)
+            if (com.onoseto.chipsnfish.online.SupaCfg.configured) {
+                Label(L("Online profil", "Online profile", "Online-Profil"))
+                Btn(L("Smazat můj online profil", "Delete my online profile", "Mein Online-Profil löschen"), BK.GHOST, Modifier.fillMaxWidth(), height = 36.dp) {
+                    Ui.confirm(L("Smazat online profil?", "Delete online profile?", "Online-Profil löschen?"),
+                        L("Ze serveru se smaže tvoje jméno, fotka, peněženka, body cti, poháry, přátelé a skupiny a odejdeš od stolu. Nejde to vrátit. Data v telefonu (hráči, záznam hand) zůstanou.",
+                          "Your name, photo, wallet, honor points, cups, friends and groups are deleted from the server and you leave the table. This can't be undone. Data on this phone (players, hand history) stays.",
+                          "Name, Foto, Geldbörse, Ehrenpunkte, Pokale, Freunde und Gruppen werden vom Server gelöscht und du verlässt den Tisch. Nicht umkehrbar. Daten auf dem Handy bleiben."),
+                        L("Smazat", "Delete", "Löschen")) { com.onoseto.chipsnfish.online.Online.deleteMe { } }
+                }
+            }
             }
             Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Label(tr("Záloha dat"))

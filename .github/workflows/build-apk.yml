@@ -22,25 +22,42 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
+        run: ./gradlew --no-daemon testGithubDebugUnitTest
 
-      - name: Build APK
-        run: ./gradlew --no-daemon assembleRelease
+      - name: Upload key for Google Play
+        env:
+          UPLOAD_KEYSTORE_B64: ${{ secrets.UPLOAD_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$UPLOAD_KEYSTORE_B64" ]; then
+            echo "$UPLOAD_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "UPLOAD_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No UPLOAD_KEYSTORE_B64 secret – the Play bundle is signed with the test key"
+          fi
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk ChipsNFish.apk
+      - name: Build APK (GitHub) and bundle (Google Play)
+        env:
+          UPLOAD_PASSWORD: ${{ secrets.UPLOAD_PASSWORD }}
+        run: ./gradlew --no-daemon assembleGithubRelease bundlePlayRelease
+
+      - name: Rename outputs
+        run: |
+          cp app/build/outputs/apk/github/release/app-github-release.apk ChipsNFish.apk
+          cp app/build/outputs/bundle/playRelease/app-play-release.aab ChipsNFish-GooglePlay.aab
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ChipsNFish-apk
-          path: ChipsNFish.apk
+          name: ChipsNFish
+          path: |
+            ChipsNFish.apk
+            ChipsNFish-GooglePlay.aab
 
       - name: Publish to "latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest ChipsNFish.apk \
+          gh release create latest ChipsNFish.apk ChipsNFish-GooglePlay.aab \
             --title "Chips&Fish – nejnovější sestavení #${{ github.run_number }}" \
-            --notes "Automaticky sestaveno z commitu ${{ github.sha }}. Stáhněte ChipsNFish.apk a nainstalujte do telefonu." \
+            --notes "Automaticky sestaveno z commitu ${{ github.sha }}. ChipsNFish.apk = instalace do telefonu, ChipsNFish-GooglePlay.aab = nahrát do Google Play Console." \
             --target ${{ github.sha }}

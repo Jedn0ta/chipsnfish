@@ -70,6 +70,12 @@ object Supa {
     }
 
     /** Makes sure we have a valid session (anonymous account, kept on this phone). */
+    /** Forgets the anonymous account on this phone; the next server call creates a new one. */
+    fun forget() {
+        uid = ""; access = ""; refresh = ""; expires = 0
+        prefs.edit().clear().apply()
+    }
+
     suspend fun ensureAuth() = lock.withLock {
         withContext(Dispatchers.IO) {
             if (access.isNotEmpty() && System.currentTimeMillis() < expires) return@withContext

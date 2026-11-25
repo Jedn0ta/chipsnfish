@@ -25,6 +25,30 @@ android {
             keyAlias = "chipsnfish"
             keyPassword = "chipsnfish"
         }
+        // Private upload key for Google Play (from GitHub secrets, never in the repo).
+        val up = System.getenv("UPLOAD_KEYSTORE")
+        if (!up.isNullOrBlank() && file(up).exists()) create("upload") {
+            storeFile = file(up)
+            storePassword = System.getenv("UPLOAD_PASSWORD")
+            keyAlias = "upload"
+            keyPassword = System.getenv("UPLOAD_PASSWORD")
+        }
+    }
+
+    flavorDimensions += "dist"
+    productFlavors {
+        // APK on GitHub: updates itself from the GitHub release
+        create("github") {
+            dimension = "dist"
+            buildConfigField("boolean", "SELF_UPDATE", "true")
+            signingConfig = signingConfigs.getByName("shared")
+        }
+        // Google Play: updates come from the Play Store only
+        create("play") {
+            dimension = "dist"
+            buildConfigField("boolean", "SELF_UPDATE", "false")
+            signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("shared")
+        }
     }
 
     buildTypes {
@@ -33,7 +57,6 @@ android {
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("shared")
         }
     }
 
@@ -46,6 +69,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

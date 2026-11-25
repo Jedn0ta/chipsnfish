@@ -41,6 +41,7 @@ object Updater {
     }
 
     fun check(ctx: Context, quiet: Boolean = false) {
+        if (!BuildConfig.SELF_UPDATE) return
         if (quiet && System.currentTimeMillis() - lastCheck < 6 * 3600_000L) return
         lastCheck = System.currentTimeMillis()
         if (!quiet) state = "checking"

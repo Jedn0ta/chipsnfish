@@ -357,6 +357,21 @@ object Online {
         }
     }
 
+    /** Deletes my online profile, honor points, cups, friends and groups on the server. */
+    fun deleteMe(onDone: () -> Unit) {
+        Game.scope.launch {
+            try {
+                Supa.rpc("cf_delete_me")
+                leaveLocal(); if (Game.online()) Game.leaveOnline()
+                Supa.forget()
+                friends = null; groups = null; myTables = emptyList(); inbox = emptyList()
+                Social.bank = null; Fame.honor = null; Fame.cups = null; Fame.top = null
+                Game.toast(L("Online profil smazán", "Online profile deleted", "Online-Profil gelöscht"))
+                onDone()
+            } catch (e: Exception) { Game.toast(err(e)) }
+        }
+    }
+
     var groups by mutableStateOf<List<OGroup>?>(null)
     var myTables by mutableStateOf<List<OTable>>(emptyList())
 
