@@ -19,8 +19,8 @@ import java.net.URL
 
 /** Supabase project of Chips&Fish. URL and the publishable (anon) key are public by design. */
 object SupaCfg {
-    const val URL = ""
-    const val KEY = ""
+    const val URL = "https://leobbaixgbnftirzdudl.supabase.co"
+    const val KEY = "sb_publishable_esmekdxKuc2F2NbSobe_kw_yfAZtjm6"
     val configured get() = URL.isNotBlank() && KEY.isNotBlank()
 }
 
