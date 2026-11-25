@@ -133,6 +133,7 @@ object Online {
     }
 
     fun leaveLocal() {
+        Social.resetTable()
         Nearby.unadvertise()
         pollJob?.cancel(); pollJob = null
         code = null
@@ -178,6 +179,7 @@ object Online {
         val h = r["hole"]?.jsonObject
         holeHand = h?.get("hand")?.jsonPrimitive?.intOrNull ?: 0
         hole = (h?.get("cards") as? JsonArray)?.map { it.jsonPrimitive.int }
+        Social.ingest(r["chat"], r["drinks"])
         shows = r["shows"]!!.jsonArray.associate { e -> val o = e.jsonObject; o["uid"]!!.jsonPrimitive.content to o["cards"]!!.jsonArray.map { it.jsonPrimitive.int } }
         val stEl = r["state"]
         if (stEl != null && stEl !is JsonNull) raw = Game.json.decodeFromJsonElement(GState.serializer(), stEl)

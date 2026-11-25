@@ -835,6 +835,108 @@ create or replace function cf_cleanup() returns void language sql security defin
 $$;
 
 -- ---------------------------------------------------------------------
+-- emoji chat and drinks (paid from the wallet, never from chips in play)
+-- ---------------------------------------------------------------------
+alter table cf_profiles add column if not exists bank int not null default 1000;
+alter table cf_profiles add column if not exists bonus_day date;
+create table if not exists cf_chat (
+  id bigserial primary key, code text not null references cf_tables(code) on delete cascade,
+  uid uuid not null, msg text not null, t timestamptz not null default now());
+create index if not exists cf_chat_code on cf_chat(code, id);
+create table if not exists cf_drinks (
+  id bigserial primary key, code text references cf_tables(code) on delete cascade,
+  from_uid uuid not null, to_uid uuid, kind text not null, price int not null, t timestamptz not null default now());
+create index if not exists cf_drinks_code on cf_drinks(code, id);
+alter table cf_chat enable row level security;
+alter table cf_drinks enable row level security;
+revoke all on cf_chat, cf_drinks from anon, authenticated;
+
+create or replace function cf_drink_price(k text) returns int language sql immutable as $$
+  select case k when 'coffee' then 20 when 'beer' then 50 when 'wine' then 80
+                when 'cocktail' then 120 when 'whisky' then 150 when 'champagne' then 400 end
+$$;
+
+-- my wallet; the first call of each day adds a bonus of 200
+create or replace function cf_wallet() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); b int; bonus int := 0;
+begin
+  insert into cf_profiles(uid) values (u) on conflict do nothing;
+  update cf_profiles set bank = bank + 200, bonus_day = current_date
+    where uid = u and (bonus_day is null or bonus_day < current_date) returning bank into b;
+  if found then bonus := 200; else select bank into b from cf_profiles where uid = u; end if;
+  return jsonb_build_object('bank', b, 'bonus', bonus);
+end $$;
+
+-- an emoji message: up to 5 indexes into the app's emoji set, e.g. '3,17,5'
+create or replace function cf_say(p_code text, p_msg text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); c text := upper(p_code);
+begin
+  if p_msg is null or p_msg !~ '^[0-9]{1,2}(,[0-9]{1,2}){0,4}$' then raise exception 'bad message'; end if;
+  if exists (select 1 from unnest(string_to_array(p_msg, ',')) x where x::int > 63) then raise exception 'bad message'; end if;
+  if not exists (select 1 from cf_players where code = c and uid = u and left_at is null) then raise exception 'not at table'; end if;
+  if exists (select 1 from cf_chat where code = c and uid = u and t > now() - interval '1 second') then raise exception 'too fast'; end if;
+  insert into cf_chat(code, uid, msg) values (c, u, p_msg);
+  delete from cf_chat where code = c and t < now() - interval '5 minutes';
+end $$;
+
+-- buy a drink for someone at the table (p_code null = practice game vs computer, only pays)
+create or replace function cf_drink(p_code text, p_to uuid, p_kind text) returns int
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); c text := upper(p_code); pr int := cf_drink_price(p_kind); b int;
+begin
+  if pr is null then raise exception 'bad drink'; end if;
+  if c is not null then
+    if not exists (select 1 from cf_players where code = c and uid = u and left_at is null) then raise exception 'not at table'; end if;
+    if p_to is null or not exists (select 1 from cf_players where code = c and uid = p_to and left_at is null) then raise exception 'player not at table'; end if;
+  end if;
+  perform cf_wallet();
+  update cf_profiles set bank = bank - pr where uid = u and bank >= pr returning bank into b;
+  if not found then raise exception 'no money'; end if;
+  insert into cf_drinks(code, from_uid, to_uid, kind, price) values (c, u, case when c is null then null else p_to end, p_kind, pr);
+  delete from cf_drinks where t < now() - interval '1 day';
+  return b;
+end $$;
+
+-- recent emoji and drinks for cf_view
+create or replace function cf_social(p_code text) returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'chat', (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'uid', c.uid, 'm', c.msg) order by c.id), '[]')
+             from cf_chat c where c.code = p_code and c.t > now() - interval '20 seconds'),
+    'drinks', (select coalesce(jsonb_agg(x.o order by x.id), '[]') from (
+               select d.id, jsonb_build_object('id', d.id, 'from', d.from_uid, 'to', d.to_uid, 'kind', d.kind,
+                        'age', (extract(epoch from now() - d.t) * 1000)::bigint) o
+               from cf_drinks d where d.code = p_code and d.t > now() - interval '15 minutes' order by d.id desc limit 40) x))
+$$;
+
+create or replace function cf_view(p_code text, p_ver int default 0) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; sec cf_secret; i int; v_hole jsonb := null; v_hand int;
+begin
+  select * into t from cf_tables where code = upper(p_code);
+  if not found then return jsonb_build_object('ok', false, 'err', 'notfound'); end if;
+  update cf_players set seen = now() where code = t.code and uid = u;
+  update cf_profiles set seen = now() where uid = u;
+  v_hand := cf_gi(t.state, 'handNo');
+  i := cf_seat_of(t.state, u);
+  if i >= 0 then
+    select * into sec from cf_secret where code = t.code;
+    if sec.hand = v_hand then v_hole := sec.hole->(i::text); end if;
+  end if;
+  return jsonb_build_object(
+    'ok', true, 'code', t.code, 'ver', t.ver, 'now', cf_now(), 'host', t.host, 'name', t.name, 'gid', t.gid,
+    'cfg', t.cfg, 'status', t.status, 'me', u,
+    'state', case when t.ver <> p_ver then t.state else null end,
+    'hole', jsonb_build_object('hand', v_hand, 'cards', v_hole),
+    'players', (select coalesce(jsonb_agg(jsonb_build_object('uid', uid, 'name', name, 'img', case when p_ver = 0 or t.ver <> p_ver then img else null end,
+                  'on', seen > now() - interval '15 seconds', 'pending', pending, 'left', left_at is not null) order by joined), '[]')
+                from cf_players where code = t.code),
+    'shows', (select coalesce(jsonb_agg(jsonb_build_object('uid', s.uid, 'cards', s.cards)), '[]') from cf_shows s where s.code = t.code and s.hand = v_hand)
+  ) || cf_social(t.code);
+end $$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -846,7 +948,8 @@ begin
     if f.proname in ('cf_profile','cf_create','cf_join','cf_start','cf_move','cf_timeout','cf_next','cf_show','cf_leave',
                      'cf_set_advisor','cf_restart','cf_view','cf_group_create','cf_group_join','cf_group_leave',
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
-                     'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss') then
+                     'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
+                     'cf_wallet','cf_say','cf_drink') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

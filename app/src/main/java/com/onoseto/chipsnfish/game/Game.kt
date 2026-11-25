@@ -506,6 +506,7 @@ object Game {
         }
         st.seats = (listOf(seatObj("hero", cfg.stack)) + bots.map { seatObj(it.id, cfg.stack) }).toMutableList()
         st.pos = null
+        com.onoseto.chipsnfish.online.Social.resetTable()
         startHand()
         eq = null; undoStack.clear(); raiseOpen = false
         update()
@@ -704,6 +705,7 @@ object Game {
         val ws = win.indices.filter { win[it] > 0 }
         st.done = Done(ws, win.toList(), sd, sc.mapValues { Cards.cat(it.value) }, win[0] - st.seats[0].total)
         learnBots(sc)
+        if (bot()) com.onoseto.chipsnfish.online.Social.botsReact(ws, st.seats.sumOf { it.total } > 30 * st.bb)
         val alive = st.seats.filter { it.stack > 0 }
         if (st.seats[0].stack <= 0) st.over = Over(false, alive.size + 1)
         else if (alive.size == 1) st.over = Over(true, 1)

@@ -452,10 +452,14 @@ private fun SeatSheet(k: Int) {
     val p = g.pl(s)
     var name by remember(p.id) { mutableStateOf(p.name) }
     HeadWho(p, name, { name = it }) {
-        if (g.online() && k != 0 && com.onoseto.chipsnfish.online.SupaCfg.configured) {
-            val O = com.onoseto.chipsnfish.online.Online
-            if (O.isFriend(p.id)) T("★ " + L("V přátelích", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
-            else Btn(L("★ Přidat do přátel", "★ Add friend", "★ Zu Freunden"), BK.GOLD, height = 34.dp) { O.addFriend(p.id, p.name) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (g.online() && k != 0 && com.onoseto.chipsnfish.online.SupaCfg.configured) {
+                val O = com.onoseto.chipsnfish.online.Online
+                if (O.isFriend(p.id)) T("★ " + L("V přátelích", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
+                else Btn(L("★ Přidat do přátel", "★ Add friend", "★ Zu Freunden"), BK.GOLD, height = 34.dp) { O.addFriend(p.id, p.name) }
+            }
+            if (com.onoseto.chipsnfish.online.Social.available() && com.onoseto.chipsnfish.online.SupaCfg.configured)
+                Btn("🍹 " + L("Drink", "Drink", "Drink"), BK.DARK, height = 34.dp) { Ui.close(); com.onoseto.chipsnfish.online.Social.openPanel("drink", s.pid) }
         }
     }
     if (s.actions.isNotEmpty()) ActionChips(s.actions)

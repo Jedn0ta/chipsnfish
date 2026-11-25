@@ -311,6 +311,12 @@ fun TableView() {
         if (Ui.moodSeat in 0 until st.n) MoodPop(geo, w, h)
         // fish bubble, swimming chip, chip rain
         FishFx(geo, w, h)
+        // emoji bubbles, flying drinks, emoji/drink panel
+        SocialFx(geo, w, h)
+        if (com.onoseto.chipsnfish.online.Social.available()) {
+            SocialBtn(Modifier.align(Alignment.BottomStart).padding(start = 2.dp, bottom = if (playing && Game.advisorOn()) 46.dp else 2.dp).zIndex(7f))
+            if (com.onoseto.chipsnfish.online.Social.open) Box(Modifier.align(Alignment.BottomStart).padding(start = 46.dp, bottom = 2.dp).zIndex(21f)) { SocialPop() }
+        }
         // right column
         Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(90.dp).zIndex(8f)) { ActBox() }
         if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 96.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
@@ -487,7 +493,10 @@ private fun SeatView(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                 // stack chip
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                    StackChip(if (s.allin && playing) "ALL-IN" else g.shortN(s.stack), s.allin && playing, crit, sc)
+                    Column(horizontalAlignment = Alignment.End) {
+                        StackChip(if (s.allin && playing) "ALL-IN" else g.shortN(s.stack), s.allin && playing, crit, sc)
+                        SeatDrinks(s.pid, sc)
+                    }
                 }
                 Spacer(Modifier.width((5 * sc).dp))
                 // avatar

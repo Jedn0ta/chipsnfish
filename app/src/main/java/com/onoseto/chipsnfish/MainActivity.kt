@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
             com.onoseto.chipsnfish.online.Nearby.start(this)
             com.onoseto.chipsnfish.online.Online.startInbox()
             com.onoseto.chipsnfish.online.Online.loadFriends()
+            com.onoseto.chipsnfish.online.Social.loadBank()
         }
         if (Game.online()) com.onoseto.chipsnfish.online.Online.startPolling()
     }

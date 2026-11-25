@@ -64,6 +64,12 @@ rpc "$A" cf_invite "{\"p_uid\":\"$UB\",\"p_code\":\"$CODE\"}" >/dev/null
 [ "$(rpc "$B" cf_inbox '{}' | jq -r '.[0].from')" = "Test A" ] || { echo "invite failed"; exit 1; }
 rpc "$A" cf_friend_remove "{\"p_uid\":\"$UB\"}" >/dev/null
 echo "✓ friends and invites"
+[ "$(rpc "$A" cf_wallet '{}' | jq -r .bank)" -ge 50 ] || { echo "wallet failed"; exit 1; }
+rpc "$A" cf_say "{\"p_code\":\"$CODE\",\"p_msg\":\"0,4,21\"}" >/dev/null
+rpc "$A" cf_drink "{\"p_code\":\"$CODE\",\"p_to\":\"$UB\",\"p_kind\":\"beer\"}" >/dev/null
+VS=$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}")
+[ "$(echo "$VS" | jq -r '.chat[-1].m')" = "0,4,21" ] && [ "$(echo "$VS" | jq -r '.drinks[-1].kind')" = "beer" ] || { echo "emoji/drinks failed: $(echo "$VS" | jq -c '{chat,drinks}')"; exit 1; }
+echo "✓ emoji chat, wallet and drinks"
 rpc "$A" cf_ping '{}' >/dev/null; echo "✓ keep-alive ping"
 rpc "$B" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null; rpc "$A" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null
 echo "ALL SERVER TESTS PASSED"
