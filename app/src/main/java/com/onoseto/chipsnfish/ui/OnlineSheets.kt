@@ -93,6 +93,7 @@ fun OnlineSheet(a: OnlineArg) {
     if (O.code != null) {
         Btn(L("Zpět ke stolu ${O.code}", "Back to table ${O.code}", "Zurück zu Tisch ${O.code}"), BK.CALL, Modifier.fillMaxWidth()) { goTable() }
     }
+    NearbyList()
     if (a.tab == "join") {
         var code by remember { mutableStateOf("") }
         Label(L("Kód stolu", "Table code", "Tischcode"))
@@ -145,6 +146,26 @@ fun OnlineSheet(a: OnlineArg) {
     Btn(L("▶ Založit stůl", "▶ Create table", "▶ Tisch erstellen"), modifier = Modifier.fillMaxWidth(), enabled = !O.busy) {
         Game.gameCfg = Game.gameCfg.copy(stack = stack, level = level, every = every); Game.saveCfg()
         O.create(tname, stack, level, every, adv, gid) { goTable() }
+    }
+}
+
+@Composable
+fun NearbyList() {
+    watch()
+    val near = com.onoseto.chipsnfish.online.Nearby.tables.filter { it.code != Online.code }
+    if (near.isEmpty()) return
+    Label(L("Stoly v okolí · Wi-Fi", "Tables nearby · Wi-Fi", "Tische in der Nähe · WLAN"))
+    near.forEach { t ->
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.win.copy(alpha = 0.12f)).border(1.dp, C.win.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                .tap { Online.join(t.code) { goTable() } }.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            T("📶", 16.sp)
+            T(t.who.ifBlank { L("Hráč", "Player", "Spieler") }, 15.sp, weight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
+            T(t.code, 16.sp, C.gold, num = true, letter = 2.sp)
+            T(L("Přisednout ›", "Join ›", "Beitreten ›"), 13.sp, C.win, FontWeight.ExtraBold)
+        }
     }
 }
 

@@ -319,6 +319,19 @@ private fun MenuScreen(onExit: () -> Unit) {
                     sub = tr("Otevřít"), cur = false, newBtn = false, onNew = {},
                 ) { Ui.hideMenu(); Ui.solo = true; Ui.goView("players") }
             }
+            val near = com.onoseto.chipsnfish.online.Nearby.tables.filter { it.code != O.code }
+            if (near.isNotEmpty()) {
+                val t = near.last()
+                Row(
+                    Modifier.clip(RoundedCornerShape(12.dp)).background(C.win.copy(alpha = 0.14f)).border(1.dp, C.win.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .tap { O.join(t.code) { goTable() } }.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    T("📶", 15.sp)
+                    T(L("Na Wi-Fi hraje ${t.who} · stůl ${t.code}", "${t.who} is playing on your Wi-Fi · table ${t.code}", "${t.who} spielt in deinem WLAN · Tisch ${t.code}"), 14.sp, C.ink, FontWeight.Bold)
+                    T(L("Přisednout ›", "Join ›", "Beitreten ›"), 13.sp, C.win, FontWeight.ExtraBold)
+                }
+            }
             Row(
                 Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap {
                     O.stopPolling()

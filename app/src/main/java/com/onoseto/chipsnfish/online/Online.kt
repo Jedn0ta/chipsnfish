@@ -111,9 +111,12 @@ object Online {
 
     // ---------------- session ----------------
 
+    fun myName() = Game.P["hero"]?.name ?: ""
+
     fun open(c: String) {
         leaveLocal()
         code = c.uppercase()
+        Nearby.advertise(c.uppercase(), myName())
         ver = 0; raw = null; hole = null; shows = emptyMap(); learned.clear(); learnedShows.clear()
         Game.enterOnline()
         startPolling()
@@ -128,6 +131,7 @@ object Online {
     }
 
     fun leaveLocal() {
+        Nearby.unadvertise()
         pollJob?.cancel(); pollJob = null
         code = null
         players = emptyList()

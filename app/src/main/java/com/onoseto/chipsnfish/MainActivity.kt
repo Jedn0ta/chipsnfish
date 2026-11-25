@@ -73,12 +73,14 @@ class MainActivity : ComponentActivity() {
         Game.gameTick()
         Game.saveLocal()
         com.onoseto.chipsnfish.online.Online.stopPolling()
+        com.onoseto.chipsnfish.online.Nearby.stop()
     }
 
     override fun onResume() {
         super.onResume()
         Ui.refreshActive()
         com.onoseto.chipsnfish.online.KeepAlive.opened(this)
+        if (com.onoseto.chipsnfish.online.SupaCfg.configured) com.onoseto.chipsnfish.online.Nearby.start(this)
         if (Game.online()) com.onoseto.chipsnfish.online.Online.startPolling()
     }
 }
