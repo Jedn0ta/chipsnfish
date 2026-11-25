@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         Ui.refreshActive()
         com.onoseto.chipsnfish.online.KeepAlive.opened(this)
+        Updater.check(this, quiet = true)
         if (com.onoseto.chipsnfish.online.SupaCfg.configured) com.onoseto.chipsnfish.online.Nearby.start(this)
         if (Game.online()) com.onoseto.chipsnfish.online.Online.startPolling()
     }

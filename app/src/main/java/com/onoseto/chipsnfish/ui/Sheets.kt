@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -756,8 +757,8 @@ private fun SettingsSheet(d: SettingsArg) {
     val ctx = LocalContext.current
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         T(tr("Nastavení").uppercase(), 24.sp, num = true)
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk").filter { it.first != "game" || g.gm() }.forEach { (k, l) ->
+        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk", "update" to "Aktualizace").filter { it.first != "game" || g.gm() }.forEach { (k, l) ->
                 val on = d.tab == k
                 Box(Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) C.ink else Color.Transparent).border(1.dp, if (on) C.ink else C.line, RoundedCornerShape(99.dp)).tap { d.tab = k; Ui.redraw() }.padding(horizontal = 11.dp, vertical = 5.dp)) {
                     T(tr(l), 12.5.sp, if (on) C.room else C.muted, FontWeight.Bold)
@@ -923,6 +924,7 @@ private fun SettingsSheet(d: SettingsArg) {
                 Btn(tr("Obnovit z textu"), BK.GHOST, Modifier.fillMaxWidth()) { if (paste.isNotBlank()) askRestore(paste.trim()) }
             }
         }
+        "update" -> UpdateTab()
         else -> {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(Triple("cs", "Čeština", "CZ"), Triple("en", "English", "EN"), Triple("de", "Deutsch", "DE")).forEach { (c, l, f) ->
@@ -936,6 +938,36 @@ private fun SettingsSheet(d: SettingsArg) {
             }
         }
     }
+}
+
+@Composable
+private fun UpdateTab() {
+    watch()
+    val ctx = LocalContext.current
+    val U = com.onoseto.chipsnfish.Updater
+    val (code, name) = remember { U.current(ctx) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { if (U.state == "idle") U.check(ctx) }
+    Summary(listOf(L("Nainstalovaná verze", "Installed version", "Installierte Version") to "$name (#$code)",
+        L("Nejnovější verze", "Latest version", "Neueste Version") to if (U.latest > 0) "#${U.latest}" else "–"))
+    when (U.state) {
+        "checking" -> Note(L("Hledám novou verzi…", "Looking for a new version…", "Suche nach neuer Version…"))
+        "latest" -> Note("<b>" + L("Máš nejnovější verzi.", "You have the latest version.", "Du hast die neueste Version.") + "</b>")
+        "available" -> {
+            Note("<b>" + L("Je k dispozici nová verze #${U.latest}.", "New version #${U.latest} is available.", "Neue Version #${U.latest} verfügbar.") + "</b> " +
+                L("Data (hráči, statistiky, rozehrané hry) zůstanou.", "Your data (players, stats, games) stays.", "Deine Daten (Spieler, Statistiken, Spiele) bleiben."))
+            Btn(L("⬇ Stáhnout a nainstalovat", "⬇ Download and install", "⬇ Herunterladen und installieren"), BK.CALL, Modifier.fillMaxWidth()) { U.download(ctx) }
+        }
+        "downloading" -> {
+            Note(L("Stahuji… ${(U.progress * 100).roundToInt()} %", "Downloading… ${(U.progress * 100).roundToInt()} %", "Lade… ${(U.progress * 100).roundToInt()} %"))
+            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(9.dp)).background(C.panel2)) { Box(Modifier.fillMaxWidth(U.progress).fillMaxHeight().background(C.win)) }
+        }
+        "ready" -> Btn(L("Instalovat", "Install", "Installieren"), BK.CALL, Modifier.fillMaxWidth()) { U.install(ctx) }
+        "error" -> Note(L("Aktualizaci se nepodařilo zjistit nebo stáhnout. Zkontroluj internet a zkus to znovu.", "Couldn't check or download the update. Check your internet and try again.", "Update konnte nicht geprüft oder geladen werden. Internet prüfen und erneut versuchen."))
+    }
+    if (U.state != "downloading") Btn(L("Zkontrolovat aktualizace", "Check for updates", "Nach Updates suchen"), BK.GHOST, Modifier.fillMaxWidth()) { U.check(ctx) }
+    Note(L("Při první aktualizaci Android požádá o povolení instalovat aplikace z Chips&Fish. Povol ho a klepni na Instalovat znovu.",
+        "On the first update Android asks for permission to install apps from Chips&Fish. Allow it and tap Install again.",
+        "Beim ersten Update fragt Android nach der Erlaubnis, Apps aus Chips&Fish zu installieren. Erlauben und erneut Installieren tippen."))
 }
 
 private fun askRestore(txt: String) {

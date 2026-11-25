@@ -319,6 +319,17 @@ private fun MenuScreen(onExit: () -> Unit) {
                     sub = tr("Otevřít"), cur = false, newBtn = false, onNew = {},
                 ) { Ui.hideMenu(); Ui.solo = true; Ui.goView("players") }
             }
+            if (com.onoseto.chipsnfish.Updater.state == "available") {
+                Row(
+                    Modifier.clip(RoundedCornerShape(12.dp)).background(C.gold.copy(alpha = 0.12f)).border(1.dp, C.gold.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .tap { Ui.open("settings", SettingsArg(tab = "update", level = 0, startStack = 0, autoBlinds = true, dealer = 0)) }.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    T("⬆", 15.sp, C.gold, FontWeight.ExtraBold)
+                    T(L("Je tu nová verze aplikace", "A new app version is available", "Neue App-Version verfügbar"), 14.sp, C.ink, FontWeight.Bold)
+                    T(L("Aktualizovat ›", "Update ›", "Aktualisieren ›"), 13.sp, C.gold, FontWeight.ExtraBold)
+                }
+            }
             val near = com.onoseto.chipsnfish.online.Nearby.tables.filter { it.code != O.code }
             if (near.isNotEmpty()) {
                 val t = near.last()
