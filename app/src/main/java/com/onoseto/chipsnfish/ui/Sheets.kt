@@ -89,7 +89,7 @@ fun SheetHost() {
     val sh = Ui.sheet ?: return
     @Suppress("UNUSED_VARIABLE") val r1 = Ui.sheetRev
     @Suppress("UNUSED_VARIABLE") val r2 = Game.rev
-    val wide = sh.kind == "card" || sh.kind == "settings" || sh.kind == "gamesetup" || sh.kind == "online" || sh.kind == "groups"
+    val wide = sh.kind in setOf("card", "settings", "gamesetup", "online", "groups", "analysis", "seat", "player")
     val compact = sh.kind == "confirm"
     Box(
         Modifier.fillMaxSize().zIndex(40f).background(Color.Black.copy(alpha = 0.65f)).tap { Ui.close() }.padding(8.dp),
@@ -251,6 +251,8 @@ private fun AnalysisSheet() {
     val g = Game
     val st = g.st
     SheetHead(tr("Rádce"))
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     if (g.playing()) CoachBox()
     // equity
     BoxPanel {
@@ -300,6 +302,8 @@ private fun AnalysisSheet() {
             }
         }
     }
+    }
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     // bluff reads
     BoxPanel {
         Label(tr("Odhad bluffu soupeřů"))
@@ -369,6 +373,8 @@ private fun AnalysisSheet() {
             }
         }
     }
+    }
+    }
 }
 
 @Composable
@@ -401,17 +407,26 @@ private fun CoachBox() {
 // ---------------- seat & player ----------------
 
 @Composable
-private fun HeadWho(p: Player, name: String, onName: (String) -> Unit) {
+private fun HeadWho(p: Player, name: String, onName: (String) -> Unit, extra: @Composable () -> Unit = {}) {
     watch()
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Avatar(p, 60.dp)
-        Column(Modifier.weight(1f)) {
-            if (p.bot || Game.online()) T(p.name, 19.sp, weight = FontWeight.ExtraBold)
-            else BasicTextField(name, onName, singleLine = true, textStyle = TextStyle(color = C.ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold), cursorBrush = SolidColor(C.gold), modifier = Modifier.fillMaxWidth())
-            Box(Modifier.fillMaxWidth().height(1.dp).background(C.line))
-            T(if (p.id == "hero") tr("To jsi ty") else Reads.typeLine(p), 12.5.sp, C.muted)
+    val ctx = LocalContext.current
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) loadImg(ctx, uri)?.let { p.img = it; Game.persistP(p); Game.update(); Ui.redraw() } ?: Game.toast(tr("Tuhle fotku se nepodařilo načíst"))
+    }
+    val canEdit = !p.bot && !(Game.online() && p.id != com.onoseto.chipsnfish.online.Online.me)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Box(Modifier.then(if (canEdit) Modifier.tap { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) } else Modifier)) {
+            Avatar(p, 48.dp)
+            if (canEdit) Box(Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(C.panel2).border(1.dp, C.line, CircleShape), contentAlignment = Alignment.Center) { T("📷", 9.sp) }
         }
-        Spacer(Modifier.width(36.dp))
+        Column(Modifier.weight(1f)) {
+            if (!canEdit) T(p.name, 18.sp, weight = FontWeight.ExtraBold, maxLines = 1)
+            else BasicTextField(name, onName, singleLine = true, textStyle = TextStyle(color = C.ink, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold), cursorBrush = SolidColor(C.gold), modifier = Modifier.fillMaxWidth())
+            Box(Modifier.fillMaxWidth().height(1.dp).background(C.line))
+            T(if (p.id == "hero") tr("To jsi ty") else Reads.typeLine(p), 12.sp, C.muted, maxLines = 1)
+        }
+        extra()
+        Spacer(Modifier.width(34.dp))
     }
 }
 
@@ -436,75 +451,42 @@ private fun SeatSheet(k: Int) {
     val s = st.seats.getOrNull(k) ?: run { Ui.close(); return }
     val p = g.pl(s)
     var name by remember(p.id) { mutableStateOf(p.name) }
-    HeadWho(p, name) { name = it }
+    HeadWho(p, name, { name = it }) {
+        if (g.online() && k != 0 && com.onoseto.chipsnfish.online.SupaCfg.configured) {
+            val O = com.onoseto.chipsnfish.online.Online
+            if (O.isFriend(p.id)) T("★ " + L("V přátelích", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
+            else Btn(L("★ Přidat do přátel", "★ Add friend", "★ Zu Freunden"), BK.GOLD, height = 34.dp) { O.addFriend(p.id, p.name) }
+        }
+    }
     if (s.actions.isNotEmpty()) ActionChips(s.actions)
-    if (g.playing() && !g.gm()) {
-        var stack by remember(k) { mutableStateOf(s.stack.toString()) }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(Modifier.weight(1f)) {
-                Label(tr("Žetony (oprava)"))
-                Field(stack, { v -> stack = v.filter { it.isDigit() }; stack.toIntOrNull()?.let { s.stack = max(0, it); g.update() } }, number = true)
-            }
-            Column(Modifier.weight(1f)) {
-                Label(tr("Tah"))
-                when {
-                    s.folded -> Btn(tr("Vrátit do hry"), BK.GHOST, Modifier.fillMaxWidth()) { s.folded = false; Ui.close(); g.update() }
-                    st.turn == k -> Btn(tr("Je na tahu"), BK.GHOST, Modifier.fillMaxWidth(), enabled = false) {}
-                    else -> Btn(tr("Dát mu tah"), BK.GHOST, Modifier.fillMaxWidth()) { st.turn = k; g.raiseOpen = false; Ui.close(); g.update() }
-                }
-            }
-        }
-    }
-    if (k != 0) {
-        val m = Reads.model(st, g.P, s)
-        val b = Reads.seatBluff(st, g.P, s)
-        val (lt, li) = Reads.lvl(b.v)
-        val lc = C.lvl(li)
-        BoxPanel {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.clip(RoundedCornerShape(99.dp)).background(lc).padding(horizontal = 7.dp, vertical = 2.dp)) { T(lt.uppercase(), 10.5.sp, Color(0xFF111111), FontWeight.ExtraBold) }
-                Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(9.dp)).background(Color.White.copy(alpha = 0.08f))) { Box(Modifier.fillMaxWidth(b.v.toFloat()).fillMaxHeight().background(lc)) }
-                T("${(b.v * 100).roundToInt()} %", 28.sp, num = true)
-            }
-            T(if (b.act) L("Odhad, že jeho útok na ${I18n.stn4(m.br!!.st)} je bluff.", "Estimate that his aggression on the ${I18n.stn4(m.br!!.st)} is a bluff.", "Schätzung, dass sein Angriff am ${I18n.stn4(m.br!!.st)} ein Bluff ist.")
-            else tr("Obecný sklon k bluffování. Až po flopu vsadí nebo zvýší, odhad se zpřesní pro konkrétní sázku."), 13.sp)
-            m.br?.let { br ->
-                var open by remember { mutableStateOf(false) }
-                T((if (open) "▾ " else "▸ ") + tr("Proč tento odhad"), 13.sp, C.muted, FontWeight.Bold, modifier = Modifier.tap { open = !open })
-                if (open) br.r.forEach { r ->
-                    Row(Modifier.fillMaxWidth()) {
-                        T(r.t, 13.sp, modifier = Modifier.weight(1f))
-                        T(if (r.isBase) L("základ ", "base ", "Basis ") + "${(r.d * 100).roundToInt()} %" else (if (r.d > 0) "+" else "−") + "${kotlin.math.abs((r.d * 100).roundToInt())} b.", 13.sp, weight = FontWeight.Bold)
-                    }
-                }
-            }
-            T(L("Podle preflopu hraje zhruba top ${(m.w * 100).roundToInt()} % startovních rukou.", "Based on preflop he plays roughly the top ${(m.w * 100).roundToInt()} % of starting hands.", "Laut Preflop spielt er etwa die Top ${(m.w * 100).roundToInt()} % der Starthände."), 12.5.sp, C.muted)
-        }
-    }
-    if (g.online() && k != 0 && com.onoseto.chipsnfish.online.SupaCfg.configured) {
-        val O = com.onoseto.chipsnfish.online.Online
-        if (O.isFriend(p.id)) Note("<b>★ " + L("V přátelích", "In your friends", "In deinen Freunden") + "</b>")
-        else Btn(L("★ Přidat do přátel", "★ Add to friends", "★ Zu Freunden"), BK.GOLD, Modifier.fillMaxWidth()) { O.addFriend(p.id, p.name) }
-    }
     val notes = remember(p.id) { mutableStateOf(p.notes) }
     val type = remember(p.id) { mutableStateOf(p.override) }
-    PlayerBlock(p, notes, type)
-    Btn(tr("Uložit hráče"), modifier = Modifier.fillMaxWidth()) { savePlayer(p, name, notes.value, type.value) }
-    if (k != 0 && !g.playing() && !g.gm()) {
-        val others = g.P.values.filter { q -> q.id != "hero" && q.stored && st.seats.none { it.pid == q.id } }.sortedByDescending { it.t }
-        Label(tr("Na tomto místě sedí"))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            others.forEach { q -> Pill(q.name + " · " + Reads.prof(q).s, false) { s.pid = q.id; g.cleanup(); g.update(); Ui.redraw() } }
-            Pill(tr("+ Nový hráč"), false) { val np = g.newPlayer(L("Hráč ", "Player ", "Spieler ") + k); s.pid = np.id; g.cleanup(); g.update(); Ui.redraw() }
+    PlayerBlock(p, notes, type, save = { savePlayer(p, name, notes.value, type.value) }, top = { if (k != 0) ReadBox(s) })
+}
+
+@Composable
+private fun ReadBox(s: com.onoseto.chipsnfish.game.Seat) {
+    watch()
+    val g = Game
+    val m = Reads.model(g.st, g.P, s)
+    val b = Reads.seatBluff(g.st, g.P, s)
+    val (lt, li) = Reads.lvl(b.v)
+    val lc = C.lvl(li)
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel2).tap { open = !open }.padding(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            T(L("Bluff", "Bluff", "Bluff"), 11.sp, C.muted, FontWeight.ExtraBold)
+            Box(Modifier.clip(RoundedCornerShape(99.dp)).background(lc).padding(horizontal = 6.dp, vertical = 1.dp)) { T(lt.uppercase(), 9.5.sp, Color(0xFF111111), FontWeight.ExtraBold) }
+            Box(Modifier.weight(1f).height(7.dp).clip(RoundedCornerShape(9.dp)).background(Color.White.copy(alpha = 0.08f))) { Box(Modifier.fillMaxWidth(b.v.toFloat()).fillMaxHeight().background(lc)) }
+            T("${(b.v * 100).roundToInt()} %", 20.sp, num = true)
         }
-        if (st.phase == "setup") Btn(L("Odebrat ze stolu", "Remove from table", "Vom Tisch nehmen"), BK.DANGER, Modifier.fillMaxWidth()) {
-            val rm = st.seats.removeAt(k)
-            st.pos?.removeAt(k)
-            st.n--
-            g.respace()
-            if (st.dealer >= st.n) st.dealer = 0
-            g.cleanup(); g.saveLayout(); Ui.close(); g.update()
-            g.toast(L("${g.P[rm.pid]?.name ?: ""} odešel na lavičku", "${g.P[rm.pid]?.name ?: ""} went to the bench", "${g.P[rm.pid]?.name ?: ""} ging auf die Bank"))
+        T((if (b.act) L("Odhad pro jeho sázku na ${I18n.stn4(m.br!!.st)}.", "For his bet on the ${I18n.stn4(m.br!!.st)}.", "Für seinen Einsatz am ${I18n.stn4(m.br!!.st)}.") else L("Obecný sklon, zatím neútočil.", "General tendency, no aggression yet.", "Allgemeine Neigung, noch kein Angriff.")) +
+            L(" Hraje cca top ${(m.w * 100).roundToInt()} % rukou.", " Plays about top ${(m.w * 100).roundToInt()} % of hands.", " Spielt etwa Top ${(m.w * 100).roundToInt()} % der Hände.") + if (m.br != null) (if (open) " ▾" else " ▸") else "", 11.5.sp, C.muted, maxLines = if (open) 2 else 1)
+        if (open) m.br?.r?.forEach { r ->
+            Row(Modifier.fillMaxWidth()) {
+                T(r.t, 11.5.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                T(if (r.isBase) "${(r.d * 100).roundToInt()} %" else (if (r.d > 0) "+" else "−") + "${kotlin.math.abs((r.d * 100).roundToInt())}", 11.5.sp, weight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -527,15 +509,15 @@ private fun PlayerSheet(a: PlayerArg) {
     val g = Game
     val p = g.P[a.id] ?: run { Ui.close(); return }
     var name by remember(p.id) { mutableStateOf(p.name) }
-    HeadWho(p, name) { name = it }
+    HeadWho(p, name, { name = it })
     val notes = remember(p.id) { mutableStateOf(p.notes) }
     val type = remember(p.id) { mutableStateOf(p.override) }
-    PlayerBlock(p, notes, type)
-    Btn(tr("Uložit hráče"), modifier = Modifier.fillMaxWidth()) { savePlayer(p, name, notes.value, type.value) }
-    if (g.st.seats.any { it.pid == p.id }) Note(tr("Hráč teď sedí u stolu. Smazat ho můžeš, až ho z místa vyměníš."))
-    else Btn(tr(if (a.confirm) "Opravdu smazat i se statistikami?" else "Smazat hráče"), BK.DANGER, Modifier.fillMaxWidth()) {
-        if (!a.confirm) { a.confirm = true; Ui.redraw() }
-        else { g.P.remove(p.id); g.saveLocal(); Ui.close(); g.bump(); g.toast(tr("Hráč smazán")) }
+    PlayerBlock(p, notes, type, save = { savePlayer(p, name, notes.value, type.value) }) {
+        if (g.st.seats.any { it.pid == p.id }) T(tr("Hráč teď sedí u stolu."), 11.sp, C.muted)
+        else T(tr(if (a.confirm) "Opravdu smazat i se statistikami?" else "Smazat hráče"), 12.sp, C.lose, FontWeight.Bold, modifier = Modifier.tap {
+            if (!a.confirm) { a.confirm = true; Ui.redraw() }
+            else { g.P.remove(p.id); g.saveLocal(); Ui.close(); g.bump(); g.toast(tr("Hráč smazán")) }
+        }.padding(vertical = 2.dp))
     }
 }
 
@@ -545,34 +527,52 @@ fun StatCell(p: Player, k: String, modifier: Modifier = Modifier) {
     Column(
         modifier.clip(RoundedCornerShape(10.dp)).background(C.panel2)
             .combinedClickable(remember { MutableInteractionSource() }, null, onLongClick = { Ui.tip = Game.statTip(p, k) }, onClick = { Ui.tip = Game.statTip(p, k) })
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 5.dp),
     ) {
-        T(Game.statFmt(k, Game.statVal(p, k)), 22.sp, num = true)
-        T(Game.statLabel(k).uppercase(), 10.5.sp, C.muted, FontWeight.ExtraBold, letter = 0.5.sp, maxLines = 1)
+        T(Game.statFmt(k, Game.statVal(p, k)), 18.sp, num = true, lineHeight = 19.sp)
+        T(Game.statLabel(k).uppercase(), 9.sp, C.muted, FontWeight.ExtraBold, maxLines = 1)
     }
 }
 
 @Composable
-private fun PlayerBlock(p: Player, notes: androidx.compose.runtime.MutableState<String>, type: androidx.compose.runtime.MutableState<String>) {
+private fun PlayerBlock(
+    p: Player, notes: androidx.compose.runtime.MutableState<String>, type: androidx.compose.runtime.MutableState<String>,
+    save: () -> Unit, top: @Composable () -> Unit = {}, bottom: @Composable () -> Unit = {},
+) {
     watch()
-    val g = Game
-    PhotoButtons(p)
-    if (p.id != "hero") {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("hands", "vpip", "pfr").forEach { StatCell(p, it, Modifier.weight(1f)) } }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("af", "caught", "showed").forEach { StatCell(p, it, Modifier.weight(1f)) } }
-        }
-        Note(tr("Podrž políčko statistiky = vysvětlení."))
+    if (p.id == "hero" || p.id == com.onoseto.chipsnfish.online.Online.me) {
+        MoodTable(p.id)
+        Btn(tr("Uložit"), modifier = Modifier.fillMaxWidth(), height = 40.dp) { save() }
+        return
     }
-    MoodTable(p.id)
-    if (p.id == "hero") return
-    Label(tr("Typ hráče"))
-    Picks(listOf("auto" to tr("Automaticky podle statistik")) + Reads.PROF.values.map { it.key to it.l }, type.value) { type.value = it; Ui.redraw() }
-    val t = Reads.PROF[if (type.value != "auto") type.value else Reads.autoType(p).t] ?: Reads.PROF.getValue("unk")
-    androidx.compose.material3.Text(rich(t.d + " " + L("Obecný sklon k bluffu", "General bluff tendency", "Allgemeine Bluff-Neigung") + ": <b>${(Reads.baseBluff(p) * 100).roundToInt()} %</b>."), color = C.muted, fontSize = 12.5.sp)
-    Label(tr("Poznámky"))
-    Field(notes.value, { notes.value = it }, Modifier.fillMaxWidth(), placeholder = tr("Např. když bluffuje, sahá na žetony…"), minH = 70.dp, single = false)
-    @Suppress("UNUSED_EXPRESSION") g
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            top()
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("hands", "vpip", "pfr").forEach { StatCell(p, it, Modifier.weight(1f)) } }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("af", "caught", "showed").forEach { StatCell(p, it, Modifier.weight(1f)) } }
+            MoodTable(p.id)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Label(tr("Typ hráče"))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                (listOf("auto" to "Auto") + Reads.PROF.values.map { it.key to it.l }).forEach { (k, l) -> SmallPill(l, type.value == k) { type.value = k } }
+            }
+            val t = Reads.PROF[if (type.value != "auto") type.value else Reads.autoType(p).t] ?: Reads.PROF.getValue("unk")
+            androidx.compose.material3.Text(rich(t.d + " " + L("Sklon k bluffu", "Bluff tendency", "Bluff-Neigung") + ": <b>${(Reads.baseBluff(p) * 100).roundToInt()} %</b>."), color = C.muted, fontSize = 11.sp, lineHeight = 14.sp)
+            Field(notes.value, { notes.value = it }, Modifier.fillMaxWidth(), placeholder = tr("Poznámky"), minH = 48.dp, single = false)
+            Btn(tr("Uložit hráče"), modifier = Modifier.fillMaxWidth(), height = 38.dp) { save() }
+            bottom()
+        }
+    }
+}
+
+@Composable
+fun SmallPill(text: String, on: Boolean, onClick: () -> Unit) {
+    watch()
+    val shape = RoundedCornerShape(99.dp)
+    Box(Modifier.clip(shape).background(if (on) C.gold else C.panel2).border(1.dp, if (on) C.gold else C.line, shape).tap(onClick).padding(horizontal = 9.dp, vertical = 4.dp)) {
+        T(text, 11.5.sp, if (on) C.goldInk else C.ink, FontWeight.Bold, maxLines = 1)
+    }
 }
 
 @Composable
@@ -786,22 +786,20 @@ private fun SettingsSheet(d: SettingsArg) {
         "game" -> {
             if (g.online()) OnlineSettingsGame()
             else if (g.gm()) {
-                Summary(listOf(
+                SummaryRow(listOf(
                     tr("Soupeřů") to "${st.seats.drop(1).count { !it.out }} / ${st.n - 1}",
                     tr("Blindy teď") to Cards.lvlStr(st.curLevel),
                     tr("Start žetony") to g.fm(st.startStack),
-                    tr("Zvyšování blindů") to if (st.blindHands > 0) L("každých ${st.blindHands} hand", "every ${st.blindHands} hands", "alle ${st.blindHands} Hände") else tr("nikdy"),
+                    tr("Zvyšování blindů") to if (st.blindHands > 0) L("po ${st.blindHands} hand", "every ${st.blindHands}", "alle ${st.blindHands}") else tr("nikdy"),
                 ))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn(tr("☰ Hlavní menu"), BK.GHOST, Modifier.weight(1f)) { Ui.close(); Ui.showMenu() }
-                    Btn(tr("Ukončit hru"), BK.DANGER, Modifier.weight(1f)) {
+                CoachSwitch(g.gameCfg.coach) { g.gameCfg.coach = it; g.saveCfg(); Ui.coachMin = false; g.bump() }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Btn(tr("☰ Hlavní menu"), BK.GHOST, Modifier.weight(1f), height = 40.dp) { Ui.close(); Ui.showMenu() }
+                    Btn(tr("♠ Výherní kombinace"), BK.GHOST, Modifier.weight(1f), height = 40.dp) { Ui.open("hands", null, Ui.sheet) }
+                    Btn(tr("Nová hra"), BK.GHOST, Modifier.weight(1f), height = 40.dp) { Ui.openGameSetup() }
+                    Btn(tr("Ukončit hru"), BK.DANGER, Modifier.weight(1f), height = 40.dp) {
                         Ui.confirm(tr("Ukončit hru?"), tr("Hra proti počítači skončí a aplikace se zavře."), tr("Ukončit hru")) { g.endGameVsComputer(); Ui.exitRequest++ }
                     }
-                }
-                CoachSwitch(g.gameCfg.coach) { g.gameCfg.coach = it; g.saveCfg(); Ui.coachMin = false; g.bump() }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn(tr("Nová hra proti počítači"), BK.GHOST, Modifier.weight(1f)) { Ui.openGameSetup() }
-                    Btn(tr("♠ Výherní kombinace"), BK.GHOST, Modifier.weight(1f)) { Ui.open("hands", null, Ui.sheet) }
                 }
             } else {
                 if (g.playing()) {
@@ -856,58 +854,65 @@ private fun SettingsSheet(d: SettingsArg) {
             Note(tr("Hodnoty podle vaší sady. Co nemáte, zaškrtni „Nepoužívat“. Měnit můžeš kdykoli, i během hry."))
             g.chips.forEach { c ->
                 var v by remember(c.k) { mutableStateOf(c.v.toString()) }
-                Row(Modifier.fillMaxWidth().alpha(if (c.off) 0.55f else 1f).clip(RoundedCornerShape(10.dp)).background(C.panel2).padding(horizontal = 10.dp, vertical = 4.dp),
+                Row(Modifier.fillMaxWidth().height(44.dp).alpha(if (c.off) 0.55f else 1f).clip(RoundedCornerShape(10.dp)).background(C.panel2).padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ChipIcon(c, 28.dp)
                     T(tr(c.l), 14.sp, weight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     Checkbox(c.off, { c.off = it; g.saveChips(); g.bump(); Ui.redraw() }, colors = CheckboxDefaults.colors(checkedColor = C.gold, checkmarkColor = C.goldInk))
                     T(tr("Nepoužívat"), 12.5.sp, C.muted)
-                    Field(v, { t -> v = t.filter { it.isDigit() }.take(6); v.toIntOrNull()?.let { if (it >= 1) { c.v = it; g.saveChips(); g.bump() } } }, Modifier.width(96.dp), number = true, big = true)
+                    Field(v, { t -> v = t.filter { it.isDigit() }.take(6); v.toIntOrNull()?.let { if (it >= 1) { c.v = it; g.saveChips(); g.bump() } } }, Modifier.width(96.dp), number = true, big = true, minH = 36.dp)
                 }
             }
         }
         "table" -> {
-            Label(tr("Barva stolu"))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                C.FELTS.forEach { (k, v) ->
-                    LookBtn(g.look.felt == k, tr(C.FELT_NAMES.getValue(k)), { g.look.felt = k; g.saveLook(); g.bump(); Ui.redraw() }) {
-                        Box(Modifier.size(30.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(v[0]), Color(v[2])))))
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Label(tr("Barva stolu"))
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        C.FELTS.forEach { (k, v) ->
+                            LookBtn(g.look.felt == k, tr(C.FELT_NAMES.getValue(k)), { g.look.felt = k; g.saveLook(); g.bump(); Ui.redraw() }, Modifier.weight(1f)) {
+                                Box(Modifier.size(26.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(v[0]), Color(v[2])))))
+                            }
+                        }
+                    }
+                    Label(tr("Rub karet"))
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        C.BACKS.forEach { (k, l) -> LookBtn(g.look.back == k, tr(l), { g.look.back = k; g.saveLook(); g.bump(); Ui.redraw() }, Modifier.weight(1f)) { CardBack(22.dp, k) } }
+                    }
+                    Label(tr("Velikost stolu"))
+                    var z by remember { mutableStateOf((2.1 - g.zoom).toFloat()) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        T(tr("menší"), 12.sp, C.muted)
+                        Slider(z, { z = it; g.zoom = ((2.1 - it) * 100).roundToInt() / 100.0; g.saveZoom(); g.bump() }, Modifier.weight(1f).height(32.dp), valueRange = 0.6f..1.5f,
+                            colors = SliderDefaults.colors(thumbColor = C.gold, activeTrackColor = C.gold, inactiveTrackColor = C.line))
+                        T(tr("větší"), 12.sp, C.muted)
+                        T("${(z * 100).roundToInt()} %", 17.sp, num = true)
                     }
                 }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Label(tr("Líc karet"))
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        C.FACES.forEach { (k, l) -> LookBtn(g.look.face == k, tr(l), { g.look.face = k; g.saveLook(); g.bump(); Ui.redraw() }, Modifier.weight(1f)) { Row { CardView(49, 20.dp, k); CardView(37, 20.dp, k) } } }
+                    }
+                    Label(tr("Rozmístění u stolu"))
+                    Note(L("Hráče i sebe posuneš tažením podél okraje stolu, umístění se uloží samo.", "Drag players (and yourself) along the table edge; positions save automatically.", "Spieler am Tischrand entlang ziehen; Positionen werden gespeichert."))
+                    Btn(tr("Obnovit výchozí rozmístění"), BK.GHOST, Modifier.fillMaxWidth(), height = 38.dp) { st.pos = g.defaultPos(st.n); g.saveLayout(); Ui.close(); g.update(); g.toast(tr("Rozmístění obnoveno")) }
+                }
             }
-            Label(tr("Rub karet"))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                C.BACKS.forEach { (k, l) -> LookBtn(g.look.back == k, tr(l), { g.look.back = k; g.saveLook(); g.bump(); Ui.redraw() }) { CardBack(30.dp, k) } }
-            }
-            Label(tr("Líc karet"))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                C.FACES.forEach { (k, l) -> LookBtn(g.look.face == k, tr(l), { g.look.face = k; g.saveLook(); g.bump(); Ui.redraw() }) { Row { CardView(49, 30.dp, k); CardView(2, 30.dp, k); CardView(37, 30.dp, k) } } }
-            }
-            Label(tr("Velikost stolu"))
-            var z by remember { mutableStateOf((2.1 - g.zoom).toFloat()) }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                T(tr("menší"), 13.sp)
-                Slider(z, { z = it; g.zoom = ((2.1 - it) * 100).roundToInt() / 100.0; g.saveZoom(); g.bump() }, Modifier.weight(1f), valueRange = 0.6f..1.5f,
-                    colors = SliderDefaults.colors(thumbColor = C.gold, activeTrackColor = C.gold, inactiveTrackColor = C.line))
-                T(tr("větší"), 13.sp)
-                T("${(z * 100).roundToInt()} %", 20.sp, num = true)
-            }
-            Note(tr("Větší stůl = menší hráči a žetony kolem něj, víc místa uprostřed."))
-            Label(tr("Rozmístění u stolu"))
-            Note(L("Hráče i sebe posuneš kdykoli tažením podél okraje stolu. Umístění se uloží samo.", "Drag players (and yourself) along the table edge anytime. Positions save automatically.", "Ziehe Spieler (und dich) jederzeit am Tischrand entlang. Positionen werden gespeichert."))
-            Btn(tr("Obnovit výchozí rozmístění"), BK.GHOST, Modifier.fillMaxWidth()) { st.pos = g.defaultPos(st.n); g.saveLayout(); Ui.close(); g.update(); g.toast(tr("Rozmístění obnoveno")) }
         }
         "data" -> {
             val me = g.P.getValue("hero")
             var name by remember { mutableStateOf(me.name) }
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Column(Modifier.weight(0.8f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Label(tr("Můj profil"))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Avatar(me, 60.dp)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Field(name, { name = it; me.name = it.trim().ifEmpty { "Ty" }; g.saveLocal(); g.bump() }, Modifier.fillMaxWidth(), big = true)
-                    PhotoButtons(me)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Avatar(me, 52.dp)
+                Field(name, { name = it; me.name = it.trim().ifEmpty { "Ty" }; g.saveLocal(); g.bump() }, Modifier.weight(1f), big = true)
             }
+            PhotoButtons(me)
+            }
+            Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Label(tr("Záloha dat"))
             Note(tr("Hráči, záznam hand, rozehrané hry i nastavení. Data jsou jen v tomhle zařízení, záloha je přenese jinam."))
             val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -939,7 +944,10 @@ private fun SettingsSheet(d: SettingsArg) {
                 Field(paste, { paste = it }, Modifier.fillMaxWidth(), placeholder = tr("Sem vlož text zálohy…"), single = false, minH = 60.dp)
                 Btn(tr("Obnovit z textu"), BK.GHOST, Modifier.fillMaxWidth()) { if (paste.isNotBlank()) askRestore(paste.trim()) }
             }
+                    }
+            }
         }
+
         "update" -> UpdateTab()
         else -> {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1010,12 +1018,24 @@ private fun askRestore(txt: String) {
 }
 
 @Composable
-private fun LookBtn(on: Boolean, label: String, onClick: () -> Unit, preview: @Composable () -> Unit) {
+private fun LookBtn(on: Boolean, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, preview: @Composable () -> Unit) {
     watch()
     Column(
-        Modifier.clip(RoundedCornerShape(10.dp)).background(C.panel2).border(2.dp, if (on) C.gold else C.line, RoundedCornerShape(10.dp)).tap(onClick).padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) { preview(); T(label, 12.sp, if (on) C.gold else C.ink, FontWeight.Bold) }
+        modifier.clip(RoundedCornerShape(9.dp)).background(C.panel2).border(2.dp, if (on) C.gold else C.line, RoundedCornerShape(9.dp)).tap(onClick).padding(vertical = 5.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) { preview(); T(label, 10.sp, if (on) C.gold else C.ink, FontWeight.Bold, maxLines = 1) }
+}
+
+@Composable
+private fun SummaryRow(items: List<Pair<String, String>>) {
+    watch()
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        items.forEach { (l, v) ->
+            Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(C.panel2).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                T(l.uppercase(), 10.sp, C.muted, FontWeight.ExtraBold, maxLines = 1); T(v, 18.sp, num = true, maxLines = 1)
+            }
+        }
+    }
 }
 
 @Composable
@@ -1055,6 +1075,7 @@ private fun GameSetupSheet(c: GameCfg) {
             Picks(listOf("mix" to tr("Mix"), "fish" to tr("Ryby"), "pro" to tr("Profíci")), c.style) { c.style = it; Ui.redraw() }
             Label(tr("Startovní žetony"))
             Picks(listOf("500" to "500", "1000" to Game.fm(1000), "2000" to Game.fm(2000), "5000" to Game.fm(5000)), c.stack.toString()) { c.stack = it.toInt(); Ui.redraw() }
+            CoachSwitch(c.coach) { c.coach = it; Ui.redraw() }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Label(tr("Rychlost soupeřů"))
@@ -1065,7 +1086,6 @@ private fun GameSetupSheet(c: GameCfg) {
             Picks(listOf("0" to tr("Nikdy"), "5" to "5 hand", "10" to "10 hand", "15" to "15 hand", "20" to "20 hand").map { it.first to if (it.first == "0") it.second else L(it.second, it.first + " hands", it.first + " Hände") }, c.every.toString()) { c.every = it.toInt(); Ui.redraw() }
         }
     }
-    CoachSwitch(c.coach) { c.coach = it; Ui.redraw() }
     val saved = Game.gameSaved()
     if (saved != null && saved.over == null) Note(tr("Rozehraná hra proti počítači skončí."))
     Btn(tr("▶ Rozdat karty"), modifier = Modifier.fillMaxWidth()) {

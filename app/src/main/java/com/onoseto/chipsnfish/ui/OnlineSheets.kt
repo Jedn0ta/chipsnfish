@@ -90,7 +90,7 @@ fun OnlineSheet(a: OnlineArg) {
     }
     if (!SupaCfg.configured) { NotConfigured(); return }
     LaunchedEffect(Unit) { O.loadLists() }
-    ProfileRow()
+    if (Game.P.getValue("hero").name == "Ty") ProfileRow()
     if (O.code != null) {
         Btn(L("Zpět ke stolu ${O.code}", "Back to table ${O.code}", "Zurück zu Tisch ${O.code}"), BK.CALL, Modifier.fillMaxWidth()) { goTable() }
     }
