@@ -53,6 +53,11 @@ object Online {
     var busy by mutableStateOf(false)
     var rev by mutableIntStateOf(0)
     var cfg: JsonObject = JsonObject(emptyMap())
+    /** cup tournament (a special event voted at the table) */
+    var cup by mutableStateOf(false)
+    var cupName by mutableStateOf("")
+    var cupVote by mutableStateOf<Pair<String, String>?>(null)   // name, proposed by uid
+    var cupVotes by mutableStateOf<Map<String, Boolean>>(emptyMap())
 
     private var ver = 0
     private var raw: GState? = null
@@ -79,6 +84,8 @@ object Online {
             m.contains("not found", true) || m.contains("notfound") -> L("Stůl s tímhle kódem neexistuje.", "There's no table with this code.", "Kein Tisch mit diesem Code.")
             m.contains("full") -> L("Stůl je plný (max. 10 hráčů).", "The table is full (max 10 players).", "Der Tisch ist voll (max. 10 Spieler).")
             m.contains("game over") -> L("Tahle hra už skončila.", "This game is already over.", "Dieses Spiel ist schon vorbei.")
+            m.contains("need three") -> L("Turnaj o pohár potřebuje aspoň 3 hráče u stolu.", "A cup tournament needs at least 3 players.", "Ein Pokalturnier braucht mindestens 3 Spieler.")
+            m.contains("already started") -> L("Hra už běží – o turnaji se hlasuje před startem.", "The game is running – vote for a cup before the start.", "Das Spiel läuft – über ein Turnier wird vor dem Start abgestimmt.")
             m.contains("need two") -> L("Ke hře jsou potřeba aspoň dva hráči.", "At least two players are needed.", "Es braucht mindestens zwei Spieler.")
             e is java.io.IOException -> L("Nejde se připojit k internetu.", "Can't connect to the internet.", "Keine Internetverbindung.")
             m.contains("anonymous", true) || m.contains("signup", true) -> L("Na serveru není zapnuté anonymní přihlášení.", "Anonymous sign-in is not enabled on the server.", "Anonyme Anmeldung ist auf dem Server nicht aktiviert.")
@@ -170,6 +177,10 @@ object Online {
         status = r["status"]?.jsonPrimitive?.contentOrNull ?: "lobby"
         cfg = r["cfg"] as? JsonObject ?: JsonObject(emptyMap())
         advisor = cfg["advisor"]?.jsonPrimitive?.booleanOrNull ?: true
+        cup = cfg["cup"]?.jsonPrimitive?.booleanOrNull ?: false
+        cupName = cfg["cupName"]?.jsonPrimitive?.contentOrNull ?: ""
+        cupVote = (cfg["cupVote"] as? JsonObject)?.let { (it["name"]?.jsonPrimitive?.contentOrNull ?: "") to (it["by"]?.jsonPrimitive?.contentOrNull ?: "") }
+        cupVotes = (r["cupv"] as? JsonArray)?.associate { e -> val o = e.jsonObject; o["uid"]!!.jsonPrimitive.content to (o["yes"]?.jsonPrimitive?.booleanOrNull ?: false) } ?: emptyMap()
         val oldImgs = players.associate { it.uid to it.img }
         players = r["players"]!!.jsonArray.map { e ->
             val o = e.jsonObject
@@ -295,6 +306,11 @@ object Online {
     }
 
     fun start() = call("cf_start", "p_code" to code)
+    fun proposeCup(n: String) {
+        if (players.count { !it.left } < 3) { Game.toast(L("Turnaj o pohár potřebuje aspoň 3 hráče u stolu.", "A cup tournament needs at least 3 players.", "Ein Pokalturnier braucht mindestens 3 Spieler.")); return }
+        call("cf_cup_propose", "p_code" to code, "p_name" to n)
+    }
+    fun voteCup(yes: Boolean) = call("cf_cup_vote", "p_code" to code, "p_yes" to yes)
     fun next() = call("cf_next", "p_code" to code)
     fun restart() = call("cf_restart", "p_code" to code)
     fun changeAdvisor(on: Boolean) = call("cf_set_advisor", "p_code" to code, "p_on" to on)

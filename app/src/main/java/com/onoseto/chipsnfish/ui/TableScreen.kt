@@ -235,7 +235,9 @@ fun TableView() {
         Canvas(Modifier.fillMaxSize()) { drawVelvetTable(geo, felt, noise) }
         // watermark on the felt
         Box(Modifier.offset((geo.cx - 150).dp, (geo.cy + geo.cw * 0.7f + 30).dp).width(300.dp), contentAlignment = Alignment.Center) {
-            T("CHIPS & FISH", 15.sp, Color.White.copy(alpha = 0.07f), num = true, letter = 6.sp)
+            if (Game.online() && com.onoseto.chipsnfish.online.Online.cup && playing)
+                T("🏆 " + com.onoseto.chipsnfish.online.Online.cupName.uppercase(), 15.sp, C.gold.copy(alpha = 0.3f), num = true, letter = 3.sp, maxLines = 1)
+            else T("CHIPS & FISH", 15.sp, Color.White.copy(alpha = 0.07f), num = true, letter = 6.sp)
         }
         // center
         Center(geo)
@@ -998,7 +1000,8 @@ private fun OnlineLobbyCenter() {
         T(L("KÓD STOLU", "TABLE CODE", "TISCHCODE"), 11.sp, Color.White.copy(alpha = 0.6f), FontWeight.ExtraBold, letter = 2.sp)
         T(code, 40.sp, C.gold, num = true, letter = 6.sp)
         T(L("Čekáme na hráče · u stolu ${Game.st.seats.size}", "Waiting for players · ${Game.st.seats.size} at the table", "Warten auf Spieler · ${Game.st.seats.size} am Tisch"), 13.sp, Color.White.copy(alpha = 0.75f), FontWeight.SemiBold)
-        T(L("Pošli přátelům pozvánku tlačítkem vpravo.", "Send your friends an invite with the button on the right.", "Schick deinen Freunden eine Einladung mit dem Knopf rechts."), 12.sp, Color.White.copy(alpha = 0.55f), align = TextAlign.Center)
+        if (O.cup || O.cupVote != null) { Spacer(Modifier.height(4.dp)); CupBanner() }
+        else T(L("Pošli přátelům pozvánku tlačítkem vpravo.", "Send your friends an invite with the button on the right.", "Schick deinen Freunden eine Einladung mit dem Knopf rechts."), 12.sp, Color.White.copy(alpha = 0.55f), align = TextAlign.Center)
         if (!O.connected) T(L("Připojuji…", "Connecting…", "Verbinde…"), 12.sp, C.lose, FontWeight.Bold)
     }
 }
@@ -1019,7 +1022,11 @@ private fun OnlineBox(): Boolean {
     }
     if (st.phase == "setup") {
         ColBtn(L("Pozvat přátele", "Invite friends", "Freunde einladen"), BK.CALL, h = 56.dp) { share(ctx, O.inviteText()) }
-        if (O.isHost) ColBtn(tr("▶ START"), BK.RAISE, h = 64.dp, enabled = st.seats.size >= 2 && !O.busy) { O.start() }
+        if (O.isHost) ColBtn(tr("▶ START"), BK.RAISE, h = 56.dp, enabled = st.seats.size >= 2 && !O.busy) { O.start() }
+        if (!O.cup && O.cupVote == null) ColBtn("🏆 " + L("Turnaj", "Cup", "Turnier"), BK.GOLD, h = 44.dp) {
+            if (O.players.count { !it.left } < 3) Game.toast(L("Turnaj o pohár potřebuje aspoň 3 hráče u stolu.", "A cup tournament needs at least 3 players.", "Ein Pokalturnier braucht mindestens 3 Spieler."))
+            else Ui.open("cup")
+        }
         else Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(10.dp)).padding(6.dp)) {
             T(L("Hru spustí zakladatel stolu.", "The host starts the game.", "Der Gastgeber startet das Spiel."), 11.sp, C.muted, align = TextAlign.Center)
         }
@@ -1041,8 +1048,10 @@ private fun OnlineBox(): Boolean {
             T("🏆", 20.sp)
             T(wn, 15.sp, C.gold, num = true, maxLines = 1)
             T(L("vyhrává hru", "wins the game", "gewinnt das Spiel"), 11.sp, C.ink, FontWeight.Bold)
-            val tier = com.onoseto.chipsnfish.online.Fame.tierFor(st.n)
-            T(com.onoseto.chipsnfish.online.Fame.cupIcon(tier) + " " + com.onoseto.chipsnfish.online.Fame.cupName(tier), 10.sp, C.gold, FontWeight.Bold, align = TextAlign.Center)
+            if (O.cup) {
+                val tier = com.onoseto.chipsnfish.online.Fame.tierFor(st.n)
+                T(com.onoseto.chipsnfish.online.Fame.cupIcon(tier) + " " + O.cupName, 10.sp, C.gold, FontWeight.Bold, align = TextAlign.Center, maxLines = 2)
+            }
         }
         ColBtn("🏆 " + L("Síň slávy", "Hall of fame", "Ruhmeshalle"), BK.DARK, h = 40.dp) { Ui.open("fame") }
         if (O.isHost) ColBtn(L("Hrát znovu", "Play again", "Nochmal"), BK.CALL) { O.restart() }

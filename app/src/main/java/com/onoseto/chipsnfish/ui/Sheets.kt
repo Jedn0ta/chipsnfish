@@ -124,6 +124,7 @@ fun SheetHost() {
                 "online" -> OnlineSheet(sh.arg as? OnlineArg ?: OnlineArg())
                 "groups" -> GroupsSheet()
                 "fame" -> FameSheet()
+                "cup" -> CupSheet()
                 "group" -> GroupSheet(sh.arg as GroupArg)
             }
         }

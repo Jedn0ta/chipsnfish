@@ -99,9 +99,9 @@ fun FameSheet() {
             T(L("VITRÍNA S POHÁRY", "TROPHY CABINET", "POKALVITRINE"), 11.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp)
             Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(C.panel2.copy(alpha = 0.6f)).padding(6.dp)) {
                 if (Fame.cupList.isEmpty()) {
-                    T(L("Pohár vyhraješ, když u online stolu s přáteli zůstaneš poslední. 2–3 hráči 🥉, 4–6 🥈, 7 a víc 🏆. Pojmenuj stůl a hraj turnaj o vlastní pohár!",
-                        "Win a cup by being the last one standing at an online table. 2–3 players 🥉, 4–6 🥈, 7+ 🏆. Name the table and play for your own cup!",
-                        "Einen Pokal gewinnst du als Letzter am Online-Tisch. 2–3 Spieler 🥉, 4–6 🥈, ab 7 🏆. Benenne den Tisch und spiele um deinen eigenen Pokal!"),
+                    T(L("Poháry jsou speciální event: turnaj o pohár si hráči u online stolu odhlasují před startem (aspoň 3 hráči). Kdo zůstane poslední, bere 🥉 (3 hráči), 🥈 (4–6) nebo 🏆 (7+).",
+                        "Cups are a special event: players at an online table vote for a cup tournament before the start (3+ players). The last one standing wins 🥉 (3), 🥈 (4–6) or 🏆 (7+).",
+                        "Pokale sind ein Sonder-Event: Die Spieler am Online-Tisch stimmen vor dem Start für ein Pokalturnier (ab 3). Der Letzte gewinnt 🥉 (3), 🥈 (4–6) oder 🏆 (7+)."),
                         11.5.sp, C.muted, modifier = Modifier.padding(4.dp))
                 } else FlowRow(
                     Modifier.verticalScroll(rememberScrollState()),
@@ -163,5 +163,78 @@ fun WalletBadge() {
         T("💰 " + (Social.bank?.let { Game.fm(it) } ?: "–"), 14.sp, C.ink, num = true)
         T("⭐ " + Game.fm(Fame.honor ?: 0), 14.sp, C.gold, num = true)
         if ((Fame.cups ?: 0) > 0) T("🏆 ${Fame.cups}", 14.sp, C.ink, num = true)
+    }
+}
+
+// ---------------- cup tournament: proposal, vote, banner ----------------
+
+/** Sheet to propose a cup tournament at the online table. */
+@Composable
+fun CupSheet() {
+    watch()
+    val O = Online
+    var name by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(O.name.ifBlank { L("Turnaj o pohár", "Cup tournament", "Pokalturnier") }) }
+    val n = O.players.count { !it.left }
+    val tier = Fame.tierFor(n)
+    SheetHead("🏆 " + L("Turnaj o pohár", "Cup tournament", "Pokalturnier"))
+    Note(L("Speciální event: hráči u stolu před startem hlasují. Projde, když je pro víc než polovina (u stolu musí být aspoň 3). Kdo zůstane poslední, získá pohár do vitríny.",
+        "A special event: the players vote before the start. It passes when more than half agree (at least 3 at the table). The last one standing wins a cup for the cabinet.",
+        "Ein Sonder-Event: Die Spieler stimmen vor dem Start ab. Angenommen bei mehr als der Hälfte (mindestens 3 am Tisch). Der Letzte am Tisch gewinnt einen Pokal."))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        T(L("Název", "Name", "Name"), 13.sp, C.muted, FontWeight.Bold)
+        Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 9.dp)) {
+            androidx.compose.foundation.text.BasicTextField(
+                name, { name = it.take(40) }, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = C.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(C.gold), modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        T(Fame.cupIcon(tier), 30.sp)
+        T(L("Teď u stolu: $n hráčů → ", "At the table now: $n players → ", "Jetzt am Tisch: $n Spieler → ") + Fame.cupName(tier) +
+            L("  (3 🥉 · 4–6 🥈 · 7+ 🏆)", "  (3 🥉 · 4–6 🥈 · 7+ 🏆)", "  (3 🥉 · 4–6 🥈 · 7+ 🏆)"), 13.sp, C.ink, FontWeight.Bold, modifier = Modifier.weight(1f))
+    }
+    Btn(L("Spustit hlasování", "Start the vote", "Abstimmung starten"), BK.GOLD, Modifier.fillMaxWidth(), enabled = n >= 3 && name.isNotBlank()) {
+        O.proposeCup(name.trim()); Ui.close()
+    }
+    if (n < 3) T(L("Počkej, až budou u stolu aspoň 3 hráči.", "Wait until at least 3 players are at the table.", "Warte, bis mindestens 3 Spieler am Tisch sind."), 12.sp, C.lose, FontWeight.Bold)
+}
+
+/** In the lobby: the running vote or the approved event. */
+@Composable
+fun CupBanner() {
+    watch()
+    val O = Online
+    val v = O.cupVote
+    if (O.cup) {
+        val tier = Fame.tierFor(O.players.count { !it.left })
+        Column(
+            Modifier.clip(RoundedCornerShape(12.dp)).background(C.gold.copy(alpha = 0.18f)).border(1.dp, C.gold, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 5.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            T("🏆 " + L("TURNAJ O POHÁR", "CUP TOURNAMENT", "POKALTURNIER"), 11.sp, C.gold, FontWeight.ExtraBold, letter = 1.5.sp)
+            T(O.cupName, 16.sp, C.ink, FontWeight.ExtraBold, maxLines = 1)
+            T(L("Vítěz získá ", "The winner gets ", "Der Sieger bekommt ") + Fame.cupIcon(tier) + " " + Fame.cupName(tier), 11.5.sp, Color.White.copy(alpha = 0.8f))
+        }
+        return
+    }
+    if (v == null) return
+    val act = O.players.count { !it.left }
+    val yes = O.cupVotes.count { it.value }; val no = O.cupVotes.count { !it.value }
+    val need = act / 2 + 1
+    val my = O.cupVotes[O.me]
+    val by = O.players.firstOrNull { it.uid == v.second }?.name ?: "?"
+    Column(
+        Modifier.clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.55f)).border(1.dp, C.gold.copy(alpha = 0.7f), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        T("🏆 " + L("$by navrhuje turnaj o pohár", "$by proposes a cup tournament", "$by schlägt ein Pokalturnier vor"), 12.sp, C.gold, FontWeight.ExtraBold, maxLines = 1)
+        T("„${v.first}“", 15.sp, C.ink, FontWeight.ExtraBold, maxLines = 1)
+        T(L("Pro $yes · proti $no · potřeba $need z $act", "Yes $yes · no $no · needs $need of $act", "Ja $yes · nein $no · nötig $need von $act"), 11.5.sp, Color.White.copy(alpha = 0.8f))
+        if (my == null) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Btn("👍 " + L("Pro", "Yes", "Ja"), BK.CALL, Modifier.width(96.dp), height = 32.dp, enabled = !O.busy) { O.voteCup(true) }
+            Btn("👎 " + L("Proti", "No", "Nein"), BK.DARK, Modifier.width(96.dp), height = 32.dp, enabled = !O.busy) { O.voteCup(false) }
+        } else T(if (my) L("Hlasoval jsi pro 👍", "You voted yes 👍", "Du hast mit Ja gestimmt 👍") else L("Hlasoval jsi proti 👎", "You voted no 👎", "Du hast mit Nein gestimmt 👎"), 11.sp, C.muted)
     }
 }

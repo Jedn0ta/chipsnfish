@@ -642,6 +642,7 @@ begin
     seats := seats || jsonb_build_array(cf_seat_obj(p.uid, cf_gi(st, 'startStack')) || '{"folded":false}');
   end loop;
   update cf_players set pending = false where code = t.code;
+  update cf_tables set cfg = cfg - 'cup' - 'cupName' - 'cupVote' where code = t.code;  -- a cup tournament needs a new vote
   st := st || jsonb_build_object('phase', 'setup', 'seats', seats, 'n', jsonb_array_length(seats), 'over', null, 'done', null,
     'handNo', 0, 'level', cf_gi(st, 'startLevel'), 'curLevel', cf_gi(st, 'startLevel'), 'turn', -1,
     'board', '[null,null,null,null,null]'::jsonb, 'betStreet', 0, 'curBet', 0);
@@ -887,17 +888,6 @@ begin
   return b;
 end $$;
 
--- recent emoji and drinks for cf_view
-create or replace function cf_social(p_code text) returns jsonb language sql stable security definer set search_path = public as $$
-  select jsonb_build_object(
-    'chat', (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'uid', c.uid, 'm', c.msg) order by c.id), '[]')
-             from cf_chat c where c.code = p_code and c.t > now() - interval '20 seconds'),
-    'drinks', (select coalesce(jsonb_agg(x.o order by x.id), '[]') from (
-               select d.id, jsonb_build_object('id', d.id, 'from', d.from_uid, 'to', d.to_uid, 'kind', d.kind,
-                        'age', (extract(epoch from now() - d.t) * 1000)::bigint) o
-               from cf_drinks d where d.code = p_code and d.t > now() - interval '15 minutes' order by d.id desc limit 40) x))
-$$;
-
 create or replace function cf_view(p_code text, p_ver int default 0) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare u uuid := cf_me(); t cf_tables; sec cf_secret; i int; v_hole jsonb := null; v_hand int;
@@ -970,7 +960,8 @@ begin
 end $$;
 
 -- after every online hand: +1 per pot won; a player who busts gets 10 per player behind him;
--- the last one standing gets 10 per opponent + 10 and a cup (bronze 2–3, silver 4–6, gold 7–10 players)
+-- the last one standing gets 10 per opponent + 10; in a cup tournament (voted at the table) also a cup:
+-- bronze 3, silver 4–6, gold 7–10 players
 create or replace function cf_award() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare st jsonb := new.state; n int; alive int := 0; busted uuid[] := '{}'; s jsonb; place int; w uuid;
@@ -994,8 +985,10 @@ begin
     select (x->>'pid')::uuid into w from jsonb_array_elements(st->'seats') x
       where not coalesce((x->>'out')::boolean, false) and coalesce((x->>'stack')::int, 0) > 0;
     insert into cf_honor(uid, pts, kind, code) values (w, (n - 1) * 10 + 10, 'win', new.code);
-    insert into cf_trophies(uid, code, name, players, tier)
-      values (w, new.code, new.name, n, case when n >= 7 then 'gold' when n >= 4 then 'silver' else 'bronze' end);
+    if coalesce((new.cfg->>'cup')::boolean, false) then
+      insert into cf_trophies(uid, code, name, players, tier)
+        values (w, new.code, coalesce(new.cfg->>'cupName', new.name), n, case when n >= 7 then 'gold' when n >= 4 then 'silver' else 'bronze' end);
+    end if;
   end if;
   return new;
 end $$;
@@ -1036,6 +1029,74 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- cup tournaments: a special event the players at the table vote for
+-- (before the start, at least 3 players, more than half must agree)
+-- ---------------------------------------------------------------------
+create table if not exists cf_cup_votes (
+  code text not null references cf_tables(code) on delete cascade, uid uuid not null, yes boolean not null,
+  primary key (code, uid));
+alter table cf_cup_votes enable row level security;
+revoke all on cf_cup_votes from anon, authenticated;
+
+create or replace function cf_cup_check(c text) returns void
+language plpgsql security definer set search_path = public as $$
+declare t cf_tables; act int; y int; nn int;
+begin
+  select * into t from cf_tables where code = c;
+  if t.cfg->'cupVote' is null or jsonb_typeof(t.cfg->'cupVote') = 'null' then return; end if;
+  select count(*) into act from cf_players where code = c and left_at is null;
+  select count(*) filter (where v.yes), count(*) filter (where not v.yes) into y, nn
+    from cf_cup_votes v join cf_players p on p.code = v.code and p.uid = v.uid and p.left_at is null where v.code = c;
+  if y * 2 > act and act >= 3 then
+    update cf_tables set cfg = (cfg - 'cupVote') || jsonb_build_object('cup', true, 'cupName', t.cfg->'cupVote'->>'name'), updated = now() where code = c;
+    delete from cf_cup_votes where code = c;
+  elsif nn * 2 >= act then
+    update cf_tables set cfg = cfg - 'cupVote', updated = now() where code = c;
+    delete from cf_cup_votes where code = c;
+  end if;
+end $$;
+
+create or replace function cf_cup_propose(p_code text, p_name text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; nm text;
+begin
+  t := cf_lock(upper(p_code));
+  if not exists (select 1 from cf_players where code = t.code and uid = u and left_at is null) then raise exception 'not at table'; end if;
+  if t.state->>'phase' <> 'setup' then raise exception 'already started'; end if;
+  if coalesce((t.cfg->>'cup')::boolean, false) then return; end if;
+  if (select count(*) from cf_players where code = t.code and left_at is null) < 3 then raise exception 'need three'; end if;
+  nm := left(coalesce(nullif(trim(p_name), ''), nullif(t.name, ''), 'Turnaj o pohár'), 40);
+  update cf_tables set cfg = cfg || jsonb_build_object('cupVote', jsonb_build_object('name', nm, 'by', u)), updated = now() where code = t.code;
+  delete from cf_cup_votes where code = t.code;
+  insert into cf_cup_votes(code, uid, yes) values (t.code, u, true);
+  perform cf_cup_check(t.code);
+end $$;
+
+create or replace function cf_cup_vote(p_code text, p_yes boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables;
+begin
+  t := cf_lock(upper(p_code));
+  if t.cfg->'cupVote' is null or jsonb_typeof(t.cfg->'cupVote') = 'null' or t.state->>'phase' <> 'setup' then return; end if;
+  if not exists (select 1 from cf_players where code = t.code and uid = u and left_at is null) then raise exception 'not at table'; end if;
+  insert into cf_cup_votes(code, uid, yes) values (t.code, u, coalesce(p_yes, false))
+    on conflict (code, uid) do update set yes = excluded.yes;
+  perform cf_cup_check(t.code);
+end $$;
+
+-- recent emoji, drinks and the running cup vote for cf_view
+create or replace function cf_social(p_code text) returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'chat', (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'uid', c.uid, 'm', c.msg) order by c.id), '[]')
+             from cf_chat c where c.code = p_code and c.t > now() - interval '20 seconds'),
+    'drinks', (select coalesce(jsonb_agg(x.o order by x.id), '[]') from (
+               select d.id, jsonb_build_object('id', d.id, 'from', d.from_uid, 'to', d.to_uid, 'kind', d.kind,
+                        'age', (extract(epoch from now() - d.t) * 1000)::bigint) o
+               from cf_drinks d where d.code = p_code and d.t > now() - interval '15 minutes' order by d.id desc limit 40) x),
+    'cupv', (select coalesce(jsonb_agg(jsonb_build_object('uid', v.uid, 'yes', v.yes)), '[]') from cf_cup_votes v where v.code = p_code))
+$$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -1048,7 +1109,7 @@ begin
                      'cf_set_advisor','cf_restart','cf_view','cf_group_create','cf_group_join','cf_group_leave',
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
-                     'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame') then
+                     'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);
