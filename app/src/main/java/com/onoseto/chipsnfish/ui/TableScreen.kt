@@ -245,7 +245,7 @@ fun TableView() {
             val p = geo.pt(st.pos!![k])
             val dx = geo.cx - p.x; val dy = geo.cy - p.y
             val dd = hypot(dx, dy).coerceAtLeast(1f)
-            val off = min(dd * 0.5f, 80 * sc)
+            val off = min(dd * 0.58f, 104 * sc)
             val bx = p.x + dx / dd * off; val by = p.y + dy / dd * off
             Column(
                 Modifier.offset((bx - 30).dp, (by - 20).dp).width(60.dp).zIndex(2f),
@@ -465,7 +465,10 @@ private fun SeatView(
             .offset((pt.x - seatW / 2).dp, (pt.y - 25 * sc).dp)
             .width(seatW.dp)
             .zIndex(if (isTurn) 5f else 3f)
-            .alpha(if (moving) 0.3f else if (s.out) 0.4f else if (folded) 0.5f else if (playing && st.turn >= 0 && !isTurn && k != 0) 0.85f else 1f)
+            .graphicsLayer(
+                alpha = if (moving) 0.3f else if (s.out) 0.4f else if (folded) 0.5f else if (playing && st.turn >= 0 && !isTurn && k != 0) 0.85f else 1f,
+                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha,
+            )
             .pointerInput(k, st.phase) {
                 detectDragGestures(
                     onDragStart = { onDragStart() },
@@ -484,7 +487,7 @@ private fun SeatView(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                 // stack chip
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                    StackChip(if (s.allin && playing) "ALL\nIN" else g.shortN(s.stack), s.allin && playing, crit, (38 * sc).dp)
+                    StackChip(if (s.allin && playing) "ALL-IN" else g.shortN(s.stack), s.allin && playing, crit, sc)
                 }
                 Spacer(Modifier.width((5 * sc).dp))
                 // avatar
@@ -561,22 +564,17 @@ private fun Text2(t: String, size: Float, col: Color, underline: Boolean) {
 }
 
 @Composable
-fun StackChip(text: String, allin: Boolean, crit: Boolean, size: Dp) {
+fun StackChip(text: String, allin: Boolean, crit: Boolean, sc: Float) {
     watch()
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val r = this.size.minDimension / 2
-            drawCircle(Color.Black.copy(alpha = 0.6f), r, center + Offset(0f, 2f))
-            val a = if (allin) Color(0xFFEF5350) else C.gold
-            val b = if (allin) Color(0xFFA52A22) else C.gold2
-            val n = 20
-            for (i in 0 until n) {
-                drawArc(if (i % 2 == 0) a else b, i * 360f / n, 360f / n, true)
-            }
-            drawCircle(if (allin) Color(0xFF7A1D16) else Color(0xFF1D2B34), r * 0.57f)
-            drawCircle(a, r - 1.dp.toPx(), style = Stroke(2.dp.toPx()))
-        }
-        T(text, (size.value * if (allin) 0.24f else if (text.length >= 4) 0.3f else 0.34f).sp, if (allin) Color.White else if (crit) Color(0xFFFF8A80) else Color(0xFFFFE9A8), num = true, align = TextAlign.Center, lineHeight = (size.value * 0.26f).sp)
+    val shape = RoundedCornerShape(99.dp)
+    Box(
+        Modifier.clip(shape)
+            .background(if (allin) Color(0xFFB3261E) else Color(0xF20B1217))
+            .border((1.5f * sc).dp, if (allin) Color(0xFFFF8A80) else C.gold.copy(alpha = 0.85f), shape)
+            .padding(horizontal = (7 * sc).dp, vertical = (1 * sc).dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        T(text, (15 * sc).sp, if (allin) Color.White else if (crit) Color(0xFFFF8A80) else C.gold, num = true, maxLines = 1, lineHeight = (17 * sc).sp)
     }
 }
 

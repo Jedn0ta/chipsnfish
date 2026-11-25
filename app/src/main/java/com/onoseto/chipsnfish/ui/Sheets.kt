@@ -177,10 +177,10 @@ fun Seg(options: List<Pair<String, String>>, cur: String, colorFor: (String) -> 
 }
 
 @Composable
-fun Picks(items: List<Pair<String, String>>, cur: String, onPick: (String) -> Unit) {
+fun Picks(items: List<Pair<String, String>>, cur: String, small: Boolean = false, onPick: (String) -> Unit) {
     watch()
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        items.forEach { (v, l) -> Pill(l, v == cur) { onPick(v) } }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(if (small) 5.dp else 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        items.forEach { (v, l) -> if (small) SmallPill(l, v == cur) { onPick(v) } else Pill(l, v == cur) { onPick(v) } }
     }
 }
 
@@ -1001,7 +1001,7 @@ fun CoachSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
         androidx.compose.material3.Switch(on, onChange, colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = C.goldInk, checkedTrackColor = C.gold))
         Column {
             T("🎓 " + L("Rádce pro začátečníky", "Beginner coach", "Anfänger-Berater"), 14.sp, weight = FontWeight.Bold)
-            T(L("Vysvětluje průběh hry, pojmy (s výslovností), co máš v ruce a co hrát.", "Explains the flow of the game, terms, your hand and what to play.", "Erklärt Spielablauf, Begriffe, deine Hand und was zu spielen ist."), 11.5.sp, C.muted)
+            T(L("Vysvětlí hru, pojmy i co hrát.", "Explains the game, terms and moves.", "Erklärt Spiel, Begriffe und Züge."), 11.5.sp, C.muted, maxLines = 1)
         }
     }
 }
@@ -1072,28 +1072,29 @@ private fun GameSetupSheet(c: GameCfg) {
                 T(L("${c.opp + 1} hráčů u stolu", "${c.opp + 1} players at the table", "${c.opp + 1} Spieler am Tisch"), 13.sp, C.muted)
             }
             Label(tr("Styl soupeřů"))
-            Picks(listOf("mix" to tr("Mix"), "fish" to tr("Ryby"), "pro" to tr("Profíci")), c.style) { c.style = it; Ui.redraw() }
+            Picks(listOf("mix" to tr("Mix"), "fish" to tr("Ryby"), "pro" to tr("Profíci")), c.style, small = true) { c.style = it; Ui.redraw() }
             Label(tr("Startovní žetony"))
-            Picks(listOf("500" to "500", "1000" to Game.fm(1000), "2000" to Game.fm(2000), "5000" to Game.fm(5000)), c.stack.toString()) { c.stack = it.toInt(); Ui.redraw() }
+            Picks(listOf("500" to "500", "1000" to Game.fm(1000), "2000" to Game.fm(2000), "5000" to Game.fm(5000)), c.stack.toString(), small = true) { c.stack = it.toInt(); Ui.redraw() }
             CoachSwitch(c.coach) { c.coach = it; Ui.redraw() }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Label(tr("Rychlost soupeřů"))
-            Picks(listOf("1.6" to tr("Pomalu"), "1.0" to tr("Normálně"), "0.45" to tr("Rychle")), c.speed.toString()) { c.speed = it.toDouble(); Ui.redraw() }
+            Picks(listOf("1.6" to tr("Pomalu"), "1.0" to tr("Normálně"), "0.45" to tr("Rychle")), c.speed.toString(), small = true) { c.speed = it.toDouble(); Ui.redraw() }
             Label(tr("Startovní blindy"))
-            Picks((0 until 7).map { it.toString() to Cards.lvlStr(it) }, c.level.toString()) { c.level = it.toInt(); Ui.redraw() }
+            Picks((0 until 7).map { it.toString() to Cards.lvlStr(it) }, c.level.toString(), small = true) { c.level = it.toInt(); Ui.redraw() }
             Label(tr("Zvyšování blindů"))
-            Picks(listOf("0" to tr("Nikdy"), "5" to "5 hand", "10" to "10 hand", "15" to "15 hand", "20" to "20 hand").map { it.first to if (it.first == "0") it.second else L(it.second, it.first + " hands", it.first + " Hände") }, c.every.toString()) { c.every = it.toInt(); Ui.redraw() }
+            Picks(listOf("0" to tr("Nikdy"), "5" to "5 hand", "10" to "10 hand", "15" to "15 hand", "20" to "20 hand").map { it.first to if (it.first == "0") it.second else L(it.second, it.first + " hands", it.first + " Hände") }, c.every.toString(), small = true) { c.every = it.toInt(); Ui.redraw() }
+            Spacer(Modifier.height(4.dp))
+            val saved = Game.gameSaved()
+            if (saved != null && saved.over == null) Note(tr("Rozehraná hra proti počítači skončí."))
+            Btn(tr("▶ Rozdat karty"), modifier = Modifier.fillMaxWidth(), height = 46.dp) {
+                Game.gameCfg = c.copy(); Game.saveCfg()
+                Ui.sheet = null; Ui.menu = false
+                Game.newGame(c)
+                Ui.goView("table")
+                Game.toast(tr("Hra začala · hodně štěstí!"))
+            }
         }
-    }
-    val saved = Game.gameSaved()
-    if (saved != null && saved.over == null) Note(tr("Rozehraná hra proti počítači skončí."))
-    Btn(tr("▶ Rozdat karty"), modifier = Modifier.fillMaxWidth()) {
-        Game.gameCfg = c.copy(); Game.saveCfg()
-        Ui.sheet = null; Ui.menu = false
-        Game.newGame(c)
-        Ui.goView("table")
-        Game.toast(tr("Hra začala · hodně štěstí!"))
     }
 }
 

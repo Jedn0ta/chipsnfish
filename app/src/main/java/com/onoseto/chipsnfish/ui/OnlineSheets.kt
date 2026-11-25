@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
@@ -123,7 +125,7 @@ fun OnlineSheet(a: OnlineArg) {
             Label(L("Název stolu (nepovinné)", "Table name (optional)", "Tischname (optional)"))
             Field(tname, { tname = it.take(40) }, Modifier.fillMaxWidth(), placeholder = L("Páteční poker", "Friday poker", "Freitagspoker"))
             Label(tr("Startovní žetony"))
-            Picks(listOf("500" to "500", "1000" to Game.fm(1000), "2000" to Game.fm(2000), "5000" to Game.fm(5000)), stack.toString()) { stack = it.toInt() }
+            Picks(listOf("500" to "500", "1000" to Game.fm(1000), "2000" to Game.fm(2000), "5000" to Game.fm(5000)), stack.toString(), small = true) { stack = it.toInt() }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Switch(adv, { adv = it }, colors = SwitchDefaults.colors(checkedThumbColor = C.goldInk, checkedTrackColor = C.gold))
                 Column {
@@ -134,19 +136,20 @@ fun OnlineSheet(a: OnlineArg) {
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Label(tr("Startovní blindy"))
-            Picks((0 until 7).map { it.toString() to Cards.lvlStr(it) }, level.toString()) { level = it.toInt() }
+            Picks((0 until 7).map { it.toString() to Cards.lvlStr(it) }, level.toString(), small = true) { level = it.toInt() }
             Label(tr("Zvyšování blindů"))
-            Picks(listOf("0", "5", "10", "15", "20").map { it to if (it == "0") tr("Nikdy") else L("$it hand", "$it hands", "$it Hände") }, every.toString()) { every = it.toInt() }
+            Picks(listOf("0", "5", "10", "15", "20").map { it to if (it == "0") tr("Nikdy") else L("$it hand", "$it hands", "$it Hände") }, every.toString(), small = true) { every = it.toInt() }
             val gs = O.groups.orEmpty()
             if (gs.isNotEmpty()) {
                 Label(L("Skupina", "Group", "Gruppe"))
-                Picks(listOf("" to L("Bez skupiny", "No group", "Keine Gruppe")) + gs.map { it.id to it.name }, gid ?: "") { gid = it.ifEmpty { null } }
+                Picks(listOf("" to L("Bez skupiny", "No group", "Keine Gruppe")) + gs.map { it.id to it.name }, gid ?: "", small = true) { gid = it.ifEmpty { null } }
+            }
+            Spacer(Modifier.height(4.dp))
+            Btn(L("▶ Založit stůl", "▶ Create table", "▶ Tisch erstellen"), modifier = Modifier.fillMaxWidth(), enabled = !O.busy, height = 46.dp) {
+                Game.gameCfg = Game.gameCfg.copy(stack = stack, level = level, every = every); Game.saveCfg()
+                O.create(tname, stack, level, every, adv, gid) { goTable() }
             }
         }
-    }
-    Btn(L("▶ Založit stůl", "▶ Create table", "▶ Tisch erstellen"), modifier = Modifier.fillMaxWidth(), enabled = !O.busy) {
-        Game.gameCfg = Game.gameCfg.copy(stack = stack, level = level, every = every); Game.saveCfg()
-        O.create(tname, stack, level, every, adv, gid) { goTable() }
     }
 }
 

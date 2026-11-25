@@ -298,7 +298,7 @@ fun Avatar(p: Player, size: Dp, ring: Color? = null, shape: Shape = CircleShape,
             Modifier.fillMaxSize().clip(shape)
                 .background(Color.hsl(hue(p.name), 0.35f, 0.32f))
                 .border(border, rc, shape)
-                .alpha(if (dim) 0.5f else 1f),
+                .graphicsLayer(alpha = if (dim) 0.5f else 1f, compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha),
             contentAlignment = Alignment.Center,
         ) {
             if (img != null) Image(img, null, Modifier.fillMaxSize().padding(border - 0.5.dp).clip(shape), contentScale = ContentScale.Crop)
