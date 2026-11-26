@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.onoseto.chipsnfish"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.onoseto.chipsnfish"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "0.1." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
