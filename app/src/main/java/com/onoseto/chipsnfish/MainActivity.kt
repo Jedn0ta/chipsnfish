@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
         Ui.refreshActive()
         com.onoseto.chipsnfish.online.KeepAlive.opened(this)
         Updater.check(this, quiet = true)
+        Updater.resume(this)
         if (com.onoseto.chipsnfish.online.SupaCfg.configured) {
             com.onoseto.chipsnfish.online.Nearby.start(this)
             com.onoseto.chipsnfish.online.Online.startInbox()

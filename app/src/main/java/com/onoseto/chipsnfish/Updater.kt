@@ -23,8 +23,17 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Updates the app from the "latest" GitHub release (each build is numbered by its run number = versionCode). */
+/**
+ * Updates come from Google Play: the Play build uses Play's in-app update screen,
+ * the old GitHub APK only points people to the Play Store.
+ */
 object Updater {
+    const val PLAY_PKG = "com.onoseto.chipsnfish"
+    /** Opt-in link of the internal test on Google Play (replace with the link from Play Console → Testers). */
+    const val PLAY_TEST = "https://play.google.com/apps/internaltest/"
+    const val PLAY_URL = "https://play.google.com/store/apps/details?id=$PLAY_PKG"
+    private var info: com.google.android.play.core.appupdate.AppUpdateInfo? = null
+
     private const val API = "https://api.github.com/repos/Jedn0ta/chipsnfish/releases/tags/latest"
     const val APK = "https://github.com/Jedn0ta/chipsnfish/releases/download/latest/ChipsNFish.apk"
 
@@ -41,7 +50,58 @@ object Updater {
     }
 
     fun check(ctx: Context, quiet: Boolean = false) {
-        if (!BuildConfig.SELF_UPDATE) return
+        if (BuildConfig.SELF_UPDATE) { state = "moved"; return }
+        if (quiet && System.currentTimeMillis() - lastCheck < 3600_000L) return
+        lastCheck = System.currentTimeMillis()
+        if (!quiet) state = "checking"
+        try {
+            com.google.android.play.core.appupdate.AppUpdateManagerFactory.create(ctx).appUpdateInfo
+                .addOnSuccessListener { i ->
+                    info = i
+                    latest = i.availableVersionCode()
+                    state = when (i.updateAvailability()) {
+                        com.google.android.play.core.install.model.UpdateAvailability.UPDATE_AVAILABLE,
+                        com.google.android.play.core.install.model.UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> "available"
+                        else -> "latest"
+                    }
+                }
+                .addOnFailureListener { if (!quiet) state = "error" else if (state == "checking") state = "idle" }
+        } catch (e: Exception) { if (!quiet) state = "error" }
+    }
+
+    /** Play's own full-screen update; the app restarts by itself when it's done. */
+    fun update(act: android.app.Activity) {
+        val i = info
+        if (i == null || state != "available") { openStore(act); return }
+        try {
+            Game.saveLocal()
+            com.google.android.play.core.appupdate.AppUpdateManagerFactory.create(act).startUpdateFlow(
+                i, act, com.google.android.play.core.appupdate.AppUpdateOptions.defaultOptions(com.google.android.play.core.install.model.AppUpdateType.IMMEDIATE))
+                .addOnFailureListener { openStore(act) }
+        } catch (e: Exception) { openStore(act) }
+    }
+
+    /** Resumes an update Play already started (call from onResume). */
+    fun resume(act: android.app.Activity) {
+        if (BuildConfig.SELF_UPDATE) return
+        try {
+            val m = com.google.android.play.core.appupdate.AppUpdateManagerFactory.create(act)
+            m.appUpdateInfo.addOnSuccessListener { i ->
+                if (i.updateAvailability() == com.google.android.play.core.install.model.UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS)
+                    m.startUpdateFlow(i, act, com.google.android.play.core.appupdate.AppUpdateOptions.defaultOptions(com.google.android.play.core.install.model.AppUpdateType.IMMEDIATE))
+            }
+        } catch (_: Exception) { }
+    }
+
+    fun openStore(ctx: Context, url: String = PLAY_URL) {
+        val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$PLAY_PKG")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val web = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try { ctx.startActivity(if (url == PLAY_URL) market else web) } catch (_: Exception) { runCatching { ctx.startActivity(web) } }
+    }
+
+    /** Old GitHub check, kept only for reference builds. */
+    @Suppress("unused")
+    private fun checkGithub(ctx: Context, quiet: Boolean = false) {
         if (quiet && System.currentTimeMillis() - lastCheck < 6 * 3600_000L) return
         lastCheck = System.currentTimeMillis()
         if (!quiet) state = "checking"

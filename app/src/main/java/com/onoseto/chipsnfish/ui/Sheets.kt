@@ -779,7 +779,7 @@ private fun SettingsSheet(d: SettingsArg) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
         T(tr("Nastavení").uppercase(), 24.sp, num = true)
         Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk", "update" to "Aktualizace").filter { (it.first != "game" || g.gm()) && (it.first != "update" || com.onoseto.chipsnfish.BuildConfig.SELF_UPDATE) }.forEach { (k, l) ->
+            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk", "update" to "Aktualizace").filter { (it.first != "game" || g.gm()) }.forEach { (k, l) ->
                 val on = d.tab == k
                 Box(Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) C.ink else Color.Transparent).border(1.dp, if (on) C.ink else C.line, RoundedCornerShape(99.dp)).tap { d.tab = k; Ui.redraw() }.padding(horizontal = 11.dp, vertical = 5.dp)) {
                     T(tr(l), 12.5.sp, if (on) C.room else C.muted, FontWeight.Bold)
@@ -986,28 +986,39 @@ private fun UpdateTab() {
     val ctx = LocalContext.current
     val U = com.onoseto.chipsnfish.Updater
     val (code, name) = remember { U.current(ctx) }
+    if (com.onoseto.chipsnfish.BuildConfig.SELF_UPDATE) {
+        // old APK from GitHub: updates now come only from Google Play
+        Summary(listOf(L("Nainstalovaná verze", "Installed version", "Installierte Version") to "$name (#$code)",
+            L("Aktualizace", "Updates", "Updates") to "Google Play"))
+        Note("<b>" + L("Aktualizace teď chodí přes Obchod Play.", "Updates now come from the Play Store.", "Updates kommen jetzt aus dem Play Store.") + "</b> " +
+            L("Tuhle verzi z GitHubu jednou odinstaluj a nainstaluj aplikaci z Obchodu Play, pak se bude aktualizovat sama. Statistiky si předtím zálohuj v Já a data.",
+              "Uninstall this GitHub version once and install the app from the Play Store; then it updates itself. Back up your stats in Me & data first.",
+              "Deinstalliere diese GitHub-Version einmal und installiere die App aus dem Play Store; dann aktualisiert sie sich selbst. Sichere vorher deine Statistiken unter Ich & Daten."))
+        Btn(L("Otevřít v Obchodě Play", "Open in the Play Store", "Im Play Store öffnen"), BK.CALL, Modifier.fillMaxWidth()) { U.openStore(ctx, U.PLAY_TEST) }
+        return
+    }
     androidx.compose.runtime.LaunchedEffect(Unit) { if (U.state == "idle") U.check(ctx) }
     Summary(listOf(L("Nainstalovaná verze", "Installed version", "Installierte Version") to "$name (#$code)",
-        L("Nejnovější verze", "Latest version", "Neueste Version") to if (U.latest > 0) "#${U.latest}" else "–"))
+        L("Nejnovější verze", "Latest version", "Neueste Version") to if (U.latest > 0) "#${U.latest}" else if (U.state == "latest") "#$code" else "–"))
     when (U.state) {
-        "checking" -> Note(L("Hledám novou verzi…", "Looking for a new version…", "Suche nach neuer Version…"))
+        "checking" -> Note(L("Hledám novou verzi v Obchodě Play…", "Looking for a new version on Google Play…", "Suche im Play Store nach neuer Version…"))
         "latest" -> Note("<b>" + L("Máš nejnovější verzi.", "You have the latest version.", "Du hast die neueste Version.") + "</b>")
         "available" -> {
-            Note("<b>" + L("Je k dispozici nová verze #${U.latest}.", "New version #${U.latest} is available.", "Neue Version #${U.latest} verfügbar.") + "</b> " +
+            Note("<b>" + L("V Obchodě Play je nová verze #${U.latest}.", "Version #${U.latest} is on Google Play.", "Version #${U.latest} ist im Play Store.") + "</b> " +
                 L("Data (hráči, statistiky, rozehrané hry) zůstanou.", "Your data (players, stats, games) stays.", "Deine Daten (Spieler, Statistiken, Spiele) bleiben."))
-            Btn(L("⬇ Stáhnout a nainstalovat", "⬇ Download and install", "⬇ Herunterladen und installieren"), BK.CALL, Modifier.fillMaxWidth()) { U.download(ctx) }
+            Btn(L("⬇ Aktualizovat", "⬇ Update", "⬇ Aktualisieren"), BK.CALL, Modifier.fillMaxWidth()) {
+                (ctx as? android.app.Activity)?.let { U.update(it) } ?: U.openStore(ctx)
+            }
         }
-        "downloading" -> {
-            Note(L("Stahuji… ${(U.progress * 100).roundToInt()} %", "Downloading… ${(U.progress * 100).roundToInt()} %", "Lade… ${(U.progress * 100).roundToInt()} %"))
-            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(9.dp)).background(C.panel2)) { Box(Modifier.fillMaxWidth(U.progress).fillMaxHeight().background(C.win)) }
-        }
-        "ready" -> Btn(L("Instalovat", "Install", "Installieren"), BK.CALL, Modifier.fillMaxWidth()) { U.install(ctx) }
-        "error" -> Note(L("Aktualizaci se nepodařilo zjistit nebo stáhnout. Zkontroluj internet a zkus to znovu.", "Couldn't check or download the update. Check your internet and try again.", "Update konnte nicht geprüft oder geladen werden. Internet prüfen und erneut versuchen."))
+        "error" -> Note(L("Obchod Play se teď nepodařilo zeptat. Zkontroluj internet, nebo otevři aplikaci v Obchodě.", "Couldn't ask Google Play right now. Check your internet or open the app in the Play Store.", "Google Play ist gerade nicht erreichbar. Internet prüfen oder die App im Play Store öffnen."))
     }
-    if (U.state != "downloading") Btn(L("Zkontrolovat aktualizace", "Check for updates", "Nach Updates suchen"), BK.GHOST, Modifier.fillMaxWidth()) { U.check(ctx) }
-    Note(L("Při první aktualizaci Android požádá o povolení instalovat aplikace z Chips&Fish. Povol ho a klepni na Instalovat znovu.",
-        "On the first update Android asks for permission to install apps from Chips&Fish. Allow it and tap Install again.",
-        "Beim ersten Update fragt Android nach der Erlaubnis, Apps aus Chips&Fish zu installieren. Erlauben und erneut Installieren tippen."))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Btn(L("Zkontrolovat aktualizace", "Check for updates", "Nach Updates suchen"), BK.GHOST, Modifier.weight(1f)) { U.check(ctx) }
+        Btn(L("Otevřít v Obchodě Play", "Open in the Play Store", "Im Play Store öffnen"), BK.GHOST, Modifier.weight(1f)) { U.openStore(ctx) }
+    }
+    Note(L("Aplikace se aktualizuje i sama přes Obchod Play, pokud to máš v Obchodě povolené.",
+        "The Play Store also updates the app automatically if auto-update is on.",
+        "Der Play Store aktualisiert die App auch automatisch, wenn Auto-Update an ist."))
 }
 
 @Composable
