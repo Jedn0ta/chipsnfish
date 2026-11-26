@@ -88,6 +88,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("com.google.android.play:app-update:2.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.5") // app-update pulls an old fragment otherwise
 
     testImplementation("junit:junit:4.13.2")
 }
