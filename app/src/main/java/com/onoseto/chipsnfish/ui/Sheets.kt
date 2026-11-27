@@ -2,6 +2,7 @@
 
 package com.onoseto.chipsnfish.ui
 
+import com.onoseto.chipsnfish.online.OFriend
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -90,7 +91,7 @@ fun SheetHost() {
     @Suppress("UNUSED_VARIABLE") val r1 = Ui.sheetRev
     @Suppress("UNUSED_VARIABLE") val r2 = Game.rev
     val wide = sh.kind in setOf("card", "settings", "gamesetup", "online", "groups", "analysis", "seat", "player", "fame")
-    val compact = sh.kind == "confirm"
+    val compact = sh.kind == "confirm" || sh.kind == "friend"
     Box(
         Modifier.fillMaxSize().zIndex(40f).background(Color(0xB3020814)).tap { Ui.close() }.padding(8.dp),
         contentAlignment = Alignment.Center,
@@ -121,6 +122,7 @@ fun SheetHost() {
                 "confirm" -> ConfirmSheet(sh.arg as ConfirmArg)
                 "online" -> OnlineSheet(sh.arg as? OnlineArg ?: OnlineArg())
                 "groups" -> GroupsSheet()
+                "friend" -> FriendSheet(sh.arg as OFriend)
                 "fame" -> FameSheet()
                 "cup" -> CupSheet()
                 "group" -> GroupSheet(sh.arg as GroupArg)

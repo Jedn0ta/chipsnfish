@@ -2,6 +2,8 @@
 
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.ui.text.style.TextAlign
+import com.onoseto.chipsnfish.game.Reads
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -361,33 +363,69 @@ private fun FriendsTab() {
         }
         return
     }
-    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    fs.forEach { f ->
-        Column(
-            Modifier.width(178.dp).glass(RoundedCornerShape(topStart = 20.dp, topEnd = 6.dp, bottomEnd = 20.dp, bottomStart = 6.dp), if (f.online) Color(0x3326D07C) else Color(0x2A2A5CA8), lift = 6.dp)
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        fs.sortedWith(compareByDescending<OFriend> { it.table != null }.thenByDescending { it.online }.thenBy { it.name.lowercase() }).forEach { f -> FriendMedal(f) }
+    }
+}
+
+/** A friend as a round medallion: their photo, a status ring and the name. Tap = glass window with actions. */
+@Composable
+private fun FriendMedal(f: OFriend) {
+    watch()
+    val ring = when { f.table != null -> LobbyBlue; f.online -> C.win; else -> Color.White.copy(alpha = 0.25f) }
+    Column(Modifier.width(86.dp).tap { Ui.open("friend", f) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Box(
+            Modifier.size(66.dp).glass(androidx.compose.foundation.shape.CircleShape, if (f.online) Color(0x3326D07C) else Color(0x2A2A5CA8), lift = 8.dp).padding(4.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Avatar(Player(f.uid, f.name, img = f.img, hat = Game.P[f.uid]?.hat ?: ""), 36.dp, ring = if (f.online) C.win else Color.White.copy(alpha = 0.3f), border = 2.dp) {
-                    Box(Modifier.align(Alignment.BottomEnd).size(11.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (f.online) C.win else Color(0xFF55646E)).border(2.dp, Color(0xFF0E1A33), androidx.compose.foundation.shape.CircleShape))
-                }
-                Column(Modifier.weight(1f)) {
-                    T(f.name, 14.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true)
-                    T(when {
-                        f.table != null -> L("u stolu ${f.table}", "at table ${f.table}", "an Tisch ${f.table}")
-                        f.online -> L("online", "online", "online")
-                        else -> L("offline", "offline", "offline")
-                    }, 11.sp, if (f.table != null || f.online) C.win else GlassMuted, FontWeight.Bold, maxLines = 1)
-                }
-                T("✕", 12.sp, GlassMuted, modifier = Modifier.tap {
-                    Ui.confirm(L("Odebrat z přátel?", "Remove friend?", "Freund entfernen?"), f.name, L("Odebrat", "Remove", "Entfernen")) { O.removeFriend(f.uid); Ui.open("groups") }
-                }.padding(4.dp))
+            Avatar(Player(f.uid, f.name, img = f.img, hat = Game.P[f.uid]?.hat ?: ""), 56.dp, ring = ring, border = 2.5.dp, dim = !f.online && f.table == null) {
+                Box(Modifier.align(Alignment.BottomEnd).size(13.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(if (f.table != null) Color(0xFF2F7BFF) else if (f.online) C.win else Color(0xFF55646E)).border(2.dp, Color(0xFF0E1A33), androidx.compose.foundation.shape.CircleShape))
             }
-            if (f.table != null && f.table != O.code) Btn(L("Přisednout", "Join", "Beitreten"), BK.CALL, Modifier.fillMaxWidth(), height = 32.dp) { O.join(f.table) { goTable() } }
-            else if (O.code != null && f.table != O.code) Btn(L("Pozvat ke stolu", "Invite", "Einladen"), BK.GOLD, Modifier.fillMaxWidth(), height = 32.dp) { O.inviteFriend(f) }
+        }
+        T(f.name, 12.5.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true, align = TextAlign.Center)
+        T(when { f.table != null -> L("hraje", "playing", "spielt"); f.online -> "online"; else -> "offline" }, 10.sp,
+            if (f.table != null) LobbyBlue else if (f.online) C.win else GlassMuted, FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** Glass window with what you can do with a friend. */
+@Composable
+fun FriendSheet(f: OFriend) {
+    watch()
+    val O = Online
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Box(Modifier.size(96.dp).glass(androidx.compose.foundation.shape.CircleShape, lift = 10.dp).padding(5.dp), contentAlignment = Alignment.Center) {
+            Avatar(Player(f.uid, f.name, img = f.img, hat = Game.P[f.uid]?.hat ?: ""), 84.dp,
+                ring = if (f.table != null) LobbyBlue else if (f.online) C.win else Color.White.copy(alpha = 0.3f), border = 3.dp)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            T(L("PŘÍTEL", "FRIEND", "FREUND"), 10.sp, LobbyBlue, FontWeight.ExtraBold, letter = 2.sp)
+            T(f.name, 24.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true)
+            T(when {
+                f.table != null -> L("Hraje u stolu ${f.table}", "Playing at table ${f.table}", "Spielt an Tisch ${f.table}")
+                f.online -> L("Je teď v aplikaci", "In the app right now", "Gerade in der App")
+                else -> L("Teď není připojený", "Not connected right now", "Gerade nicht verbunden")
+            }, 13.sp, if (f.table != null) LobbyBlue else if (f.online) C.win else GlassMuted, FontWeight.Bold)
+            Game.P[f.uid]?.takeIf { it.hands > 0 }?.let { p ->
+                T(L("${p.hands} společných hand · ${Reads.PROF.getValue(Reads.effType(p)).s}", "${p.hands} hands together · ${Reads.PROF.getValue(Reads.effType(p)).s}", "${p.hands} gemeinsame Hände · ${Reads.PROF.getValue(Reads.effType(p)).s}"), 12.sp, GlassMuted)
+            }
         }
     }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (f.table != null && f.table != O.code) Btn(L("Přisednout ke stolu", "Join their table", "An den Tisch"), BK.GOLD, Modifier.weight(1f), height = 42.dp) { Ui.close(); O.join(f.table) { goTable() } }
+        if (O.code != null && f.table != O.code) Btn(L("Pozvat ke stolu ${O.code}", "Invite to table ${O.code}", "An Tisch ${O.code} einladen"), BK.GOLD, Modifier.weight(1f), height = 42.dp) { O.inviteFriend(f); Ui.close() }
+        if (O.code == null && f.table == null) Btn(L("Založit stůl a pozvat", "Open a table and invite", "Tisch eröffnen und einladen"), BK.GOLD, Modifier.weight(1f), height = 42.dp) { Ui.open("online", OnlineArg()) }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Btn(L("Statistiky", "Statistics", "Statistiken"), BK.GHOST, Modifier.weight(1f), height = 38.dp) {
+            if (Game.P[f.uid] == null) Game.P[f.uid] = Player(f.uid, f.name, img = f.img, stored = true)
+            Ui.open("player", PlayerArg(f.uid))
+        }
+        Btn(L("Zpět", "Back", "Zurück"), BK.GHOST, Modifier.weight(1f), height = 38.dp) { Ui.open("groups") }
+        Btn(L("Odebrat", "Remove", "Entfernen"), BK.DANGER, Modifier.weight(1f), height = 38.dp) {
+            Ui.confirm(L("Odebrat z přátel?", "Remove friend?", "Freund entfernen?"), f.name, L("Odebrat", "Remove", "Entfernen")) { O.removeFriend(f.uid); Ui.open("groups") }
+        }
     }
 }
 
