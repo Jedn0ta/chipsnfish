@@ -521,6 +521,12 @@ private fun PlayerSheet(a: PlayerArg) {
     val notes = remember(p.id) { mutableStateOf(p.notes) }
     val type = remember(p.id) { mutableStateOf(p.override) }
     PlayerBlock(p, notes, type, save = { savePlayer(p, name, notes.value, type.value) }) {
+        val O = com.onoseto.chipsnfish.online.Online
+        val online = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-").containsMatchIn(p.id) && p.id != O.me && com.onoseto.chipsnfish.online.SupaCfg.configured
+        if (online) {
+            if (O.isFriend(p.id)) T("★ " + L("V přátelích", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
+            else Btn(L("★ Přidat do přátel", "★ Add friend", "★ Zu Freunden"), BK.GOLD, height = 34.dp) { O.addFriend(p.id, p.name) }
+        }
         if (g.st.seats.any { it.pid == p.id }) T(tr("Hráč teď sedí u stolu."), 11.sp, C.muted)
         else T(tr(if (a.confirm) "Opravdu smazat i se statistikami?" else "Smazat hráče"), 12.sp, C.lose, FontWeight.Bold, modifier = Modifier.tap {
             if (!a.confirm) { a.confirm = true; Ui.redraw() }
@@ -579,7 +585,7 @@ fun SmallPill(text: String, on: Boolean, onClick: () -> Unit) {
     watch()
     val shape = RoundedCornerShape(99.dp)
     Box(Modifier.clip(shape).background(if (on) C.gold else C.panel2).border(1.dp, if (on) C.gold else C.line, shape).tap(onClick).padding(horizontal = 9.dp, vertical = 4.dp)) {
-        T(text, 11.5.sp, if (on) C.goldInk else C.ink, FontWeight.Bold, maxLines = 1)
+        T(text, 11.5.sp, if (on) C.goldInk else C.ink, FontWeight.Bold, maxLines = 1, fit = true)
     }
 }
 

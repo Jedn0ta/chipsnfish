@@ -1177,6 +1177,43 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- friend codes: share your code or link, the other one adds you (both become friends)
+-- ---------------------------------------------------------------------
+alter table cf_profiles add column if not exists fcode text;
+create unique index if not exists cf_profiles_fcode on cf_profiles(fcode);
+
+create or replace function cf_friend_code() returns text
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); c text; abc text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; i int; tries int := 0;
+begin
+  insert into cf_profiles(uid) values (u) on conflict do nothing;
+  select fcode into c from cf_profiles where uid = u;
+  while c is null loop
+    tries := tries + 1; if tries > 50 then raise exception 'no code'; end if;
+    c := '';
+    for i in 1..6 loop c := c || substr(abc, 1 + floor(random() * length(abc))::int, 1); end loop;
+    begin
+      update cf_profiles set fcode = c where uid = u;
+    exception when unique_violation then c := null;
+    end;
+  end loop;
+  return c;
+end $$;
+
+create or replace function cf_friend_add_code(p_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); f cf_profiles;
+begin
+  select * into f from cf_profiles where fcode = upper(btrim(p_code));
+  if not found then raise exception 'no such friend code'; end if;
+  if f.uid = u then raise exception 'own friend code'; end if;
+  insert into cf_profiles(uid) values (u) on conflict do nothing;
+  insert into cf_friends(uid, fid) values (u, f.uid) on conflict do nothing;
+  insert into cf_friends(uid, fid) values (f.uid, u) on conflict do nothing;
+  return jsonb_build_object('uid', f.uid, 'name', f.name);
+end $$;
+
+-- ---------------------------------------------------------------------
 -- delete my online profile and everything tied to it (Google Play requirement)
 -- ---------------------------------------------------------------------
 create or replace function cf_delete_me() returns void
@@ -1214,7 +1251,7 @@ begin
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
                      'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me',
-                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text') then
+                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

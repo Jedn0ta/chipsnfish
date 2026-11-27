@@ -1,5 +1,9 @@
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.draw.drawWithContent
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Canvas
@@ -96,12 +100,26 @@ fun T(
     maxLines: Int = Int.MAX_VALUE,
     letter: TextUnit = TextUnit.Unspecified,
     lineHeight: TextUnit = TextUnit.Unspecified,
+    /** Shrink the font (down to 55 %) until the text fits its box instead of being cut off. */
+    fit: Boolean = false,
 ) {
     watch()
+    if (!fit) {
+        Text(
+            text, modifier = modifier, color = color, fontSize = size, fontWeight = if (num) FontWeight.Bold else weight,
+            fontFamily = if (num) F.num else F.body, textAlign = align, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+            letterSpacing = letter, lineHeight = lineHeight,
+        )
+        return
+    }
+    var k by remember(text, size) { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    var ready by remember(text, size) { mutableStateOf(false) }
     Text(
-        text, modifier = modifier, color = color, fontSize = size, fontWeight = if (num) FontWeight.Bold else weight,
-        fontFamily = if (num) F.num else F.body, textAlign = align, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
-        letterSpacing = letter, lineHeight = lineHeight,
+        text, modifier = modifier.drawWithContent { if (ready) drawContent() }, color = color, fontSize = size * k,
+        fontWeight = if (num) FontWeight.Bold else weight, fontFamily = if (num) F.num else F.body, textAlign = align,
+        maxLines = maxLines, overflow = TextOverflow.Ellipsis, softWrap = maxLines > 1,
+        letterSpacing = if (letter.isSpecified) letter * k else letter, lineHeight = if (lineHeight.isSpecified) lineHeight * k else lineHeight,
+        onTextLayout = { r -> if ((r.hasVisualOverflow || r.isLineEllipsized(r.lineCount - 1)) && k > 0.56f) k *= 0.9f else ready = true },
     )
 }
 
@@ -405,7 +423,7 @@ fun btnInk(kind: BK): Color = when (kind) {
 fun Btn(text: String, kind: BK = BK.GOLD, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 44.dp, onClick: () -> Unit) {
     watch()
     GBtn(kind, modifier.heightIn(min = height), enabled, onClick = onClick) {
-        T(text, 14.5.sp, btnInk(kind), FontWeight.ExtraBold, align = TextAlign.Center, maxLines = 2)
+        T(text, 14.5.sp, btnInk(kind), FontWeight.ExtraBold, align = TextAlign.Center, maxLines = 2, lineHeight = 17.sp, fit = true)
     }
 }
 
@@ -419,7 +437,7 @@ fun Pill(text: String, on: Boolean, enabled: Boolean = true, onClick: () -> Unit
             .border(1.dp, if (on) C.gold else C.line, shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp)
-    ) { T(text, 13.sp, if (on) C.goldInk else C.ink, FontWeight.Bold) }
+    ) { T(text, 13.sp, if (on) C.goldInk else C.ink, FontWeight.Bold, maxLines = 1, fit = true) }
 }
 
 @Composable

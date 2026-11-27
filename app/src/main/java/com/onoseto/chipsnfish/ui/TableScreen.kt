@@ -771,14 +771,14 @@ private fun ActBox() {
         if (undo) ColBtn(tr("↶ Zpět"), BK.DARK, h = 32.dp) { g.undo() }
         TurnWho(k)
         GBtn(BK.RAISE, Modifier.fillMaxWidth().height(48.dp), enabled = mx > st.curBet, on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) {
-            T(if (st.curBet == 0) "BET" else "RAISE", 15.sp, C.goldInk, num = true, letter = 0.5.sp)
+            T(if (st.curBet == 0) "BET" else "RAISE", 15.sp, C.goldInk, num = true, letter = 0.5.sp, maxLines = 1, fit = true)
         }
         GBtn(BK.CALL, Modifier.fillMaxWidth().height(50.dp), ring = ring, onClick = { g.heroAction("call") }) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 when {
-                    toCall == 0 -> T("CHECK", 15.sp, Color.White, num = true)
-                    toCall >= s.stack -> { T("ALL-IN", 15.sp, Color.White, num = true); T(g.fm(s.stack), 15.sp, Color.White, num = true) }
-                    else -> { T("CALL", 15.sp, Color.White, num = true, lineHeight = 15.sp); T(g.fm(toCall), 15.sp, Color.White, num = true, lineHeight = 15.sp) }
+                    toCall == 0 -> T("CHECK", 15.sp, Color.White, num = true, maxLines = 1, fit = true)
+                    toCall >= s.stack -> { T("ALL-IN", 14.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1, fit = true); T(g.fm(s.stack), 14.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1, fit = true) }
+                    else -> { T("CALL", 14.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1, fit = true); T(g.fm(toCall), 14.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1, fit = true) }
                 }
             }
         }
@@ -787,7 +787,7 @@ private fun ActBox() {
         GBtn(BK.FOLD, Modifier.fillMaxWidth().height(46.dp), onClick = {
             if (toCall == 0 && !foldArm) { foldArm = true; g.toast(L("Check je zdarma. Klepni znovu, pokud opravdu chceš složit.", "Checking is free. Tap again if you really want to fold.", "Check ist gratis. Nochmal tippen, um wirklich zu folden.")) }
             else g.heroAction("fold")
-        }) { T(if (foldArm) L("OPRAVDU?", "SURE?", "SICHER?") else "FOLD", 15.sp, Color.White, num = true) }
+        }) { T(if (foldArm) L("OPRAVDU?", "SURE?", "SICHER?") else "FOLD", 15.sp, Color.White, num = true, maxLines = 1, fit = true) }
     }
 }
 
@@ -795,7 +795,7 @@ private fun ActBox() {
 private fun ColBtn(text: String, kind: BK, h: Dp = 50.dp, enabled: Boolean = true, onClick: () -> Unit) {
     watch()
     GBtn(kind, Modifier.fillMaxWidth().height(h), enabled = enabled, onClick = onClick) {
-        T(text.uppercase(), if (text.length > 12) 11.sp else 14.sp, btnInk(kind), num = true, align = TextAlign.Center, maxLines = 3, lineHeight = 13.sp)
+        T(text.uppercase(), 13.5.sp, btnInk(kind), num = true, align = TextAlign.Center, maxLines = 2, lineHeight = 15.sp, fit = true)
     }
 }
 
@@ -973,10 +973,10 @@ private fun RaisePop() {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            GBtn(BK.DARK, Modifier.weight(1f).height(46.dp), onClick = { g.raiseOpen = false; g.bump() }) { T(tr("Zrušit"), 14.sp, Color.White, FontWeight.ExtraBold) }
+            GBtn(BK.DARK, Modifier.weight(1f).height(46.dp), onClick = { g.raiseOpen = false; g.bump() }) { T(tr("Zrušit"), 14.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true) }
             GBtn(BK.RAISE, Modifier.weight(2.2f).height(46.dp), onClick = { g.heroAction("raise") }) {
                 val to = g.raiseTo
-                T(if (to >= mx) "All-in " + g.fm(mx) else raiseLbl + L(" na ", " to ", " auf ") + g.fm(to), 16.sp, C.goldInk, num = true)
+                T(if (to >= mx) "All-in " + g.fm(mx) else raiseLbl + L(" na ", " to ", " auf ") + g.fm(to), 16.sp, C.goldInk, num = true, maxLines = 1, fit = true)
             }
         }
     }
@@ -1186,7 +1186,7 @@ private fun CoachPanel() {
         }
         if (m.act.isNotEmpty() && Game.st.turn == 0) {
             GBtn(BK.GOLD, Modifier.fillMaxWidth().height(34.dp), onClick = { Game.doCoach(m.act, m.amt) }) {
-                T(L("Zahrát: ", "Play: ", "Spielen: ") + m.label, 13.sp, C.goldInk, FontWeight.ExtraBold, maxLines = 1)
+                T(L("Zahrát: ", "Play: ", "Spielen: ") + m.label, 13.sp, C.goldInk, FontWeight.ExtraBold, maxLines = 1, fit = true)
             }
         }
     }

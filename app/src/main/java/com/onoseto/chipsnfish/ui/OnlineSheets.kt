@@ -307,6 +307,41 @@ fun OnlineSettingsGame() {
 }
 
 
+/** My friend code + field to add a friend by code. */
+@Composable
+private fun AddFriendBar() {
+    watch()
+    val O = Online
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(Unit) { O.loadFriendCode() }
+    var c by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.gold.copy(alpha = 0.08f)).border(1.dp, C.gold.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column {
+            T(L("MŮJ KÓD PŘÍTELE", "MY FRIEND CODE", "MEIN FREUNDESCODE"), 9.5.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp)
+            T(O.myFriendCode ?: "······", 19.sp, C.gold, num = true, letter = 2.sp)
+        }
+        Btn(L("Sdílet", "Share", "Teilen"), BK.DARK, Modifier.width(84.dp), enabled = O.myFriendCode != null, height = 34.dp) {
+            O.myFriendCode?.let { share(ctx, O.friendInviteText(it)) }
+        }
+        Spacer(Modifier.weight(1f))
+        Box(Modifier.width(140.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
+            if (c.isEmpty()) T(L("kód přítele", "friend's code", "Code des Freundes"), 14.sp, C.muted, maxLines = 1)
+            androidx.compose.foundation.text.BasicTextField(
+                c, { c = it.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(6) }, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = C.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(C.gold), modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Btn("★ " + L("Přidat", "Add", "Hinzufügen"), BK.GOLD, Modifier.width(100.dp), enabled = c.length == 6 && !O.busy, height = 34.dp) {
+            O.addFriendByCode(c) { c = "" }
+        }
+    }
+}
+
 @Composable
 private fun FriendsTab() {
     watch()
@@ -315,13 +350,14 @@ private fun FriendsTab() {
     if (O.code != null) Note(L("Sedíš u stolu <b>${O.code}</b>. Klepni u přítele na <b>Pozvat</b> a jemu se v aplikaci ukáže pozvánka.",
         "You're at table <b>${O.code}</b>. Tap <b>Invite</b> next to a friend and they'll see the invite in the app.",
         "Du sitzt an Tisch <b>${O.code}</b>. Tippe bei einem Freund auf <b>Einladen</b>, er sieht die Einladung in der App."))
+    AddFriendBar()
     if (fs == null) { Note(L("Načítám…", "Loading…", "Lade…")); return }
     if (fs.isEmpty()) {
         BoxPanel {
             T(L("Zatím nemáš žádné přátele", "No friends yet", "Noch keine Freunde"), 15.sp, weight = FontWeight.ExtraBold)
-            Note(L("Přátele přidáš u stolu: klepni na hráče a dej <b>Přidat do přátel</b>. Pak tu uvidíš, kdo je zrovna v aplikaci a u kterého stolu sedí.",
-                "Add friends at the table: tap a player and choose <b>Add to friends</b>. Then you'll see who's online and where they're playing.",
-                "Freunde fügst du am Tisch hinzu: Spieler antippen und <b>Zu Freunden</b> wählen. Dann siehst du, wer online ist und wo er spielt."))
+            Note(L("Pošli kamarádovi svůj <b>kód přítele</b> (Sdílet), nebo zadej jeho kód nahoře. Přidat jde i u stolu: klepni na hráče a dej <b>Přidat do přátel</b>. Pak ho odsud pozveš ke stolu.",
+                "Send a friend your <b>friend code</b> (Share) or enter theirs above. You can also tap a player at the table and choose <b>Add to friends</b>. Then invite them to a table from here.",
+                "Schick einem Freund deinen <b>Freundescode</b> (Teilen) oder gib seinen oben ein. Am Tisch geht es auch: Spieler antippen, <b>Zu Freunden</b>. Dann lädst du ihn von hier an einen Tisch ein."))
         }
         return
     }

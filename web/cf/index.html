@@ -37,18 +37,20 @@
 </main>
 <script>
   var q = new URLSearchParams(location.search), t = (q.get('t') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(),
-      g = (q.get('g') || '').replace(/[^A-Za-z0-9-]/g, '');
-  var path = t ? 't/' + t : g ? 'g/' + g : '';
+      g = (q.get('g') || '').replace(/[^A-Za-z0-9-]/g, ''),
+      f = (q.get('f') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  var path = t ? 't/' + t : g ? 'g/' + g : f ? 'f/' + f : '';
   var en = !/^cs|^sk/i.test(navigator.language || '');
   if (en) {
     document.documentElement.lang = 'en';
-    document.getElementById('lead').textContent = g ? 'An invitation to a poker group.' : 'An invitation to a poker table.';
-    document.getElementById('codelbl').textContent = 'table code';
+    document.getElementById('lead').textContent = f ? 'A friend request.' : g ? 'An invitation to a poker group.' : 'An invitation to a poker table.';
+    document.getElementById('codelbl').textContent = f ? 'friend code' : 'table code';
     document.getElementById('open').textContent = 'Open in the app';
     document.querySelector('a.ghost').textContent = 'Download the app (Android)';
     document.getElementById('hint').textContent = "If you don't have the app yet, download and install it, then tap the invite link again. You can also join by entering the table code.";
   } else if (g) document.getElementById('lead').textContent = 'Pozvánka do pokerové skupiny.';
-  if (t) { document.getElementById('code').textContent = t; document.getElementById('codebox').hidden = false; }
+  else if (f) { document.getElementById('lead').textContent = 'Žádost o přátelství.'; document.getElementById('codelbl').textContent = 'kód přítele'; }
+  if (t || f) { document.getElementById('code').textContent = t || f; document.getElementById('codebox').hidden = false; }
   var a = document.getElementById('open');
   if (path) {
     var back = location.href + (location.search ? '&' : '?') + 'nf=1';

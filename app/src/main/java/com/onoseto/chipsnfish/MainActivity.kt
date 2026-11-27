@@ -50,7 +50,9 @@ class MainActivity : ComponentActivity() {
         val u = i?.data ?: return
         val t = u.getQueryParameter("t") ?: if (u.scheme == "chipsnfish" && u.host == "t") u.lastPathSegment else null
         val g = u.getQueryParameter("g") ?: if (u.scheme == "chipsnfish" && u.host == "g") u.lastPathSegment else null
+        val f = u.getQueryParameter("f") ?: if (u.scheme == "chipsnfish" && u.host == "f") u.lastPathSegment else null
         when {
+            !f.isNullOrBlank() -> Ui.deep = "f" to f.trim()
             !t.isNullOrBlank() -> Ui.deep = "t" to t.trim()
             !g.isNullOrBlank() -> Ui.deep = "g" to g.trim()
         }

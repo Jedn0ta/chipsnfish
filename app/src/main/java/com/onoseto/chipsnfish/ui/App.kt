@@ -98,6 +98,7 @@ fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
             Ui.deep = null
             if (!com.onoseto.chipsnfish.online.SupaCfg.configured) Game.toast(L("Online server zatím není připojený.", "The online server isn't connected yet.", "Der Online-Server ist noch nicht verbunden."))
             else if (d.first == "t") com.onoseto.chipsnfish.online.Online.join(d.second) { goTable() }
+            else if (d.first == "f") com.onoseto.chipsnfish.online.Online.addFriendByCode(d.second) { Ui.open("groups") }
             else com.onoseto.chipsnfish.online.Online.joinGroup(d.second) { n ->
                 Game.toast(L("Jsi ve skupině „$n“", "You joined \"$n\"", "Du bist in der Gruppe „$n“")); Ui.open("groups")
             }

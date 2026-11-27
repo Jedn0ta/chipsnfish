@@ -452,6 +452,42 @@ object Online {
         }
     }
 
+    var myFriendCode by mutableStateOf<String?>(null)
+
+    fun loadFriendCode() {
+        if (!SupaCfg.configured || myFriendCode != null) return
+        Game.scope.launch {
+            try { syncProfile(); myFriendCode = Supa.rpc("cf_friend_code").jsonPrimitive.contentOrNull } catch (_: Exception) { }
+        }
+    }
+
+    /** Adds a friend by the 6-letter code (both of you become friends). */
+    fun addFriendByCode(c: String, onOk: () -> Unit = {}) {
+        val code = c.trim().uppercase().filter { it.isLetterOrDigit() }
+        if (code.length != 6) { Game.toast(L("Kód přítele má 6 znaků.", "A friend code has 6 characters.", "Ein Freundescode hat 6 Zeichen.")); return }
+        Game.scope.launch {
+            try {
+                syncProfile()
+                val o = Supa.rpc("cf_friend_add_code", args("p_code" to code)).jsonObject
+                val n = o["name"]?.jsonPrimitive?.contentOrNull ?: "?"
+                Game.toast(L("$n je teď tvůj přítel ★", "$n is now your friend ★", "$n ist jetzt dein Freund ★"))
+                loadFriends(); onOk()
+            } catch (e: Exception) {
+                val m = e.message ?: ""
+                Game.toast(when {
+                    m.contains("own friend code") -> L("To je tvůj vlastní kód 🙂", "That's your own code 🙂", "Das ist dein eigener Code 🙂")
+                    m.contains("no such friend code") -> L("Takový kód přítele neexistuje.", "No such friend code.", "Diesen Freundescode gibt es nicht.")
+                    else -> err(e)
+                })
+            }
+        }
+    }
+
+    fun friendInviteText(c: String) = L(
+        "Přidej si mě do přátel v Hold'em Chips&Fish ♠ Můj kód: $c\n${WEB}?f=$c",
+        "Add me as a friend in Hold'em Chips&Fish ♠ My code: $c\n${WEB}?f=$c",
+        "Füg mich als Freund in Hold'em Chips&Fish hinzu ♠ Mein Code: $c\n${WEB}?f=$c")
+
     fun removeFriend(uid: String) = Game.scope.launch { runCatching { Supa.rpc("cf_friend_remove", args("p_uid" to uid)) }; loadFriends() }
 
     fun inviteFriend(f: OFriend) {
