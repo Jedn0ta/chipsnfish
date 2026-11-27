@@ -2,6 +2,11 @@
 
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.composed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.activity.compose.BackHandler
@@ -296,6 +301,42 @@ private fun BlindGroup() {
 
 // ---------------- menu & splash ----------------
 
+// ---------------- lobby ----------------
+
+/** The lobby picture and where it sits on screen, so glass panels can show it blurred behind them. */
+private class Backdrop(val img: androidx.compose.ui.graphics.ImageBitmap) {
+    var origin by mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
+    var size by mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
+}
+private val LocalBackdrop = androidx.compose.runtime.staticCompositionLocalOf<Backdrop?> { null }
+
+/** Frosted glass: the blurred lobby behind, a light sheen and a thin bright edge. */
+private fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape, tint: Color = Color(0x2A2A5CA8), lift: androidx.compose.ui.unit.Dp = 14.dp): Modifier = composed {
+    val bd = LocalBackdrop.current
+    var pos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    this
+        .onGloballyPositioned { pos = it.positionInRoot() }
+        .shadow(lift, shape, ambientColor = Color(0xFF020814), spotColor = Color(0xFF000000))
+        .clip(shape)
+        .drawBehind {
+            if (bd != null && bd.size.width > 0) {
+                val iw = bd.img.width; val ih = bd.img.height
+                val sc = kotlin.math.max(bd.size.width / iw.toFloat(), bd.size.height / ih.toFloat())
+                val dw = iw * sc; val dh = ih * sc
+                val ox = bd.origin.x + (bd.size.width - dw) / 2 - pos.x
+                val oy = bd.origin.y + (bd.size.height - dh) / 2 - pos.y
+                drawImage(bd.img, androidx.compose.ui.unit.IntOffset.Zero, androidx.compose.ui.unit.IntSize(iw, ih),
+                    androidx.compose.ui.unit.IntOffset(ox.toInt(), oy.toInt()), androidx.compose.ui.unit.IntSize(dw.toInt(), dh.toInt()))
+            }
+            drawRect(tint)
+            drawRect(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.03f), Color.White.copy(alpha = 0.07f)),
+                start = androidx.compose.ui.geometry.Offset.Zero, end = androidx.compose.ui.geometry.Offset(size.width, size.height)))
+        }
+        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0.06f), Color(0x667FC4FF))), shape)
+}
+
+private val LobbyBlue = Color(0xFF7FC4FF)
+
 @Composable
 private fun MenuScreen(onExit: () -> Unit) {
     watch()
@@ -303,138 +344,149 @@ private fun MenuScreen(onExit: () -> Unit) {
     val O = com.onoseto.chipsnfish.online.Online
     val gs = g.gameSaved()
     val gOn = gs != null && gs.over == null
-    Box(Modifier.fillMaxSize().zIndex(30f).background(C.room).tap { }) {
-        // the lobby: a warm card room in the background
+    val blur = androidx.compose.ui.res.imageResource(com.onoseto.chipsnfish.R.drawable.lobby_bg_blur)
+    val bd = remember(blur) { Backdrop(blur) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalBackdrop provides bd) {
+    Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }
+        .onGloballyPositioned { bd.origin = it.positionInRoot(); bd.size = it.size }) {
         androidx.compose.foundation.Image(
             androidx.compose.ui.res.painterResource(com.onoseto.chipsnfish.R.drawable.lobby_bg), null,
             Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop,
         )
         LobbyBokeh()
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color.Black.copy(alpha = 0.62f), 0.55f to Color.Black.copy(alpha = 0.25f), 1f to Color.Black.copy(alpha = 0.45f))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x99030814), 0.35f to Color.Transparent, 1f to Color(0xCC030814))))
         // top bar
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FishLogo(Modifier.size(34.dp))
-            Row {
-                T("HOLD'EM ", 22.sp, C.ink, num = true, letter = 1.sp)
-                GoldTitle("CHIPS&FISH", 22f)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FishLogo(Modifier.size(32.dp))
+            Column {
+                T("HOLD'EM", 11.sp, LobbyBlue, num = true, letter = 4.sp, lineHeight = 12.sp)
+                T("CHIPS&FISH", 22.sp, Color.White, num = true, letter = 1.5.sp, lineHeight = 24.sp)
             }
             Spacer(Modifier.weight(1f))
-            WalletBadge()
+            LobbyWallet()
             LobbyIconBtn("gear") { Ui.openSettings() }
             LobbyIconBtn("power") { g.saveLocal(); onExit() }
         }
         // left: play with friends
         Column(
-            Modifier.align(Alignment.CenterStart).padding(start = 16.dp, top = 30.dp).width(400.dp),
+            Modifier.align(Alignment.CenterStart).padding(start = 16.dp, top = 34.dp).width(390.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Glass(Modifier.fillMaxWidth()) {
-                T(L("HRÁT S PŘÁTELI", "PLAY WITH FRIENDS", "MIT FREUNDEN SPIELEN"), 26.sp, C.ink, num = true, letter = 1.sp)
-                T(L("Online stůl pro 2–10 hráčů. Karty rozdává server.", "Online table for 2–10 players. The server deals.", "Online-Tisch für 2–10 Spieler. Der Server gibt."), 12.5.sp, C.muted, maxLines = 1, fit = true)
-                Spacer(Modifier.height(4.dp))
+            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                T(L("ONLINE · 2–10 HRÁČŮ", "ONLINE · 2–10 PLAYERS", "ONLINE · 2–10 SPIELER"), 10.5.sp, LobbyBlue, FontWeight.ExtraBold, letter = 2.sp)
+                T(L("Hrát s přáteli", "Play with friends", "Mit Freunden spielen"), 28.sp, Color.White, FontWeight.ExtraBold, lineHeight = 32.sp, maxLines = 1, fit = true)
+                T(L("Stůl jen pro vaši partu. Karty rozdává server.", "A table just for your crew. The server deals.", "Ein Tisch nur für eure Runde. Der Server gibt."), 12.5.sp, Color.White.copy(alpha = 0.65f), maxLines = 1, fit = true)
+                Spacer(Modifier.height(6.dp))
                 if (O.code != null) {
-                    Btn("▶ " + L("Pokračovat · stůl ${O.code}", "Continue · table ${O.code}", "Weiter · Tisch ${O.code}"), BK.GOLD, Modifier.fillMaxWidth(), height = 48.dp) { goTable() }
-                    Btn(L("Jiný stůl", "Other table", "Anderer Tisch"), BK.GHOST, Modifier.fillMaxWidth(), height = 36.dp) { Ui.open("online", OnlineArg()) }
+                    Btn(L("Pokračovat · stůl ${O.code}", "Continue · table ${O.code}", "Weiter · Tisch ${O.code}"), BK.BLUE, Modifier.fillMaxWidth(), height = 48.dp) { goTable() }
+                    GlassBtn(L("Jiný stůl", "Other table", "Anderer Tisch"), Modifier.fillMaxWidth()) { Ui.open("online", OnlineArg()) }
                 } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn("▶ " + L("Nový stůl", "New table", "Neuer Tisch"), BK.GOLD, Modifier.weight(1f), height = 48.dp) { Ui.open("online", OnlineArg()) }
-                    Btn(L("Připojit kódem", "Join with code", "Mit Code beitreten"), BK.DARK, Modifier.weight(1f), height = 48.dp) { Ui.open("online", OnlineArg(tab = "join")) }
+                    Btn(L("Nový stůl", "New table", "Neuer Tisch"), BK.BLUE, Modifier.weight(1.2f), height = 48.dp) { Ui.open("online", OnlineArg()) }
+                    GlassBtn(L("Mám kód", "I have a code", "Ich habe einen Code"), Modifier.weight(1f).height(48.dp)) { Ui.open("online", OnlineArg(tab = "join")) }
                 }
                 val near = com.onoseto.chipsnfish.online.Nearby.tables.filter { it.code != O.code }
                 if (near.isNotEmpty()) {
                     val t = near.last()
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.win.copy(alpha = 0.16f)).border(1.dp, C.win.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                            .tap { O.join(t.code) { goTable() } }.padding(horizontal = 10.dp, vertical = 7.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x3326D07C)).border(1.dp, Color(0x8826D07C), RoundedCornerShape(12.dp))
+                            .tap { O.join(t.code) { goTable() } }.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        T("📶", 14.sp)
-                        T(L("Na Wi-Fi hraje ${t.who} · ${t.code}", "${t.who} on your Wi-Fi · ${t.code}", "${t.who} im WLAN · ${t.code}"), 13.sp, C.ink, FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1, fit = true)
-                        T(L("Přisednout ›", "Join ›", "Beitreten ›"), 12.5.sp, C.win, FontWeight.ExtraBold)
+                        Box(Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF3CE08A)))
+                        T(L("${t.who} hraje na tvé Wi-Fi", "${t.who} is playing on your Wi-Fi", "${t.who} spielt in deinem WLAN"), 13.sp, Color.White, FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1, fit = true)
+                        T(L("Přisednout", "Join", "Beitreten"), 12.5.sp, Color(0xFF6CF0A8), FontWeight.ExtraBold)
                     }
                 }
                 FriendsOnlineRow()
             }
             NameBar()
         }
-        // right: the other rooms of the lobby
+        // right: the rest of the lobby
         Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 16.dp, top = 30.dp).width(340.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.align(Alignment.CenterEnd).padding(end = 16.dp, top = 34.dp).width(330.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                LobbyTile("🤖", L("Trénink", "Practice", "Training"),
-                    if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Weiter · Hand #${gs!!.handNo}") else L("Proti počítači", "Vs the computer", "Gegen Computer"),
-                    Modifier.weight(1f), hot = gOn) {
-                    O.stopPolling()
-                    if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.goView("table") } else Ui.openGameSetup()
-                }
-                LobbyTile("👥", L("Přátelé", "Friends", "Freunde"),
-                    O.friends?.count { it.online }?.takeIf { it > 0 }?.let { L("$it online", "$it online", "$it online") } ?: L("Kódy a pozvánky", "Codes & invites", "Codes & Einladungen"),
-                    Modifier.weight(1f)) { Ui.open("groups") }
+            LobbyRow(L("Trénink", "Practice", "Training"),
+                if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Weiter · Hand #${gs!!.handNo}") else L("Proti počítači, s rádcem", "Vs the computer, with a coach", "Gegen den Computer, mit Coach"),
+                hot = gOn, extra = if (gOn) L("Nový", "New", "Neu") else null, onExtra = { O.stopPolling(); Ui.openGameSetup() }) {
+                O.stopPolling()
+                if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.goView("table") } else Ui.openGameSetup()
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                LobbyTile("📊", L("Statistiky", "Statistics", "Statistiken"), L("Všichni hráči", "All players", "Alle Spieler"), Modifier.weight(1f)) {
-                    Ui.hideMenu(); Ui.solo = true; Ui.goView("players")
-                }
-                LobbyTile("🏆", L("Síň slávy", "Hall of fame", "Ruhmeshalle"), L("Body cti a poháry", "Honor & cups", "Ehre & Pokale"), Modifier.weight(1f)) { Ui.open("fame") }
+            LobbyRow(L("Přátelé", "Friends", "Freunde"),
+                O.friends?.count { it.online }?.takeIf { it > 0 }?.let { L("$it online · pozvat ke stolu", "$it online · invite to a table", "$it online · an den Tisch einladen") } ?: L("Kód přítele, skupiny, pozvánky", "Friend code, groups, invites", "Freundescode, Gruppen, Einladungen")) { Ui.open("groups") }
+            LobbyRow(L("Statistiky", "Statistics", "Statistiken"), L("Všichni hráči a jejich styl", "Every player and their style", "Alle Spieler und ihr Stil")) {
+                Ui.hideMenu(); Ui.solo = true; Ui.goView("players")
             }
-            if (gOn) T(L("+ Nový trénink", "+ New practice", "+ Neues Training"), 12.sp, C.muted, FontWeight.Bold,
-                modifier = Modifier.align(Alignment.End).tap { O.stopPolling(); Ui.openGameSetup() })
-            if (com.onoseto.chipsnfish.Updater.state == "available") {
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.gold.copy(alpha = 0.16f)).border(1.dp, C.gold.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
-                        .tap { Ui.open("settings", SettingsArg(tab = "update", level = 0, startStack = 0, autoBlinds = true, dealer = 0)) }.padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    T("⬆", 14.sp, C.gold, FontWeight.ExtraBold)
-                    T(L("Nová verze aplikace", "New app version", "Neue App-Version"), 13.sp, C.ink, FontWeight.Bold, modifier = Modifier.weight(1f))
-                    T(L("Aktualizovat ›", "Update ›", "Aktualisieren ›"), 12.5.sp, C.gold, FontWeight.ExtraBold)
+            LobbyRow(L("Síň slávy", "Hall of fame", "Ruhmeshalle"), L("Body cti, žebříček, poháry", "Honor points, ranking, cups", "Ehrenpunkte, Rangliste, Pokale")) { Ui.open("fame") }
+            if (com.onoseto.chipsnfish.Updater.state == "available")
+                LobbyRow(L("Nová verze", "New version", "Neue Version"), L("Aktualizovat z Obchodu Play", "Update from Google Play", "Aus Google Play aktualisieren"), hot = true) {
+                    Ui.open("settings", SettingsArg(tab = "update", level = 0, startStack = 0, autoBlinds = true, dealer = 0))
                 }
-            }
         }
+    }
     }
 }
 
-/** Frosted dark panel used in the lobby. */
+/** One slim glass row on the right side of the lobby. */
 @Composable
-private fun Glass(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    val sh = RoundedCornerShape(18.dp)
-    Column(
-        modifier.shadow(16.dp, sh).clip(sh)
-            .background(Brush.verticalGradient(listOf(Color(0xE61C2A35), Color(0xF00E161C))))
-            .border(1.dp, Brush.verticalGradient(listOf(C.gold.copy(alpha = 0.7f), Color.White.copy(alpha = 0.06f))), sh)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp), content = content,
-    )
-}
-
-@Composable
-private fun LobbyTile(icon: String, title: String, sub: String, modifier: Modifier, hot: Boolean = false, onClick: () -> Unit) {
+private fun LobbyRow(title: String, sub: String, hot: Boolean = false, extra: String? = null, onExtra: () -> Unit = {}, onClick: () -> Unit) {
     watch()
     val sh = RoundedCornerShape(16.dp)
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.95f else 1f, label = "tile")
-    Column(
-        modifier.height(104.dp).graphicsLayer(scaleX = sc, scaleY = sc).shadow(10.dp, sh, spotColor = if (hot) C.gold else Color.Black).clip(sh)
-            .background(Brush.verticalGradient(listOf(Color(0xE6223442), Color(0xF0121B22))))
-            .border(if (hot) 2.dp else 1.dp, if (hot) Brush.linearGradient(listOf(Color(0xFFFFE9A8), C.gold2)) else Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.04f))), sh)
-            .clickable(src, null, onClick = onClick).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.97f else 1f, label = "row")
+    Row(
+        Modifier.fillMaxWidth().height(58.dp).graphicsLayer(scaleX = sc, scaleY = sc)
+            .glass(sh, if (hot) Color(0x3D2F7BFF) else Color(0x2A2A5CA8), lift = 10.dp)
+            .then(if (hot) Modifier.border(1.5.dp, Brush.linearGradient(listOf(Color(0xFF9AD6FF), Color(0xFF2F7BFF))), sh) else Modifier)
+            .clickable(src, null, onClick = onClick).padding(start = 16.dp, end = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        T(icon, 24.sp, lineHeight = 28.sp)
-        Spacer(Modifier.weight(1f))
-        T(title.uppercase(), 17.sp, C.ink, num = true, maxLines = 1, fit = true)
-        T(sub + " ›", 11.5.sp, if (hot) C.gold else C.muted, FontWeight.Bold, maxLines = 1, fit = true)
+        Box(Modifier.width(3.dp).height(26.dp).clip(RoundedCornerShape(2.dp)).background(if (hot) LobbyBlue else Color.White.copy(alpha = 0.25f)))
+        Column(Modifier.weight(1f)) {
+            T(title, 16.5.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true, lineHeight = 19.sp)
+            T(sub, 11.5.sp, if (hot) LobbyBlue else Color.White.copy(alpha = 0.6f), FontWeight.SemiBold, maxLines = 1, fit = true, lineHeight = 14.sp)
+        }
+        if (extra != null) Box(
+            Modifier.clip(RoundedCornerShape(99.dp)).background(Color.White.copy(alpha = 0.1f)).border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(99.dp))
+                .tap(onExtra).padding(horizontal = 10.dp, vertical = 5.dp),
+        ) { T(extra, 11.sp, Color.White, FontWeight.Bold) }
+        T("›", 22.sp, Color.White.copy(alpha = 0.55f), FontWeight.Light)
     }
+}
+
+/** Secondary button in glass style. */
+@Composable
+private fun GlassBtn(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.heightIn(min = 36.dp).clip(RoundedCornerShape(11.dp)).background(Color.White.copy(alpha = 0.08f))
+            .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(11.dp)).clickable(onClick = onClick).padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) { T(text, 14.5.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true) }
 }
 
 @Composable
 private fun LobbyIconBtn(icon: String, onClick: () -> Unit) {
-    Box(
-        Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.45f)).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)).tap(onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon24(icon, C.ink) }
+    Box(Modifier.size(38.dp).glass(androidx.compose.foundation.shape.CircleShape, lift = 6.dp).tap(onClick), contentAlignment = Alignment.Center) { Icon24(icon, Color.White) }
+}
+
+/** Wallet chips and honor points as one glass pill. */
+@Composable
+private fun LobbyWallet() {
+    watch()
+    val F = com.onoseto.chipsnfish.online.Fame
+    val S = com.onoseto.chipsnfish.online.Social
+    if (S.bank == null && F.honor == null) return
+    Row(
+        Modifier.height(38.dp).glass(RoundedCornerShape(99.dp), lift = 6.dp).tap { Ui.open("fame") }.padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        ChipDisc(C.gold, 16.dp)
+        T(S.bank?.let { Game.fm(it) } ?: "–", 14.sp, Color.White, num = true)
+        Box(Modifier.width(1.dp).height(16.dp).background(Color.White.copy(alpha = 0.2f)))
+        T("★", 14.sp, LobbyBlue, FontWeight.Bold)
+        T(Game.fm(F.honor ?: 0), 14.sp, Color.White, num = true)
+    }
 }
 
 /** Online friends as little avatars; tap = friends & invites. */
@@ -444,26 +496,26 @@ private fun FriendsOnlineRow() {
     val on = com.onoseto.chipsnfish.online.Online.friends?.filter { it.online }.orEmpty()
     if (on.isEmpty()) return
     Row(Modifier.tap { Ui.open("groups") }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        T(L("Online:", "Online:", "Online:"), 11.5.sp, C.muted, FontWeight.Bold)
+        T(L("Online", "Online", "Online"), 11.sp, Color.White.copy(alpha = 0.6f), FontWeight.Bold)
         on.take(7).forEach { f ->
-            Avatar(com.onoseto.chipsnfish.game.Player(f.uid, f.name, img = f.img, hat = Game.P[f.uid]?.hat ?: ""), 26.dp, ring = C.win, border = 2.dp)
+            Avatar(com.onoseto.chipsnfish.game.Player(f.uid, f.name, img = f.img, hat = Game.P[f.uid]?.hat ?: ""), 26.dp, ring = Color(0xFF3CE08A), border = 2.dp)
         }
-        if (on.size > 7) T("+${on.size - 7}", 12.sp, C.muted, num = true)
+        if (on.size > 7) T("+${on.size - 7}", 12.sp, Color.White.copy(alpha = 0.6f), num = true)
     }
 }
 
-/** Slowly drifting warm light specks over the lobby picture. */
+/** Slowly drifting cool light specks over the lobby picture. */
 @Composable
 private fun LobbyBokeh() {
-    val t = rememberInfiniteTransition(label = "bokeh").animateFloat(0f, 1f, infiniteRepeatable(tween(26000, easing = LinearEasing)), label = "b")
-    val dots = remember { List(18) { floatArrayOf(Math.random().toFloat(), Math.random().toFloat() * 0.6f, 4f + Math.random().toFloat() * 10f, Math.random().toFloat()) } }
+    val t = rememberInfiniteTransition(label = "bokeh").animateFloat(0f, 1f, infiniteRepeatable(tween(30000, easing = LinearEasing)), label = "b")
+    val dots = remember { List(16) { floatArrayOf(Math.random().toFloat(), Math.random().toFloat() * 0.6f, 4f + Math.random().toFloat() * 10f, Math.random().toFloat()) } }
     androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
         dots.forEach { d ->
             val ph = (t.value + d[3]) % 1f
             val x = (d[0] + ph * 0.08f) % 1f * size.width
             val y = d[1] * size.height + kotlin.math.sin(ph * 6.283f) * 8f
-            val a = 0.05f + 0.1f * kotlin.math.sin(ph * 3.1416f)
-            drawCircle(Color(0xFFFFD18A).copy(alpha = a), d[2] * density, androidx.compose.ui.geometry.Offset(x, y))
+            val a = 0.04f + 0.09f * kotlin.math.sin(ph * 3.1416f)
+            drawCircle(Color(0xFF9ED2FF).copy(alpha = a), d[2] * density, androidx.compose.ui.geometry.Offset(x, y))
         }
     }
 }
@@ -552,12 +604,12 @@ private fun NameBar() {
     }
     val empty = name.isBlank()
     Row(
-        Modifier.clip(RoundedCornerShape(99.dp)).background(C.panel2.copy(alpha = 0.85f))
-            .border(1.dp, if (empty) C.gold else C.line, RoundedCornerShape(99.dp)).padding(start = 4.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
+        Modifier.glass(RoundedCornerShape(99.dp), lift = 6.dp)
+            .then(if (empty) Modifier.border(1.5.dp, LobbyBlue, RoundedCornerShape(99.dp)) else Modifier).padding(start = 4.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Avatar(me, 30.dp, border = 2.dp)
-        T(if (empty) L("Jak ti máme říkat?", "What's your name?", "Wie heißt du?") else L("Hraješ jako", "Playing as", "Du spielst als"), 13.sp, if (empty) C.gold else C.muted, FontWeight.Bold)
+        T(if (empty) L("Jak ti máme říkat?", "What's your name?", "Wie heißt du?") else L("Hraješ jako", "Playing as", "Du spielst als"), 13.sp, if (empty) LobbyBlue else Color.White.copy(alpha = 0.6f), FontWeight.Bold)
         Box(Modifier.width(170.dp)) {
             if (name.isEmpty()) T(L("Zadej jméno", "Enter your name", "Name eingeben"), 16.sp, C.muted.copy(alpha = 0.7f))
             androidx.compose.foundation.text.BasicTextField(

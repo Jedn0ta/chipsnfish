@@ -356,7 +356,7 @@ fun FishLogo(modifier: Modifier = Modifier) {
 
 // ---------------- buttons ----------------
 
-enum class BK { FOLD, CALL, RAISE, DARK, GOLD, GHOST, DANGER }
+enum class BK { FOLD, CALL, RAISE, DARK, GOLD, GHOST, DANGER, BLUE }
 
 @Composable
 fun GBtn(
@@ -380,6 +380,7 @@ fun GBtn(
         BK.RAISE, BK.GOLD -> Brush.verticalGradient(listOf(Color(0xFFFFD976), C.gold, C.gold2))
         BK.DARK -> Brush.verticalGradient(listOf(Color(0xFF4E5C66), Color(0xFF2C363E), Color(0xFF1E262C)))
         BK.GHOST -> Brush.verticalGradient(listOf(Color(0xFF213240), C.panel2))
+        BK.BLUE -> Brush.verticalGradient(listOf(Color(0xFF6CC4FF), Color(0xFF2F7BFF), Color(0xFF1C47C9)))
         BK.DANGER -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
     }
     val flat = kind == BK.GHOST || kind == BK.DANGER
