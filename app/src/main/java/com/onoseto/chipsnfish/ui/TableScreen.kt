@@ -174,6 +174,35 @@ class Geo(val w: Float, val h: Float, n: Int, zoom: Double, playing: Boolean) {
         return best
     }
 
+    /** Like project(), but only looks near the previous spot, so the seat never jumps to the other side of the table. */
+    fun projectNear(p: Offset, s0: Double): Double {
+        var best = s0; var bd = Float.MAX_VALUE
+        for (i in -90..90) {
+            val s = s0 + i * 0.002
+            val q = pt(s)
+            val dd = (q.x - p.x) * (q.x - p.x) + (q.y - p.y) * (q.y - p.y)
+            if (dd < bd) { bd = dd; best = s }
+        }
+        return ((best % 1) + 1) % 1
+    }
+
+    /** Keep seat k between its neighbours (seat order must not change during a game), with room for the seat. */
+    fun between(k: Int, s: Double): Double {
+        fun m(x: Double) = ((x % 1) + 1) % 1
+        val st = Game.st
+        val n = st.n
+        if (n < 3) return m(s)
+        val pos = st.pos!!
+        val prev = pos[(k - 1 + n) % n]
+        val next = pos[(k + 1) % n]
+        val span = m(next - prev).let { if (it == 0.0) 1.0 else it }
+        val perim = 2 * (x1 - x0 - 2 * r) + 2 * (y1 - y0 - 2 * r) + 2 * PI.toFloat() * r
+        val gap = minOf((120 * sc / perim).toDouble(), span / 2)
+        var d = m(s - prev)
+        if (d > span) d = if (d - span < 1 - d) span - gap else gap
+        return m(prev + d.coerceIn(gap, span - gap))
+    }
+
     private fun clashes(k: Int, s: Double): Boolean {
         val st = Game.st
         val p = pt(s)
@@ -293,7 +322,10 @@ fun TableView() {
                                 if (hypot(q.x - d.cur.x, q.y - d.cur.y) < 34 * sc) { d.swap = j; break }
                             }
                         }
-                        d.s = if (d.swap == null) geo.clampS(k, geo.project(d.cur)) else null
+                        // follow the finger smoothly: stay near the last spot and between the neighbours;
+                        // the final, collision-free spot is picked when the finger is lifted
+                        val near = geo.projectNear(d.cur, d.s ?: st.pos!![k])
+                        d.s = if (d.swap != null) null else if (st.phase == "setup") near else geo.between(k, near)
                     },
                     onDragEnd = {
                         val d = drag
@@ -305,7 +337,7 @@ fun TableView() {
                                 val a = st.seats[d.k]; st.seats[d.k] = st.seats[sw]; st.seats[sw] = a
                                 Game.update(); Game.toast(tr("Hráči prohozeni"))
                             } else if (s != null) {
-                                st.pos!![d.k] = s
+                                st.pos!![d.k] = geo.clampS(d.k, s)
                                 Game.saveLayout(); Game.update()
                                 Game.toast(tr(if (d.k == 0) "Tvoje místo uloženo" else "Umístění uloženo"))
                             }
@@ -358,7 +390,10 @@ fun TableView() {
             val s = d.s
             if (s != null) {
                 val m = geo.pt(s)
-                Box(Modifier.offset((m.x - 22).dp, (m.y - 22).dp).size(44.dp).zIndex(6f).clip(CircleShape).background(C.gold.copy(alpha = 0.2f)).border(3.dp, C.gold, CircleShape))
+                val gs = 50 * geo.sc / 0.8f
+                Box(Modifier.offset((m.x - gs / 2).dp, (m.y - gs / 2).dp).size(gs.dp).zIndex(6f).graphicsLayer(scaleX = 1.08f, scaleY = 1.08f)) {
+                    Avatar(Game.pl(st.seats[d.k]), gs.dp, ring = C.gold, border = (3 * geo.sc / 0.8f).dp)
+                }
             }
         }
         // quick actions for a tapped player
