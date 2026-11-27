@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.onoseto.chipsnfish.ui
 
 import androidx.compose.foundation.Canvas
@@ -6,6 +8,23 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -74,55 +93,84 @@ private fun Tile(on: Boolean, onClick: () -> Unit, content: @Composable () -> Un
     ) { content() }
 }
 
-/** The whole "look" tab: table colour + tone, table size, card backs, card faces, chips. */
+/** The whole "look" tab: table colour + size, card back and card face carousels. */
 @Composable
 fun LookSettings() {
     watch()
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) { FeltPicker(); TableSize() }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Head(tr("Rub karet"), tr(C.BACKS[Game.look.back] ?: ""))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                C.BACKS.keys.forEach { k ->
-                    Tile(Game.look.back == k, { Game.look.back = k; saveLook() }) {
-                        if (k == "fish") Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF173A52), Color(0xFF0B1A26)))), contentAlignment = Alignment.Center) { FishLogo(Modifier.size(TILE * 0.7f)) }
-                        else Canvas(Modifier.fillMaxSize()) { val (a, b, t) = backCols(k); with(CardArt) { back(a, b, t) } }
-                    }
-                }
-            }
-            Head(tr("Líc karet"), tr(C.FACES[Game.look.face] ?: ""))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                C.FACES.keys.forEach { k ->
-                    // a crop of the K♦ corner shows the style (index size, colours, court art) without a whole card
-                    Tile(Game.look.face == k, { Game.look.face = k; saveLook() }) { CardView(46, TILE, k) }
-                }
-            }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.width(212.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { FeltPicker(); TableSize() }
+        Column(Modifier.weight(0.85f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Label(tr("Rub karet"))
+            val keys = remember { C.BACKS.keys.toList() }
+            LookCarousel(keys, Game.look.back, 74.dp, 128.dp, { if (Game.look.back != it) { Game.look.back = it; saveLook() } }) { k -> CardBack(74.dp, k) }
+            T(tr(C.BACKS[Game.look.back] ?: ""), 13.sp, LobbyBlue, FontWeight.Bold, maxLines = 1)
+            Dots(keys.size, keys.indexOf(Game.look.back))
+        }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Label(tr("Líc karet"))
+            val keys = remember { C.FACES.keys.toList() }
+            LookCarousel(keys, Game.look.face, 120.dp, 128.dp, { if (Game.look.face != it) { Game.look.face = it; saveLook() } }) { k -> CardFan(k) }
+            T(tr(C.FACES[Game.look.face] ?: ""), 13.sp, LobbyBlue, FontWeight.Bold, maxLines = 1, fit = true)
+            Dots(keys.size, keys.indexOf(Game.look.face))
         }
     }
-    ChipValues()
+}
+
+@Composable
+private fun CardFan(face: String) {
+    Box(Modifier.size(120.dp, 116.dp), contentAlignment = Alignment.Center) {
+        listOf(Triple(23, -12f, -34), Triple(45, 0f, 0), Triple(48, 12f, 34)).forEach { (c, rot, dx) ->
+            CardView(c, 54.dp, face, modifier = Modifier.offset(x = dx.dp, y = if (dx == 0) (-3).dp else 5.dp).rotate(rot))
+        }
+    }
+}
+
+@Composable
+private fun Dots(n: Int, sel: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(n) { i -> Box(Modifier.size(if (i == sel) 14.dp else 5.dp, 5.dp).clip(CircleShape).background(if (i == sel) LobbyBlue else Color.White.copy(alpha = 0.25f))) }
+    }
+}
+
+/** Swipe, or press-hold-and-slide, to pick; neighbours peek in at the sides. Tapping a neighbour picks it too. */
+@Composable
+private fun LookCarousel(keys: List<String>, selected: String, itemW: Dp, h: Dp, onPick: (String) -> Unit, content: @Composable (String) -> Unit) {
+    val state = rememberPagerState(keys.indexOf(selected).coerceAtLeast(0)) { keys.size }
+    val pick by rememberUpdatedState(onPick)
+    val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(state) {
+        snapshotFlow { state.currentPage }.drop(1).collect { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); pick(keys[it]) }
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth().height(h)) {
+        val pad = ((maxWidth - itemW) / 2).coerceAtLeast(0.dp)
+        HorizontalPager(state, Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = pad), pageSize = PageSize.Fixed(itemW), pageSpacing = 2.dp) { page ->
+            Box(
+                Modifier.fillMaxSize()
+                    .graphicsLayer {
+                        val off = abs((state.currentPage - page) + state.currentPageOffsetFraction).coerceIn(0f, 1f)
+                        val sc = 1f - 0.32f * off
+                        scaleX = sc; scaleY = sc; alpha = 1f - 0.6f * off
+                    }
+                    .tap { scope.launch { state.animateScrollToPage(page) } },
+                contentAlignment = Alignment.Center,
+            ) { content(keys[page]) }
+        }
+    }
 }
 
 @Composable
 private fun FeltPicker() {
     val cur = remember(Game.look.felt) { C.feltHue(Game.look.felt) }
-    var tone by remember(Game.look.felt) { mutableFloatStateOf(cur.third) }
-    Head(tr("Barva stolu"))
+    Label(tr("Barva stolu"))
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         C.FELT_PRESETS.forEach { (h, i) ->
             val v = remember(h, i) { C.felt(C.feltKey(h, i)) }
             val on = abs(h - cur.first) < 3f && abs(i - cur.second) < 0.03f
-            Tile(on, { Game.look.felt = C.feltKey(h, i, tone); saveLook() }) {
+            Tile(on, { Game.look.felt = C.feltKey(h, i); saveLook() }) {
                 Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(v[0]), Color(v[1]), Color(v[2])))))
             }
         }
-    }
-    // tone of the chosen colour: darker … lighter
-    val track = remember(cur.first, cur.second) { Brush.horizontalGradient(listOf(0f, 0.5f, 1f).map { Color(C.felt(C.feltKey(cur.first, cur.second, it))[1]) }) }
-    ThinSlider(tone, track) { t, done ->
-        tone = t
-        Game.look.felt = C.feltKey(cur.first, cur.second, t)
-        if (done) Game.saveLook()
-        Game.bump()
     }
 }
 
@@ -164,34 +212,5 @@ private fun ThinSlider(value: Float, track: Brush, onChange: (Float, Boolean) ->
         val x = r + value.coerceIn(0f, 1f) * (size.width - 2 * r)
         drawCircle(Color.Black.copy(alpha = 0.35f), r * 0.8f, Offset(x, center.y + 1.5f))
         drawCircle(Color.White, r * 0.76f, Offset(x, center.y))
-    }
-}
-
-/** Chips: tap a chip to use / not use it, type its value under it. */
-@Composable
-private fun ChipValues() {
-    val g = Game
-    Head(L("Žetony", "Chips", "Chips"), L("klepnutím vypneš / zapneš", "tap to turn off / on", "antippen = an / aus"))
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        g.chips.forEach { c ->
-            var v by remember(c.k) { mutableStateOf(c.v.toString()) }
-            Column(Modifier.weight(1f).alpha(if (c.off) 0.35f else 1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(Modifier.height(32.dp).tap { c.off = !c.off; g.saveChips(); g.bump(); Ui.redraw() }, contentAlignment = Alignment.Center) { ChipIcon(c, 28.dp) }
-                BasicTextField(
-                    v, { t -> v = t.filter { it.isDigit() }.take(6); v.toIntOrNull()?.let { if (it >= 1) { c.v = it; g.saveChips(); g.bump() } } },
-                    Modifier.fillMaxWidth().wrapContentHeight(),
-                    enabled = !c.off, singleLine = true,
-                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = F.num, textAlign = TextAlign.Center),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    cursorBrush = SolidColor(LobbyBlue),
-                    decorationBox = { inner ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            inner()
-                            Box(Modifier.width(46.dp).height(1.dp).background(Color.White.copy(alpha = if (c.off) 0.1f else 0.3f)))
-                        }
-                    },
-                )
-            }
-        }
     }
 }

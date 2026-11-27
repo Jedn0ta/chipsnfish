@@ -108,8 +108,8 @@ object Game {
         layouts = runCatching { json.decodeFromString<MutableMap<String, List<Double>>>(getS("hr4-layouts") ?: "{}") }.getOrNull() ?: mutableMapOf()
         gameCfg = runCatching { json.decodeFromString<GameCfg>(getS("hr6-cfg") ?: "{}") }.getOrNull() ?: GameCfg()
         fish = runCatching { json.decodeFromString<MutableList<String>>(getS("hr-fish") ?: "null") }.getOrNull()
-        val cs = runCatching { json.decodeFromString<List<ChipSave>>(getS("hr5-chips") ?: "[]") }.getOrNull() ?: emptyList()
-        chips = CHIPDEF.map { d -> val x = cs.find { it.k == d.k }; d.copy(v = x?.v?.coerceAtLeast(1) ?: d.v, off = x?.off ?: false) }
+        // chip values are fixed now (no longer editable in settings)
+        chips = CHIPDEF.map { it.copy() }
         if (P["hero"] == null) P["hero"] = Player("hero", "Ty")
         mode = if (getS("hr-mode")?.trim('"') == "game") "game" else "coach"
         var s = loadState(if (mode == "game") "hr6-game" else "hr4-state")

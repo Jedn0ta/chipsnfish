@@ -793,7 +793,7 @@ private fun SettingsSheet(d: SettingsArg) {
         T(L("Nastavení", "Settings", "Einstellungen"), 22.sp, Color.White, FontWeight.ExtraBold)
         listOf(
             Triple("game", L("Hra", "Game", "Spiel"), L("rádce, nová hra", "coach, new game", "Coach, neues Spiel")),
-            Triple("look", L("Stůl a žetony", "Table & chips", "Tisch & Chips"), L("barvy, karty, hodnoty", "colours, cards, values", "Farben, Karten, Werte")),
+            Triple("look", L("Stůl a karty", "Table & cards", "Tisch & Karten"), L("barva, rub, líc", "colour, back, face", "Farbe, Rücken, Bild")),
             Triple("data", L("Já a data", "Me & data", "Ich & Daten"), L("profil, záloha", "profile, backup", "Profil, Backup")),
             Triple("update", L("Aktualizace", "Updates", "Updates"), L("nová verze", "new version", "neue Version")),
         ).forEach { (k, l, sub) -> SettingsTabCard(l, sub, d.tab == k) { d.tab = k; Ui.redraw() } }
