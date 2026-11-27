@@ -222,7 +222,14 @@ private fun WhoRow(target: String?, mine: Boolean = false) {
 private fun ChatTab() {
     watch()
     var txt by remember { mutableStateOf("") }
+    // a message aimed at one player starts with @name
+    val to = Social.target?.let { t -> Game.st.seats.firstOrNull { it.pid == t }?.let { Game.pl(it).name } }
+    fun out(m: String) = if (to != null) "@$to $m" else m
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (to != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            T(L("Pro: ", "To: ", "An: ") + to, 12.sp, C.gold, FontWeight.Bold)
+            SmallPill(L("všem", "everyone", "alle"), false) { Social.target = null }
+        }
         Row(
             Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).padding(start = 10.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -237,11 +244,11 @@ private fun ChatTab() {
             }
             T("${txt.length}/${Social.TEXT_MAX}", 10.5.sp, if (txt.length >= Social.TEXT_MAX) C.gold else C.muted, num = true)
             Btn(L("Poslat", "Send", "Senden"), BK.GOLD, Modifier.width(88.dp), enabled = txt.isNotBlank(), height = 32.dp) {
-                Social.sendText(txt); txt = ""; Social.open = false
+                Social.sendText(out(txt)); txt = ""; Social.open = false
             }
         }
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Social.phrases().forEach { ph -> SmallPill(ph, false) { Social.sendText(ph); Social.open = false } }
+            Social.phrases().forEach { ph -> SmallPill(ph, false) { Social.sendText(out(ph)); Social.open = false } }
         }
         T(L("Max 60 znaků, jedna zpráva za 3 s. Sprostá slova se nahradí hvězdičkami.", "Max 60 characters, one message every 3 s. Rude words are starred out.", "Max. 60 Zeichen, eine Nachricht alle 3 s. Schimpfwörter werden ersetzt."), 10.sp, C.muted, maxLines = 1)
     }

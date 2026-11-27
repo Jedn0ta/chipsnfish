@@ -61,11 +61,22 @@ object Invites {
     const val ACT_YES = "com.onoseto.chipsnfish.INVITE_YES"
     const val ACT_NO = "com.onoseto.chipsnfish.INVITE_NO"
 
-    fun schedule(ctx: Context) {
-        val req = PeriodicWorkRequestBuilder<InviteWorker>(15, TimeUnit.MINUTES)
+    /** How often to look for invites in the background: 0 = off, else minutes (15 or 60). */
+    fun every(ctx: Context) = prefs(ctx).getInt("every", 15)
+
+    fun setEvery(ctx: Context, m: Int) {
+        prefs(ctx).edit().putInt("every", m).apply()
+        schedule(ctx, ExistingPeriodicWorkPolicy.UPDATE)
+    }
+
+    fun schedule(ctx: Context, policy: ExistingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.KEEP) {
+        val m = every(ctx)
+        val wm = WorkManager.getInstance(ctx)
+        if (m <= 0) { wm.cancelUniqueWork("cf-invites"); return }
+        val req = PeriodicWorkRequestBuilder<InviteWorker>(m.toLong(), TimeUnit.MINUTES)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork("cf-invites", ExistingPeriodicWorkPolicy.KEEP, req)
+        wm.enqueueUniquePeriodicWork("cf-invites", policy, req)
     }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("cf_invites", Context.MODE_PRIVATE)

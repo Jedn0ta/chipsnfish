@@ -32,6 +32,8 @@ object Ui {
     var sheetRev by mutableIntStateOf(0)
     var tip by mutableStateOf<List<String>?>(null)
     var moodSeat by mutableIntStateOf(-1)
+    /** Seat whose quick-action menu is open (-1 = none). */
+    var seatMenu by mutableIntStateOf(-1)
     var fishText by mutableStateOf<String?>(null)
     var fishId by mutableIntStateOf(0)
     var swimId by mutableIntStateOf(0)

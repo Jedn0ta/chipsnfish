@@ -837,6 +837,13 @@ private fun SettingsSheet(d: SettingsArg) {
             PhotoButtons(me)
             if (com.onoseto.chipsnfish.online.SupaCfg.configured) {
                 Label(L("Online profil", "Online profile", "Online-Profil"))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    T(L("Pozvánky na pozadí", "Invites in background", "Einladungen im Hintergrund"), 12.5.sp, Color.White, FontWeight.Bold, modifier = Modifier.weight(1f))
+                    var ev by remember { mutableStateOf(com.onoseto.chipsnfish.online.Invites.every(ctx)) }
+                    listOf(0 to L("Vyp.", "Off", "Aus"), 15 to "15 min", 60 to "1 h").forEach { (m, l) ->
+                        SmallPill(l, ev == m) { ev = m; com.onoseto.chipsnfish.online.Invites.setEvery(ctx, m) }
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     T(L("Kdo složí, smí vidět moje karty", "Players who folded may see my cards", "Wer gefoldet hat, darf meine Karten sehen"), 12.5.sp, Color.White, FontWeight.Bold, modifier = Modifier.weight(1f))
                     SmallPill(if (g.gameCfg.peek) L("Ano ✓", "Yes ✓", "Ja ✓") else L("Ne", "No", "Nein"), g.gameCfg.peek) { com.onoseto.chipsnfish.online.Online.setPeek(!g.gameCfg.peek); Ui.redraw() }

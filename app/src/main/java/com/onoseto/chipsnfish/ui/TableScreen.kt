@@ -360,6 +360,8 @@ fun TableView() {
                 Box(Modifier.offset((m.x - 22).dp, (m.y - 22).dp).size(44.dp).zIndex(6f).clip(CircleShape).background(C.gold.copy(alpha = 0.2f)).border(3.dp, C.gold, CircleShape))
             }
         }
+        // quick actions for a tapped player
+        if (Ui.seatMenu in 1 until st.n) SeatMenu(Ui.seatMenu, geo, w)
         // mood popup
         if (Ui.moodSeat in 0 until st.n) MoodPop(geo, w, h)
         // fish bubble, swimming chip, chip rain
@@ -496,6 +498,53 @@ private fun GameResult() {
     }
 }
 
+/** Tap on a player during the game: what I can do with him, instead of his statistics. */
+@Composable
+private fun SeatMenu(k: Int, geo: Geo, w: Float) {
+    watch()
+    val g = Game
+    val st = g.st
+    val s = st.seats.getOrNull(k) ?: return
+    val p = g.pl(s)
+    val pt = geo.pt(st.pos!![k])
+    val social = com.onoseto.chipsnfish.online.Social
+    val shop = social.available() && com.onoseto.chipsnfish.online.SupaCfg.configured
+    val items = buildList<Triple<String, String, () -> Unit>> {
+        if (g.playing() && !s.out && !s.folded && st.done == null && st.one?.get(k) == null && (g.online() || st.hole[k] != null))
+            add(Triple("🂠", L("Ukaž kartu", "Show a card", "Karte zeigen"), { g.askCard(k) }))
+        if (shop) add(Triple("🍹", L("Drink", "Drink", "Drink"), { social.openPanel("drink", s.pid) }))
+        if (shop) add(Triple("🎁", L("Darovat", "Give", "Schenken"), { social.openPanel("hat", s.pid) }))
+        if (social.available()) add(Triple("💬", L("Napsat", "Message", "Schreiben"), { social.openPanel("chat", s.pid) }))
+        if (social.available()) add(Triple("😀", L("Emoji", "Emoji", "Emoji"), { social.openPanel("emoji", s.pid) }))
+        add(Triple("ⓘ", L("Profil", "Profile", "Profil"), { Ui.open("seat", k) }))
+    }
+    val mw = items.size * 64f + 16f
+    val x = (pt.x - mw / 2).coerceIn(4f, w - mw - 4f)
+    val y = if (pt.y < geo.cy) pt.y + 46f else pt.y - 118f
+    // tap anywhere else closes it
+    Box(Modifier.fillMaxSize().zIndex(22f).tap { Ui.seatMenu = -1 })
+    Column(
+        Modifier.offset(x.dp, y.dp).zIndex(23f).shadow(12.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
+            .background(Color(0xF0101A28)).border(1.dp, LobbyBlue.copy(alpha = 0.5f), RoundedCornerShape(18.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        T(p.name, 12.sp, LobbyBlue, FontWeight.ExtraBold, maxLines = 1)
+        Row {
+            items.forEach { (ic, label, fn) ->
+                Column(
+                    Modifier.width(64.dp).clip(RoundedCornerShape(12.dp)).tap { Ui.seatMenu = -1; fn() }.padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(Modifier.size(38.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)).border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape), contentAlignment = Alignment.Center) {
+                        T(ic, 18.sp, Color.White, FontWeight.Bold)
+                    }
+                    T(label, 10.5.sp, Color.White, FontWeight.Bold, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
 /** The table itself; reads the felt colour on its own, so a colour change in the settings shows at once. */
 @Composable
 private fun FeltCanvas(geo: Geo) {
@@ -591,7 +640,7 @@ private fun SeatView(
             }
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() }, indication = null,
-                onClick = { Ui.moodSeat = -1; Ui.open("seat", k) },
+                onClick = { Ui.moodSeat = -1; if (k != 0 && g.gm()) Ui.seatMenu = k else Ui.open("seat", k) },
                 onLongClick = { Ui.moodSeat = k },
             ),
     ) {
