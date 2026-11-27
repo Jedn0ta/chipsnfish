@@ -246,7 +246,18 @@ fun TableView() {
         val sc = geo.sc
         // rail & velvet felt
         val noise = remember { velvetNoise() }
-        Canvas(Modifier.fillMaxSize()) { drawVelvetTable(geo, felt, noise) }
+        val dens = LocalDensity.current.density
+        Canvas(Modifier.fillMaxSize().pointerInput(geo) {
+            // double tap on the felt = check (only when it's my turn and checking is free)
+            detectTapGestures(onDoubleTap = { o ->
+                val x = o.x / dens; val y = o.y / dens
+                if (x < geo.x0 || x > geo.x1 || y < geo.y0 || y > geo.y1) return@detectTapGestures
+                val g = Game; val s0 = g.st
+                if (!g.gm() || !g.playing() || s0.turn != 0 || s0.done != null) return@detectTapGestures
+                if (s0.curBet - s0.seats[0].bet <= 0) g.heroAction("call")
+                else g.toast(L("Check teď nejde, je potřeba dorovnat", "Can't check now, there's a bet to call", "Check geht nicht, es gibt einen Einsatz"))
+            })
+        }) { drawVelvetTable(geo, felt, noise) }
         // watermark on the felt
         Box(Modifier.offset((geo.cx - 150).dp, (geo.cy + geo.cw * 0.7f + 30).dp).width(300.dp), contentAlignment = Alignment.Center) {
             if (Game.online() && com.onoseto.chipsnfish.online.Online.cup && playing)
