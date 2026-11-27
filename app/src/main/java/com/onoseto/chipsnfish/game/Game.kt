@@ -119,8 +119,8 @@ object Game {
     }
 
     // ================= persistence =================
-    private fun getS(k: String): String? = prefs.getString(k, null)
-    private fun setS(k: String, v: String?) {
+    fun getS(k: String): String? = prefs.getString(k, null)
+    fun setS(k: String, v: String?) {
         prefs.edit().apply { if (v == null) remove(k) else putString(k, v) }.apply()
     }
 

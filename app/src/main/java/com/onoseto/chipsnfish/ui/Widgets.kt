@@ -314,12 +314,20 @@ fun Avatar(p: Player, size: Dp, ring: Color? = null, shape: Shape = CircleShape,
             if (img != null) Image(img, null, Modifier.fillMaxSize().padding(border - 0.5.dp).clip(shape), contentScale = ContentScale.Crop)
             else T(initials(p.name), (size.value * 0.36f).sp, Color.White, num = true)
         }
-        // hat on the head (bought with wallet chips)
+        // hat / accessory (bought with wallet chips, or from the advent calendar)
         val hat = com.onoseto.chipsnfish.online.Social.hatIcon(p.hat)
-        if (hat.isNotEmpty() && size >= 22.dp) Box(
-            Modifier.align(Alignment.TopCenter).offset(x = size * 0.06f, y = -size * 0.42f)
-                .graphicsLayer(rotationZ = -14f, alpha = if (dim) 0.6f else 1f),
-        ) { T(hat, (size.value * 0.5f).sp, lineHeight = (size.value * 0.6f).sp) }
+        val ad = Xmas.item(p.hat)
+        val a = if (dim) 0.6f else 1f
+        if (size >= 22.dp && p.hat.isNotEmpty()) when {
+            ad != null && ad.icon.isEmpty() -> SantaHat(
+                Modifier.align(Alignment.TopCenter).offset(x = size * 0.1f, y = -size * 0.4f).size(size * 0.7f).graphicsLayer(rotationZ = 10f, alpha = a), gold = ad.id == "santagold")
+            ad?.pos == "face" -> Box(Modifier.align(Alignment.Center).offset(y = -size * 0.08f).graphicsLayer(alpha = a)) { T(hat, (size.value * 0.42f).sp, lineHeight = (size.value * 0.5f).sp) }
+            ad?.pos == "side" -> Box(Modifier.align(Alignment.BottomEnd).offset(x = size * 0.16f, y = size * 0.06f).graphicsLayer(rotationZ = 10f, alpha = a)) { T(hat, (size.value * 0.36f).sp, lineHeight = (size.value * 0.44f).sp) }
+            ad?.pos == "neck" -> Box(Modifier.align(Alignment.BottomCenter).offset(y = size * 0.16f).graphicsLayer(alpha = a)) { T(hat, (size.value * 0.42f).sp, lineHeight = (size.value * 0.5f).sp) }
+            hat.isNotEmpty() -> Box(
+                Modifier.align(Alignment.TopCenter).offset(x = size * 0.06f, y = -size * 0.42f).graphicsLayer(rotationZ = -14f, alpha = a),
+            ) { T(hat, (size.value * 0.5f).sp, lineHeight = (size.value * 0.6f).sp) }
+        }
         overlay()
     }
 }

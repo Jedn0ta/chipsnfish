@@ -54,7 +54,7 @@ object Social {
         Drink("crown", "👑", "Koruna", "Crown", "Krone", 1000),
     )
     fun hat(id: String) = HATS.firstOrNull { it.id == id }
-    fun hatIcon(id: String) = hat(id)?.icon ?: ""
+    fun hatIcon(id: String) = hat(id)?.icon ?: com.onoseto.chipsnfish.ui.Xmas.item(id)?.icon ?: ""
 
     /** Quick phrases for the short chat. */
     fun phrases() = listOf(

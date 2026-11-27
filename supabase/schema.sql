@@ -1362,6 +1362,45 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- advent calendar (1–24 December): one window a day, the same item for
+-- everybody; items are wearable like hats (stored in cf_hats)
+-- ---------------------------------------------------------------------
+create table if not exists cf_advent (
+  uid uuid not null,
+  day int not null,
+  t timestamptz not null default now(),
+  primary key (uid, day)
+);
+alter table cf_advent enable row level security;
+revoke all on cf_advent from anon, authenticated;
+
+create or replace function cf_advent_item(d int) returns text language sql immutable as $$
+  select (array['santa','shades','ginger','scarf','star','candy','specs','bell','lolly','snowman','gloves','cupcake',
+                'bow','tree','goggles','donut','glowstar','gift','milk','deer','mistletoe','choco','flake','santagold'])[d]
+$$;
+
+create or replace function cf_today() returns date language sql stable as $$
+  select coalesce(nullif(current_setting('test.today', true), '')::date, (now() at time zone 'Europe/Prague')::date)
+$$;
+
+create or replace function cf_advent_open(p_day int) returns text
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); d date := cf_today(); k text;
+begin
+  if u is null then raise exception 'not signed in'; end if;
+  if extract(month from d) <> 12 or p_day < 1 or p_day > 24 or p_day > extract(day from d) then raise exception 'not yet'; end if;
+  k := cf_advent_item(p_day);
+  insert into cf_advent(uid, day) values (u, p_day) on conflict do nothing;
+  if not exists (select 1 from cf_hats where uid = u and kind = k) then insert into cf_hats(uid, kind) values (u, k); end if;
+  return k;
+end $$;
+
+create or replace function cf_advent_days() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(day order by day), '[]'::jsonb) from cf_advent where uid = cf_me()
+$$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -1375,7 +1414,7 @@ begin
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
                      'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me',
-                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek','cf_ask_card','cf_ask_answer') then
+                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek','cf_ask_card','cf_ask_answer','cf_advent_open','cf_advent_days') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

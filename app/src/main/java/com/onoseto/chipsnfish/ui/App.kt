@@ -198,8 +198,7 @@ private fun TopBar() {
     val playing = g.playing()
     var fishTaps by remember { mutableStateOf(listOf<Long>()) }
     Row(Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        FishLogo(
-            Modifier.size(28.dp).combinedClickable(remember { MutableInteractionSource() }, null,
+        FishHat(28.dp, Modifier.combinedClickable(remember { MutableInteractionSource() }, null,
                 onLongClick = { if (playing && Ui.view == "table") Ui.open("hands") else Ui.open("about") },
                 onClick = {
                     Sound.chip()
@@ -323,20 +322,24 @@ private fun MenuScreen(onExit: () -> Unit) {
     val gOn = gs != null && gs.over == null
     // a finished online game is closed when you come back to the lobby
     LaunchedEffect(O.code, O.status) { if (O.code != null && O.status == "over") O.leave() }
+    LaunchedEffect(Unit) { Xmas.load() }
     Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }) {
         LobbyBackground()
         // top bar
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FishLogo(Modifier.size(32.dp))
+            FishHat(32.dp, Modifier.combinedClickable(remember { MutableInteractionSource() }, null, onLongClick = { Ui.open("advent") }, onClick = {}))
             Column {
                 T("HOLD'EM", 11.sp, LobbyBlue, num = true, letter = 4.sp, lineHeight = 12.sp)
                 T("CHIPS&FISH", 22.sp, Color.White, num = true, letter = 1.5.sp, lineHeight = 24.sp)
             }
             Spacer(Modifier.weight(1f))
+            if (Xmas.calendarOn()) GlassPill("🎄 " + L("Advent", "Advent", "Advent") + " ${Xmas.openUpTo()}.", hot = Xmas.openUpTo() !in Xmas.opened) { Ui.open("advent") }
             OnlinePill()
             LobbyWallet()
             LobbyIconBtn("gear") { Ui.openSettings() }
-            LobbyIconBtn("power") { g.saveLocal(); onExit() }
+            LobbyIconBtn("power") {
+                Ui.confirm(L("Ukončit aplikaci?", "Quit the app?", "App beenden?"), L("Všechno se uloží, příště pokračuješ tam, kde jsi skončil.", "Everything is saved, next time you continue where you left off.", "Alles wird gespeichert."), L("Ukončit", "Quit", "Beenden")) { g.saveLocal(); onExit() }
+            }
         }
         // left: me
         Column(
@@ -361,8 +364,9 @@ private fun MenuScreen(onExit: () -> Unit) {
         }
         // centre: the big play button
         Column(Modifier.align(Alignment.Center).padding(top = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (O.code != null) PlayOrb(L("POKRAČOVAT", "CONTINUE", "WEITER"), L("stůl ${O.code}", "table ${O.code}", "Tisch ${O.code}")) { goTable() }
-            else PlayOrb(L("HRÁT", "PLAY", "SPIELEN"), L("s přáteli", "with friends", "mit Freunden")) { Ui.open("online", OnlineArg()) }
+            val tilt by rememberTilt()
+            if (O.code != null) PlayCards(L("POKRAČOVAT", "CONTINUE", "WEITER"), L("stůl ${O.code}", "table ${O.code}", "Tisch ${O.code}"), tilt) { goTable() }
+            else PlayCards(L("HRÁT", "PLAY", "SPIELEN"), L("s přáteli", "with friends", "mit Freunden"), tilt) { Ui.open("online", OnlineArg()) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (O.code != null) GlassPill(L("Jiný stůl", "Other table", "Anderer Tisch")) { Ui.open("online", OnlineArg()) }
                 GlassPill(L("Mám kód stolu", "I have a code", "Ich habe einen Code")) { Ui.open("online", OnlineArg(tab = "join")) }
