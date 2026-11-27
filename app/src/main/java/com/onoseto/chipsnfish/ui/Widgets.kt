@@ -149,26 +149,19 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
     val s = c and 3
     val col = suitColor(s, face)
     val w = cw.value
-    val shape = RoundedCornerShape(cw * 0.13f)
+    val real = face == "picture"
+    val shape = RoundedCornerShape(cw * (if (real) 0.06f else 0.13f))
     Box(
         modifier
             .size(cw, cw * 1.4f)
             .shadow(cw * 0.1f, shape, ambientColor = Color.Black, spotColor = Color.Black)
-            .then(if (glow) Modifier.border(2.dp, C.gold.copy(alpha = 0.8f), shape) else Modifier.border(0.6.dp, Color(0xFFCFCAC0), shape))
+            .then(if (glow) Modifier.border(2.dp, C.gold.copy(alpha = 0.8f), shape) else if (real) Modifier else Modifier.border(0.6.dp, Color(0xFFCFCAC0), shape))
             .clip(shape)
             .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F3EC), Color(0xFFEDE8DD))))
     ) {
-        if (face == "picture") {
-            // classic layout: small corner indices + pips / court figure in the middle
-            Canvas(Modifier.fillMaxSize()) { with(CardArt) { face(r, s, col) } }
-            val idx = @Composable { m: Modifier ->
-                Column(m.padding(start = cw * 0.035f, top = cw * 0.025f).width(cw * 0.21f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(Cards.rl(r), color = col, fontFamily = F.num, fontWeight = FontWeight.ExtraBold, fontSize = (w * (if (r == 8) 0.21f else 0.27f)).sp, lineHeight = (w * 0.26f).sp, letterSpacing = (-1).sp, maxLines = 1, softWrap = false)
-                    Canvas(Modifier.size(cw * 0.15f)) { with(CardArt) { suit(s, center, size.height, col) } }
-                }
-            }
-            idx(Modifier.align(Alignment.TopStart))
-            idx(Modifier.align(Alignment.BottomEnd).rotate(180f))
+        if (real) {
+            androidx.compose.foundation.Image(CardImg.bitmap(c), null, Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
             return@Box
         }
         val jumbo = face == "jumbo"
@@ -212,10 +205,10 @@ fun CardSlot(cw: Dp, label: String = "+", next: Boolean = false, locked: Boolean
     val col = if (next) C.gold else Color.White.copy(alpha = if (locked) 0.28f else 0.5f)
     Box(
         modifier.size(cw, cw * 1.4f).clip(shape)
-            .background(if (next) C.gold.copy(alpha = 0.08f) else Color.Black.copy(alpha = if (locked) 0.14f else 0.18f))
+            .background(if (next) C.gold.copy(alpha = 0.08f) else if (locked) Color.Transparent else Color.Black.copy(alpha = 0.18f))
             .drawBehind {
                 drawRoundRect(
-                    color = if (locked) Color.White.copy(alpha = 0.08f) else col,
+                    color = if (locked) Color.White.copy(alpha = 0.1f) else col,
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(cw.toPx() * 0.13f),
                     style = Stroke(2.dp.toPx(), pathEffect = if (locked) null else PathEffect.dashPathEffect(floatArrayOf(6f, 5f))),
                 )

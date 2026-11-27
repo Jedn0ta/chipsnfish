@@ -253,13 +253,13 @@ fun TableView() {
             val dd = hypot(dx, dy).coerceAtLeast(1f)
             val off = min(dd * 0.58f, 104 * sc)
             val bx = p.x + dx / dd * off; val by = p.y + dy / dd * off
-            Column(
-                Modifier.offset((bx - 30).dp, (by - 20).dp).width(60.dp).zIndex(2f),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Row(
+                Modifier.offset((bx - 40).dp, (by - 12).dp).width(80.dp).zIndex(2f),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
-                ChipPile(s.bet, 1, (16 * sc / 0.8f).dp)
-                Box(Modifier.clip(RoundedCornerShape(99.dp)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 7.dp)) {
-                    T(Game.fm(s.bet), (19 * sc).sp, C.ink, num = true)
+                ChipPile(s.bet, 1, (15 * sc / 0.8f).dp)
+                Box(Modifier.offset(x = (-3).dp).clip(RoundedCornerShape(99.dp)).background(Color.Black.copy(alpha = 0.5f)).padding(start = 6.dp, end = 7.dp)) {
+                    T(Game.fm(s.bet), (14 * sc / 0.8f).sp, C.gold, num = true, maxLines = 1)
                 }
             }
         }
@@ -545,9 +545,9 @@ private fun SeatView(
                     if (g.online() && com.onoseto.chipsnfish.online.Online.players.any { it.uid == s.pid && (!it.on || it.left) }) Box(Modifier.align(Alignment.BottomStart).size((12 * sc).dp).clip(CircleShape).background(C.lose).border(1.5.dp, Color.Black, CircleShape))
                     if (isLead) Crown(Modifier.align(Alignment.TopCenter).offset(y = (-14 * sc).dp).size((24 * sc).dp, (16 * sc).dp))
                     if (g.gm() && k > 0 && playing && !s.folded && !s.out && st.reveal?.get(k) == null) {
-                        Row(Modifier.align(Alignment.BottomEnd).offset((8 * sc).dp, (4 * sc).dp)) {
-                            CardBack((15 * sc).dp, modifier = Modifier.rotate(-10f))
-                            CardBack((15 * sc).dp, modifier = Modifier.offset((-6 * sc).dp).rotate(8f))
+                        Row(Modifier.align(Alignment.TopEnd).offset((12 * sc).dp, (-4 * sc).dp)) {
+                            CardBack((16 * sc).dp, modifier = Modifier.rotate(-8f))
+                            CardBack((16 * sc).dp, modifier = Modifier.offset((-8 * sc).dp).rotate(10f))
                         }
                     }
                     if (s.mood.isNotEmpty()) T(s.mood.joinToString(""), (12 * sc).sp, modifier = Modifier.align(Alignment.BottomStart).offset((-8 * sc).dp, (6 * sc).dp))
@@ -557,10 +557,6 @@ private fun SeatView(
                     val rv = st.reveal?.get(k)
                     if (g.gm() && rv != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { rv.forEach { CardView(it, (25 * sc).dp) } }
-                    } else if (k > 0 && !s.folded && !s.out && g.advisorOn()) {
-                        val b = Reads.seatBluff(st, g.P, s)
-                        val (_, ci) = Reads.lvl(b.v)
-                        Text2("${(b.v * 100).roundToInt()}%", (16 * sc), C.lvl(ci), underline = b.act)
                     }
                 }
             }
@@ -893,16 +889,11 @@ private fun MyCards() {
         if (eq != null && !folded && g.advisorOn()) e = " · ${((if (eq.allFolded) 1.0 else eq.eq) * 100).roundToInt()} %"
         I18n.cat(Cards.CAT[c] + " " + Cards.rl((sc shr 16) and 15)) + e
     } else if (st.hero.any { it != null }) tr("vyber druhou kartu") else tr("vyber své karty")
-    Box(Modifier.fillMaxWidth().height(86.dp), contentAlignment = Alignment.TopEnd) {
-        Row(
-            Modifier.wrapContentSize(Alignment.TopEnd, unbounded = true).requiredWidth(260.dp).alpha(if (folded && g.playing()) 0.45f else 1f),
-            horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically,
+    Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.TopEnd) {
+        Column(
+            Modifier.wrapContentSize(Alignment.TopEnd, unbounded = true).requiredWidth(cw * 2 + 4.dp).alpha(if (folded && g.playing()) 0.45f else 1f),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            val parts = info.split(" · ")
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 6.dp)) {
-                if (both && !g.gm() && !Ui.peek) T(tr("podrž = ukázat"), 11.sp, C.muted, FontWeight.Bold)
-                else parts.forEachIndexed { i, ptxt -> T(ptxt, 13.sp, C.gold, if (i == 0) FontWeight.Bold else FontWeight.ExtraBold, num = i > 0, maxLines = 1) }
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 for (i in 0..1) {
                     val c = st.hero[i]
@@ -920,6 +911,8 @@ private fun MyCards() {
                     }
                 }
             }
+            if (both && !g.gm() && !Ui.peek) T(tr("podrž = ukázat"), 11.sp, C.muted, FontWeight.Bold, maxLines = 1)
+            else T(info.replace(" · ", "  "), 11.5.sp, C.gold, FontWeight.Bold, maxLines = 1, fit = true, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
     }
 }
