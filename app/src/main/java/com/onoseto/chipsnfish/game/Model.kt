@@ -62,6 +62,8 @@ data class GStats(var hands: Int = 0, var won: Int = 0)
 
 @Serializable
 data class GState(
+    /** >0 = hero busted out in this place and keeps watching the computer players */
+    var watchPlace: Int = 0,
     var mode: String = "coach",
     var blindMin: Int = 15,
     var blindStart: Long = 0,
@@ -139,7 +141,7 @@ data class Look(var felt: String = "blue", var back: String = "red", var face: S
 @Serializable
 data class GameCfg(
     var opp: Int = 5,
-    var stack: Int = 1000,
+    var stack: Int = 100,
     var level: Int = 0,
     var every: Int = 10,
     var style: String = "mix",

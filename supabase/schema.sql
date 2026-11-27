@@ -450,7 +450,7 @@ create or replace function cf_create(p_name text, p_cfg jsonb, p_gid uuid defaul
 language plpgsql security definer set search_path = public as $$
 declare
   u uuid := cf_me(); v_code text; tries int := 0; alphabet text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  stack int := greatest(10, least(1000000, coalesce((p_cfg->>'stack')::int, 1000)));
+  stack int := greatest(10, least(1000000, coalesce((p_cfg->>'stack')::int, 100)));
   lv int := greatest(0, least(9, coalesce((p_cfg->>'level')::int, 0)));
   every int := greatest(0, least(100, coalesce((p_cfg->>'every')::int, 10)));
   adv boolean := coalesce((p_cfg->>'advisor')::boolean, true);

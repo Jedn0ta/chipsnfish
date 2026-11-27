@@ -115,7 +115,7 @@ fun OnlineSheet(a: OnlineArg) {
     }
     var tname by remember { mutableStateOf("") }
     val c = Game.gameCfg
-    var stack by remember { mutableStateOf(c.stack) }
+    var stack by remember { mutableStateOf(if (c.stack in listOf(100, 200, 300)) c.stack else 100) }
     var level by remember { mutableStateOf(c.level) }
     var every by remember { mutableStateOf(c.every) }
     var adv by remember { mutableStateOf(true) }
@@ -125,7 +125,7 @@ fun OnlineSheet(a: OnlineArg) {
             Label(L("Název stolu (nepovinné)", "Table name (optional)", "Tischname (optional)"))
             Field(tname, { tname = it.take(40) }, Modifier.fillMaxWidth(), placeholder = L("Páteční poker", "Friday poker", "Freitagspoker"))
             Label(tr("Startovní žetony"))
-            Picks(listOf("500" to "500", "1000" to Game.fm(1000), "2000" to Game.fm(2000), "5000" to Game.fm(5000)), stack.toString(), small = true) { stack = it.toInt() }
+            Picks(listOf("100" to "100", "200" to "200", "300" to "300"), stack.toString(), small = true) { stack = it.toInt() }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Switch(adv, { adv = it }, colors = SwitchDefaults.colors(checkedThumbColor = C.goldInk, checkedTrackColor = C.gold))
                 Column {

@@ -717,8 +717,19 @@ private fun ActBox() {
                     T(tr(if (over.win) "Vyhrál jsi celou hru!" else "Vypadl jsi"), 13.sp, if (over.win) C.win else C.ink, FontWeight.ExtraBold, align = TextAlign.Center)
                     T(if (over.win) "🏆" else L("${over.place}. místo", "${over.place}th place", "${over.place}. Platz"), 16.sp, C.gold, num = true)
                 }
+                if (!over.win && st.watchPlace == 0 && st.seats.count { it.stack > 0 } >= 2)
+                    ColBtn("👀 " + L("Sledovat dál", "Keep watching", "Weiter zusehen"), BK.DARK, h = 44.dp) { g.watchOn() }
                 ColBtn(tr("Nová hra"), BK.CALL) { Ui.openGameSetup() }
                 ColBtn(tr("Menu"), BK.DARK) { Ui.showMenu() }
+                return@Column
+            }
+            if (st.watchPlace > 0) {
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    T("👀 " + L("Sleduješ hru", "Watching", "Du schaust zu"), 12.sp, C.ink, FontWeight.ExtraBold, align = TextAlign.Center, maxLines = 1, fit = true)
+                    T(L("vypadl jsi na ${st.watchPlace}. místě", "you finished ${st.watchPlace}th", "du bist ${st.watchPlace}. geworden"), 10.5.sp, C.muted, align = TextAlign.Center)
+                }
+                if (st.done != null) ColBtn(tr("Další hand") + " ▶", BK.CALL, h = 56.dp) { if (g.gameNext()) Ui.openGameSetup() }
+                ColBtn(tr("Nová hra"), BK.DARK, h = 44.dp) { Ui.openGameSetup() }
                 return@Column
             }
             if (st.done != null) {
@@ -1056,6 +1067,17 @@ private fun OnlineBox(): Boolean {
         ColBtn("🏆 " + L("Síň slávy", "Hall of fame", "Ruhmeshalle"), BK.DARK, h = 40.dp) { Ui.open("fame") }
         if (O.isHost) ColBtn(L("Hrát znovu", "Play again", "Nochmal"), BK.CALL) { O.restart() }
         ColBtn(L("Opustit stůl", "Leave table", "Tisch verlassen"), BK.DARK) { leave() }
+        return true
+    }
+    if (st.seats.getOrNull(0)?.out == true) {
+        val left = st.seats.count { !it.out }
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            T("👀 " + L("Sleduješ hru", "Watching", "Du schaust zu"), 12.sp, C.ink, FontWeight.ExtraBold, align = TextAlign.Center, maxLines = 1, fit = true)
+            T(L("vypadl jsi · ve hře ještě $left", "you're out · $left still in", "du bist raus · noch $left im Spiel"), 10.5.sp, C.muted, align = TextAlign.Center)
+        }
+        if (st.done == null && st.turn >= 0) TurnWho(st.turn)
+        if (st.done != null && O.isHost) ColBtn(tr("Další hand") + " ▶", BK.RAISE, h = 52.dp, enabled = !O.busy) { O.next() }
+        ColBtn(L("Opustit stůl", "Leave table", "Tisch verlassen"), BK.DARK, h = 40.dp) { leave() }
         return true
     }
     if (st.done != null) {

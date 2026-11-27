@@ -1094,6 +1094,7 @@ private fun Summary(items: List<Pair<String, String>>) {
 @Composable
 private fun GameSetupSheet(c: GameCfg) {
     watch()
+    if (c.stack !in listOf(100, 200, 300)) c.stack = 100
     SheetHead(tr("Nová hra · Texas Hold'em"))
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1109,7 +1110,7 @@ private fun GameSetupSheet(c: GameCfg) {
             Label(tr("Styl soupeřů"))
             Picks(listOf("mix" to tr("Mix"), "fish" to tr("Ryby"), "pro" to tr("Profíci")), c.style, small = true) { c.style = it; Ui.redraw() }
             Label(tr("Startovní žetony"))
-            Picks(listOf("500" to "500", "1000" to Game.fm(1000), "2000" to Game.fm(2000), "5000" to Game.fm(5000)), c.stack.toString(), small = true) { c.stack = it.toInt(); Ui.redraw() }
+            Picks(listOf("100" to "100", "200" to "200", "300" to "300"), c.stack.toString(), small = true) { c.stack = it.toInt(); Ui.redraw() }
             CoachSwitch(c.coach) { c.coach = it; Ui.redraw() }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {

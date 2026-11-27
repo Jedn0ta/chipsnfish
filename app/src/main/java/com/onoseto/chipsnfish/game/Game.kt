@@ -506,6 +506,7 @@ object Game {
         }
         st.seats = (listOf(seatObj("hero", cfg.stack)) + bots.map { seatObj(it.id, cfg.stack) }).toMutableList()
         st.pos = null
+        st.watchPlace = 0
         com.onoseto.chipsnfish.online.Social.resetTable()
         startHand()
         eq = null; undoStack.clear(); raiseOpen = false
@@ -707,7 +708,8 @@ object Game {
         learnBots(sc)
         if (bot()) com.onoseto.chipsnfish.online.Social.botsReact(ws, st.seats.sumOf { it.total } > 30 * st.bb)
         val alive = st.seats.filter { it.stack > 0 }
-        if (st.seats[0].stack <= 0) st.over = Over(false, alive.size + 1)
+        if (st.watchPlace > 0) { if (alive.size <= 1) st.over = Over(false, st.watchPlace) }
+        else if (st.seats[0].stack <= 0) st.over = Over(false, alive.size + 1)
         else if (alive.size == 1) st.over = Over(true, 1)
         if (bot()) com.onoseto.chipsnfish.online.Fame.practiceHand(win[0] - st.seats[0].total, st.bb, st.over?.win == true, st.n - 1)
         val stats = st.stats ?: GStats().also { st.stats = it }
@@ -856,6 +858,14 @@ object Game {
     }
 
     // ================= live advisor mode flows =================
+    /** After busting out vs the computer: stay and watch the rest of the game. */
+    fun watchOn() {
+        val o = st.over ?: return
+        if (o.win || st.seats.count { it.stack > 0 } < 2) return
+        st.watchPlace = o.place; st.over = null
+        gameNext()
+    }
+
     fun nextHand() {
         st.dealer = nxt(st.dealer); st.sample = false; st.tab = 0
         cleanup(); startHand(); eq = null
