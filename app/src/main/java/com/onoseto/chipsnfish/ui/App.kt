@@ -2,6 +2,7 @@
 
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.ui.res.imageResource
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -344,7 +345,7 @@ private fun MenuScreen(onExit: () -> Unit) {
     val O = com.onoseto.chipsnfish.online.Online
     val gs = g.gameSaved()
     val gOn = gs != null && gs.over == null
-    val blur = androidx.compose.ui.res.imageResource(com.onoseto.chipsnfish.R.drawable.lobby_bg_blur)
+    val blur = androidx.compose.ui.graphics.ImageBitmap.imageResource(com.onoseto.chipsnfish.R.drawable.lobby_bg_blur)
     val bd = remember(blur) { Backdrop(blur) }
     androidx.compose.runtime.CompositionLocalProvider(LocalBackdrop provides bd) {
     Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }
@@ -367,59 +368,55 @@ private fun MenuScreen(onExit: () -> Unit) {
             LobbyIconBtn("gear") { Ui.openSettings() }
             LobbyIconBtn("power") { g.saveLocal(); onExit() }
         }
-        // left: play with friends
+        // left: me
         Column(
-            Modifier.align(Alignment.CenterStart).padding(start = 16.dp, top = 34.dp).width(390.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                T(L("ONLINE · 2–10 HRÁČŮ", "ONLINE · 2–10 PLAYERS", "ONLINE · 2–10 SPIELER"), 10.5.sp, LobbyBlue, FontWeight.ExtraBold, letter = 2.sp)
-                T(L("Hrát s přáteli", "Play with friends", "Mit Freunden spielen"), 28.sp, Color.White, FontWeight.ExtraBold, lineHeight = 32.sp, maxLines = 1, fit = true)
-                T(L("Stůl jen pro vaši partu. Karty rozdává server.", "A table just for your crew. The server deals.", "Ein Tisch nur für eure Runde. Der Server gibt."), 12.5.sp, Color.White.copy(alpha = 0.65f), maxLines = 1, fit = true)
-                Spacer(Modifier.height(6.dp))
-                if (O.code != null) {
-                    Btn(L("Pokračovat · stůl ${O.code}", "Continue · table ${O.code}", "Weiter · Tisch ${O.code}"), BK.BLUE, Modifier.fillMaxWidth(), height = 48.dp) { goTable() }
-                    GlassBtn(L("Jiný stůl", "Other table", "Anderer Tisch"), Modifier.fillMaxWidth()) { Ui.open("online", OnlineArg()) }
-                } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn(L("Nový stůl", "New table", "Neuer Tisch"), BK.BLUE, Modifier.weight(1.2f), height = 48.dp) { Ui.open("online", OnlineArg()) }
-                    GlassBtn(L("Mám kód", "I have a code", "Ich habe einen Code"), Modifier.weight(1f).height(48.dp)) { Ui.open("online", OnlineArg(tab = "join")) }
-                }
-                val near = com.onoseto.chipsnfish.online.Nearby.tables.filter { it.code != O.code }
-                if (near.isNotEmpty()) {
-                    val t = near.last()
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x3326D07C)).border(1.dp, Color(0x8826D07C), RoundedCornerShape(12.dp))
-                            .tap { O.join(t.code) { goTable() } }.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF3CE08A)))
-                        T(L("${t.who} hraje na tvé Wi-Fi", "${t.who} is playing on your Wi-Fi", "${t.who} spielt in deinem WLAN"), 13.sp, Color.White, FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1, fit = true)
-                        T(L("Přisednout", "Join", "Beitreten"), 12.5.sp, Color(0xFF6CF0A8), FontWeight.ExtraBold)
-                    }
-                }
-                FriendsOnlineRow()
-            }
-            NameBar()
-        }
-        // right: the rest of the lobby
-        Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 16.dp, top = 34.dp).width(330.dp),
+            Modifier.align(Alignment.CenterStart).padding(start = 16.dp, top = 40.dp).width(236.dp)
+                .glass(RoundedCornerShape(topStart = 28.dp, topEnd = 8.dp, bottomEnd = 28.dp, bottomStart = 8.dp)).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            ProfileBlock()
+            val near = com.onoseto.chipsnfish.online.Nearby.tables.filter { it.code != O.code }
+            if (near.isNotEmpty()) {
+                val t = near.last()
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(99.dp)).background(Color(0x3326D07C)).border(1.dp, Color(0x8826D07C), RoundedCornerShape(99.dp))
+                        .tap { O.join(t.code) { goTable() } }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(Modifier.size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF3CE08A)))
+                    T(L("${t.who} hraje na Wi-Fi · přisednout", "${t.who} on your Wi-Fi · join", "${t.who} im WLAN · beitreten"), 11.5.sp, Color.White, FontWeight.Bold, maxLines = 1, fit = true)
+                }
+            }
+            FriendsOnlineRow()
+        }
+        // centre: the big play button
+        Column(Modifier.align(Alignment.Center).padding(top = 30.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (O.code != null) PlayOrb(L("POKRAČOVAT", "CONTINUE", "WEITER"), L("stůl ${O.code}", "table ${O.code}", "Tisch ${O.code}")) { goTable() }
+            else PlayOrb(L("HRÁT", "PLAY", "SPIELEN"), L("s přáteli", "with friends", "mit Freunden")) { Ui.open("online", OnlineArg()) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (O.code != null) GlassPill(L("Jiný stůl", "Other table", "Anderer Tisch")) { Ui.open("online", OnlineArg()) }
+                GlassPill(L("Mám kód stolu", "I have a code", "Ich habe einen Code")) { Ui.open("online", OnlineArg(tab = "join")) }
+            }
+        }
+        // right: the rest of the lobby, fanned around the play button
+        Column(
+            Modifier.align(Alignment.CenterEnd).padding(end = 16.dp, top = 40.dp).width(214.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End,
+        ) {
             LobbyRow(L("Trénink", "Practice", "Training"),
-                if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Weiter · Hand #${gs!!.handNo}") else L("Proti počítači, s rádcem", "Vs the computer, with a coach", "Gegen den Computer, mit Coach"),
-                hot = gOn, extra = if (gOn) L("Nový", "New", "Neu") else null, onExtra = { O.stopPolling(); Ui.openGameSetup() }) {
+                if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Weiter · Hand #${gs!!.handNo}") else L("Proti počítači", "Vs the computer", "Gegen den Computer"),
+                hot = gOn, indent = 26.dp, extra = if (gOn) L("Nový", "New", "Neu") else null, onExtra = { O.stopPolling(); Ui.openGameSetup() }) {
                 O.stopPolling()
                 if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.goView("table") } else Ui.openGameSetup()
             }
             LobbyRow(L("Přátelé", "Friends", "Freunde"),
-                O.friends?.count { it.online }?.takeIf { it > 0 }?.let { L("$it online · pozvat ke stolu", "$it online · invite to a table", "$it online · an den Tisch einladen") } ?: L("Kód přítele, skupiny, pozvánky", "Friend code, groups, invites", "Freundescode, Gruppen, Einladungen")) { Ui.open("groups") }
-            LobbyRow(L("Statistiky", "Statistics", "Statistiken"), L("Všichni hráči a jejich styl", "Every player and their style", "Alle Spieler und ihr Stil")) {
+                O.friends?.count { it.online }?.takeIf { it > 0 }?.let { L("$it online", "$it online", "$it online") } ?: L("Kódy a pozvánky", "Codes & invites", "Codes & Einladungen"), indent = 8.dp) { Ui.open("groups") }
+            LobbyRow(L("Statistiky", "Statistics", "Statistiken"), L("Všichni hráči", "All players", "Alle Spieler"), indent = 8.dp) {
                 Ui.hideMenu(); Ui.solo = true; Ui.goView("players")
             }
-            LobbyRow(L("Síň slávy", "Hall of fame", "Ruhmeshalle"), L("Body cti, žebříček, poháry", "Honor points, ranking, cups", "Ehrenpunkte, Rangliste, Pokale")) { Ui.open("fame") }
+            LobbyRow(L("Síň slávy", "Hall of fame", "Ruhmeshalle"), L("Žebříček a poháry", "Ranking & cups", "Rangliste & Pokale"), indent = 26.dp) { Ui.open("fame") }
             if (com.onoseto.chipsnfish.Updater.state == "available")
-                LobbyRow(L("Nová verze", "New version", "Neue Version"), L("Aktualizovat z Obchodu Play", "Update from Google Play", "Aus Google Play aktualisieren"), hot = true) {
+                GlassPill(L("Nová verze · aktualizovat", "New version · update", "Neue Version · aktualisieren"), hot = true) {
                     Ui.open("settings", SettingsArg(tab = "update", level = 0, startStack = 0, autoBlinds = true, dealer = 0))
                 }
         }
@@ -427,16 +424,116 @@ private fun MenuScreen(onExit: () -> Unit) {
     }
 }
 
-/** One slim glass row on the right side of the lobby. */
+/** Big glowing round play button with a pulsing ring. */
 @Composable
-private fun LobbyRow(title: String, sub: String, hot: Boolean = false, extra: String? = null, onExtra: () -> Unit = {}, onClick: () -> Unit) {
+private fun PlayOrb(title: String, sub: String, onClick: () -> Unit) {
     watch()
-    val sh = RoundedCornerShape(16.dp)
+    val pulse = rememberInfiniteTransition(label = "orb").animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = LinearEasing)), label = "p")
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.97f else 1f, label = "row")
+    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.93f else 1f, label = "orbpress")
+    Box(Modifier.size(170.dp), contentAlignment = Alignment.Center) {
+        // pulse rings
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val r0 = size.minDimension * 0.36f
+            for (k in 0..1) {
+                val ph = (pulse.value + k * 0.5f) % 1f
+                drawCircle(LobbyBlue.copy(alpha = 0.45f * (1f - ph)), r0 * (1f + 0.38f * ph), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+            }
+            drawCircle(Brush.radialGradient(listOf(Color(0x664FA8FF), Color.Transparent), radius = size.minDimension * 0.5f), size.minDimension * 0.5f)
+        }
+        Box(
+            Modifier.size(124.dp).graphicsLayer(scaleX = sc, scaleY = sc)
+                .shadow(24.dp, androidx.compose.foundation.shape.CircleShape, ambientColor = Color(0xFF2F7BFF), spotColor = Color(0xFF2F7BFF))
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(Brush.radialGradient(listOf(Color(0xFF8AD2FF), Color(0xFF2F7BFF), Color(0xFF0F2C8C)), center = androidx.compose.ui.geometry.Offset.Unspecified))
+                .drawBehind {
+                    drawOval(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Transparent), 0f, size.height * 0.5f),
+                        topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.18f, size.height * 0.06f),
+                        size = androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.42f))
+                }
+                .border(2.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.9f), Color(0x552F7BFF))), androidx.compose.foundation.shape.CircleShape)
+                .clickable(src, null, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                T(title, 24.sp, Color.White, num = true, letter = 1.5.sp, maxLines = 1, fit = true, modifier = Modifier.padding(horizontal = 10.dp))
+                T(sub, 12.sp, Color.White.copy(alpha = 0.85f), FontWeight.Bold, maxLines = 1, fit = true)
+            }
+        }
+    }
+}
+
+/** Rounded glass pill (secondary action). */
+@Composable
+private fun GlassPill(text: String, hot: Boolean = false, onClick: () -> Unit) {
+    Box(
+        Modifier.height(36.dp).glass(RoundedCornerShape(99.dp), if (hot) Color(0x552F7BFF) else Color(0x2A2A5CA8), lift = 6.dp)
+            .clickable(onClick = onClick).padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
+    ) { T(text, 13.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true) }
+}
+
+/** My avatar, name and what I have. */
+@Composable
+private fun ProfileBlock() {
+    watch()
+    val me = Game.P.getValue("hero")
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Avatar(me, 52.dp, ring = LobbyBlue, border = 2.dp)
+        Column(Modifier.weight(1f)) {
+            T(L("HRÁČ", "PLAYER", "SPIELER"), 9.5.sp, LobbyBlue, FontWeight.ExtraBold, letter = 2.sp)
+            NameField()
+        }
+    }
+    val F = com.onoseto.chipsnfish.online.Fame
+    val S = com.onoseto.chipsnfish.online.Social
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        StatChip(L("žetony", "chips", "Chips"), S.bank?.let { Game.fm(it) } ?: "–", Modifier.weight(1f))
+        StatChip(L("čest", "honor", "Ehre"), Game.fm(F.honor ?: 0), Modifier.weight(1f))
+        StatChip(L("poháry", "cups", "Pokale"), "${F.cups ?: 0}", Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StatChip(label: String, value: String, modifier: Modifier) {
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.07f)).padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        T(value, 15.sp, Color.White, num = true, maxLines = 1, fit = true)
+        T(label.uppercase(), 8.5.sp, Color.White.copy(alpha = 0.55f), FontWeight.ExtraBold, letter = 1.sp)
+    }
+}
+
+/** Editable player name (saved and sent to the server). */
+@Composable
+private fun NameField() {
+    watch()
+    val me = Game.P.getValue("hero")
+    var name by remember { mutableStateOf(if (me.name == "Ty") "" else me.name) }
+    LaunchedEffect(name) {
+        delay(900)
+        if (com.onoseto.chipsnfish.online.SupaCfg.configured && name.isNotBlank()) runCatching { com.onoseto.chipsnfish.online.Online.syncProfile() }
+    }
+    Box(Modifier.fillMaxWidth()) {
+        if (name.isEmpty()) T(L("Zadej jméno ✎", "Your name ✎", "Dein Name ✎"), 17.sp, LobbyBlue, FontWeight.ExtraBold)
+        androidx.compose.foundation.text.BasicTextField(
+            name, { v -> name = v.take(24); me.name = v.trim().ifEmpty { "Ty" }; Game.saveLocal(); Game.bump() },
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(LobbyBlue), modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** One slim glass row on the right side of the lobby. */
+@Composable
+private fun LobbyRow(title: String, sub: String, hot: Boolean = false, indent: androidx.compose.ui.unit.Dp = 0.dp, extra: String? = null, onExtra: () -> Unit = {}, onClick: () -> Unit) {
+    watch()
+    val sh = RoundedCornerShape(topStart = 22.dp, topEnd = 6.dp, bottomEnd = 22.dp, bottomStart = 6.dp)
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.96f else 1f, label = "row")
     Row(
-        Modifier.fillMaxWidth().height(58.dp).graphicsLayer(scaleX = sc, scaleY = sc)
+        Modifier.padding(end = indent).fillMaxWidth().height(54.dp).graphicsLayer(scaleX = sc, scaleY = sc)
             .glass(sh, if (hot) Color(0x3D2F7BFF) else Color(0x2A2A5CA8), lift = 10.dp)
             .then(if (hot) Modifier.border(1.5.dp, Brush.linearGradient(listOf(Color(0xFF9AD6FF), Color(0xFF2F7BFF))), sh) else Modifier)
             .clickable(src, null, onClick = onClick).padding(start = 16.dp, end = 10.dp),
