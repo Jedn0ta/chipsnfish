@@ -82,6 +82,8 @@ object Game {
     fun gm() = mode == "game" || mode == "online"
     /** Pre-selected "check / fold" for this hand number (-1 = off): fires automatically when it's the hero's turn. */
     var preCF = -1
+    /** Pre-selected "call any" for this hand number (-1 = off). */
+    var preCall = -1
     fun bot() = mode == "game"
     fun online() = mode == "online"
     fun advisorOn() = if (online()) com.onoseto.chipsnfish.online.Online.advisor else true
