@@ -508,6 +508,20 @@ object Online {
         }
     }
 
+    /** Challenge a friend: a fresh heads-up table and an invite for them. */
+    fun challenge(f: OFriend, onOk: () -> Unit) {
+        val me = myName()
+        create("⚔ $me vs ${f.name}".take(40), 100, 0, 5, advisor, null) { c ->
+            Game.scope.launch {
+                try {
+                    Supa.rpc("cf_invite", args("p_uid" to f.uid, "p_code" to c))
+                    Game.toast(L("Výzva pro ${f.name} odeslána ⚔", "Challenge sent to ${f.name} ⚔", "Herausforderung an ${f.name} gesendet ⚔"))
+                } catch (e: Exception) { Game.toast(err(e)) }
+            }
+            onOk()
+        }
+    }
+
     fun dismissInvite(i: OInvite) {
         dismissed.add(i.id)
         inbox = inbox.filter { it.id != i.id }

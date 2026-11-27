@@ -416,7 +416,9 @@ fun FriendSheet(f: OFriend) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (f.table != null && f.table != O.code) Btn(L("Přisednout ke stolu", "Join their table", "An den Tisch"), BK.GOLD, Modifier.weight(1f), height = 42.dp) { Ui.close(); O.join(f.table) { goTable() } }
         if (O.code != null && f.table != O.code) Btn(L("Pozvat ke stolu ${O.code}", "Invite to table ${O.code}", "An Tisch ${O.code} einladen"), BK.GOLD, Modifier.weight(1f), height = 42.dp) { O.inviteFriend(f); Ui.close() }
-        if (O.code == null && f.table == null) Btn(L("Založit stůl a pozvat", "Open a table and invite", "Tisch eröffnen und einladen"), BK.GOLD, Modifier.weight(1f), height = 42.dp) { Ui.open("online", OnlineArg()) }
+        Btn("⚔ " + L("Vyzvat na souboj", "Challenge", "Herausfordern"), BK.RAISE, Modifier.weight(1f), height = 42.dp, enabled = !O.busy) {
+            Ui.close(); O.challenge(f) { goTable() }
+        }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Btn(L("Statistiky", "Statistics", "Statistiken"), BK.GHOST, Modifier.weight(1f), height = 38.dp) {
