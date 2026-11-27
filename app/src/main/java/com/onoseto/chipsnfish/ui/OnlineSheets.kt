@@ -2,6 +2,7 @@
 
 package com.onoseto.chipsnfish.ui
 
+import com.onoseto.chipsnfish.online.OFriend
 import androidx.compose.ui.text.style.TextAlign
 import com.onoseto.chipsnfish.game.Reads
 import androidx.compose.foundation.background
