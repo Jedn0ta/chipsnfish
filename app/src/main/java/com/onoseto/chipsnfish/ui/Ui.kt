@@ -124,9 +124,10 @@ object Sound {
     }
 
     /** Soft two-note chime: it's your turn. */
-    fun turn() = play(chime)
+    // sounds are switched off (user request); kept as no-ops so call sites stay simple
+    fun turn() {}
 
-    fun chip() = play(pcm)
+    fun chip() {}
 
     private fun play(data: ShortArray) {
         thread(isDaemon = true) {

@@ -5,6 +5,8 @@ package com.onoseto.chipsnfish.ui
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import kotlin.math.sqrt
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
@@ -331,7 +333,7 @@ fun TableView() {
             if (com.onoseto.chipsnfish.online.Social.open) Box(Modifier.align(Alignment.TopStart).padding(start = 46.dp, top = 2.dp).zIndex(21f)) { SocialPop() }
         }
         // right column
-        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(124.dp).zIndex(8f)) { ActBox() }
+        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(124.dp).fillMaxHeight().zIndex(8f)) { ActBox() }
         if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 130.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
         // beginner coach (practice game)
         if (playing && Game.bot() && Game.gameCfg.coach) Box(Modifier.align(Alignment.BottomStart).padding(start = 46.dp, bottom = 2.dp).zIndex(7f)) { CoachPanel() }
@@ -463,15 +465,20 @@ private fun PosButton(tag: String, k: Int, pos: (Int) -> Double, geo: Geo, dragg
     if (k !in 0 until st.n || st.pos == null) return
     val sc = geo.sc / 0.8f
     val p = geo.pt(pos(k))
-    val dx = geo.cx - p.x; val dy = geo.cy - p.y
-    val dd = hypot(dx, dy).coerceAtLeast(1f)
-    val ux = dx / dd; val uy = dy / dd
-    // seats are wide (stack left, cards right) and low: keep out of them with an elliptical clearance
-    val ax = 96f * sc; val ay = 50f * sc
-    val dist = min(1f / sqrt((ux / ax) * (ux / ax) + (uy / ay) * (uy / ay)), dd * 0.55f)
-    val side = 26f * sc
-    val tx = p.x + ux * dist - uy * side
-    val ty = p.y + uy * dist + ux * side
+    // the faint gold betting line on the felt (same geometry as drawVelvetTable): a rounded rect inset from the felt
+    val fl = geo.x0 + 2; val ft = geo.y0 + 2; val fw = geo.x1 - geo.x0 - 4; val fh = geo.y1 - geo.y0 - 4
+    val bi = min(fw, fh) * 0.13f
+    val lr = max(2f, geo.r - 2 - bi)
+    val lL = fl + bi + lr; val lR = fl + fw - bi - lr; val lT = ft + bi + lr; val lB = ft + fh - bi - lr
+    // closest point on the line to the seat: clamp to the inner rect, then step out by the corner radius
+    val qx = p.x.coerceIn(lL, max(lL, lR)); val qy = p.y.coerceIn(lT, max(lT, lB))
+    var nx = p.x - qx; var ny = p.y - qy
+    val nd = hypot(nx, ny)
+    if (nd < 0.5f) { nx = 0f; ny = if (p.y < geo.cy) -1f else 1f } else { nx /= nd; ny /= nd }
+    // slide a bit along the line so the button sits beside the bet, not on it
+    val side = 30f * sc
+    val tx = qx + nx * lr - ny * side
+    val ty = qy + ny * lr + nx * side
     val spec = if (dragging) snap<Float>() else tween<Float>(500, easing = FastOutSlowInEasing)
     val x by animateFloatAsState(tx, spec, label = "px$tag")
     val y by animateFloatAsState(ty, spec, label = "py$tag")
@@ -732,7 +739,7 @@ private fun ActBox() {
             }
         }
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp), horizontalAlignment = Alignment.End) {
+    Column(Modifier.fillMaxWidth().fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.Bottom), horizontalAlignment = Alignment.End) {
         if (st.phase == "ready") {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(10.dp)).padding(6.dp)) {
                 T(tr("Připraveno"), 15.sp, C.gold, num = true)
@@ -748,7 +755,8 @@ private fun ActBox() {
         }
         if (g.online()) { if (OnlineBox()) return@Column }
         if (!g.playing()) { SetupBench(); return@Column }
-        val hc: @Composable () -> Unit = { MyCards() }
+        // hole cards stay pinned at the top of the column; the buttons sit at the bottom, so the cards never jump
+        val hc: @Composable ColumnScope.() -> Unit = { MyCards(); Spacer(Modifier.weight(1f)) }
         if (g.bot()) {
             val over = st.over
             if (over != null) {
@@ -1096,7 +1104,7 @@ private fun OnlineLobbyCenter() {
 
 /** Right column for an online table outside of my own betting turn. Returns true when it drew the column. */
 @Composable
-private fun OnlineBox(): Boolean {
+private fun ColumnScope.OnlineBox(): Boolean {
     watch()
     val g = Game
     val st = g.st
@@ -1157,7 +1165,7 @@ private fun OnlineBox(): Boolean {
         return true
     }
     if (st.done != null) {
-        MyCards()
+        MyCards(); Spacer(Modifier.weight(1f))
         val inHand = !st.seats[0].out && !st.hero.contains(null)
         if (inHand && !O.didShow()) {
             ColBtn(L("Ukázat karty", "Show cards", "Karten zeigen"), BK.CALL, h = 46.dp) { O.show() }
