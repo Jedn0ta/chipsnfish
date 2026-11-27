@@ -38,6 +38,11 @@ object Ui {
     var rainId by mutableIntStateOf(0)
     var bye by mutableStateOf(false)
     var peek by mutableStateOf(false)
+    /** Hole cards being dragged to the fold zone (offset in px), whether they're over it, and where the zone is (root px). */
+    var foldDrag by mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
+    var foldHot by mutableStateOf(false)
+    var foldZone = androidx.compose.ui.geometry.Offset.Zero
+    var foldR = 0f
     var exitRequest by mutableIntStateOf(0)
     var coachMin by mutableStateOf(false)
     /** Pending invite from a link: "t" table code or "g" group id. */

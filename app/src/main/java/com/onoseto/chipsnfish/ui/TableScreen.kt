@@ -5,6 +5,8 @@ package com.onoseto.chipsnfish.ui
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import kotlin.math.sqrt
@@ -305,6 +307,22 @@ fun TableView() {
                         }
                     },
                 )
+            }
+        }
+        // fold zone: appears in the middle of the table while my cards are being dragged
+        if (Ui.foldDrag != null) {
+            val hot = Ui.foldHot
+            Box(
+                Modifier.offset((geo.cx - 56).dp, (geo.cy - 56).dp).size(112.dp).zIndex(15f)
+                    .onGloballyPositioned { Ui.foldZone = it.boundsInRoot().center; Ui.foldR = it.size.width / 2f }
+                    .clip(CircleShape).background(if (hot) C.lose.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.35f))
+                    .border(2.dp, if (hot) Color.White else C.lose.copy(alpha = 0.8f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    T("FOLD", 22.sp, Color.White, num = true, letter = 2.sp)
+                    T(if (hot) L("pusť", "release", "loslassen") else L("sem přetáhni", "drop here", "hierher ziehen"), 11.sp, Color.White.copy(alpha = 0.8f), FontWeight.Bold)
+                }
             }
         }
         // dealer / small blind / big blind buttons lying on the felt in front of the player
@@ -790,10 +808,15 @@ private fun ActBox() {
                 hc()
                 val me = st.seats[0]
                 if (st.done == null && st.turn >= 0 && !me.folded && !me.out && !me.allin && me.stack > 0) {
-                    T(L("PŘEDVOLBA", "PRE-SELECT", "VORWAHL"), 9.5.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp, modifier = Modifier.padding(top = 4.dp).fillMaxWidth(), align = TextAlign.Center)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        PreBtn("CHECK\nFOLD", g.preCF == st.handNo, BK.FOLD, Modifier.weight(1f)) { g.preCF = if (g.preCF == st.handNo) -1 else st.handNo; if (g.preCF >= 0) g.preCall = -1; g.bump() }
-                        PreBtn("CALL\nANY", g.preCall == st.handNo, BK.CALL, Modifier.weight(1f)) { g.preCall = if (g.preCall == st.handNo) -1 else st.handNo; if (g.preCall >= 0) g.preCF = -1; g.bump() }
+                    Box(Modifier.fillMaxWidth().height(158.dp)) {
+                        T(L("PŘEDVOLBA", "PRE-SELECT", "VORWAHL"), 9.5.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp, modifier = Modifier.offset(0.dp, 60.dp))
+                        val cf = g.preCF == st.handNo; val ca = g.preCall == st.handNo
+                        RoundBtn(60.dp, if (cf) RB_FOLD else RB_DARK, Modifier.offset(22.dp, 96.dp), on = cf, onClick = { g.preCF = if (cf) -1 else st.handNo; if (g.preCF >= 0) g.preCall = -1; g.bump() }) {
+                            T((if (cf) "✓ " else "") + "CHECK\nFOLD", 9.5.sp, Color.White, num = true, maxLines = 2, lineHeight = 11.sp, align = TextAlign.Center)
+                        }
+                        RoundBtn(78.dp, if (ca) RB_CALL else RB_DARK, Modifier.offset(94.dp, 80.dp), on = ca, onClick = { g.preCall = if (ca) -1 else st.handNo; if (g.preCall >= 0) g.preCF = -1; g.bump() }) {
+                            T((if (ca) "✓ " else "") + "CALL\nANY", 11.sp, Color.White, num = true, maxLines = 2, lineHeight = 13.sp, align = TextAlign.Center)
+                        }
                     }
                 }
                 return@Column
@@ -831,44 +854,43 @@ private fun ActBox() {
         }
         hc()
         if (undo) ColBtn(tr("↶ Zpět"), BK.DARK, h = 32.dp) { g.undo() }
-        // raise: pick a size with the quick chips, then one tap on RAISE; "⋯" opens the exact amount
+        // corner cluster: big CALL in the corner, FOLD beside it, RAISE above it, bet sizes in the free quarter
         val (mn, _) = g.minMax(s)
         val canRaise = mx > st.curBet
         LaunchedEffect(k, st.betStreet, st.curBet) { if (g.raiseTo !in mn..mx) g.raiseTo = mn }
-        if (canRaise) {
-            val pt = g.potTotal()
-            fun pre(f: Double) = (((st.curBet + f * (pt + toCall)) / g.step()).roundToInt() * g.step()).coerceIn(mn, mx)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                listOf("MIN" to mn, "½" to pre(0.5), "POT" to pre(1.0), "MAX" to mx).forEach { (l, x) ->
-                    val on = g.raiseTo == x
-                    Box(
-                        Modifier.weight(1f).height(26.dp).clip(RoundedCornerShape(8.dp)).background(if (on) C.gold.copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.35f))
-                            .border(1.dp, if (on) C.gold else Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp)).tap { g.raiseTo = x; g.bump() },
-                        contentAlignment = Alignment.Center,
-                    ) { T(l, 10.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true) }
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            GBtn(BK.RAISE, Modifier.weight(1f).height(42.dp), enabled = canRaise, onClick = { g.raiseOpen = false; g.heroAction("raise") }) {
-                val to = g.raiseTo.coerceIn(mn, mx)
-                T((if (to >= mx) "ALL-IN " else if (st.curBet == 0) "BET " else "RAISE ") + g.fm(to), 13.sp, C.goldInk, num = true, maxLines = 1, fit = true)
-            }
-            if (canRaise) GBtn(BK.DARK, Modifier.width(28.dp).height(42.dp), on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) { T("⋯", 16.sp, Color.White, FontWeight.Black) }
-        }
-        // folding when checking is free needs a second tap
         var foldArm by remember(st.handNo, st.betStreet, st.turn) { mutableStateOf(false) }
         LaunchedEffect(foldArm) { if (foldArm) { delay(2500); foldArm = false } }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            GBtn(if (toCall == 0 && !foldArm) BK.DARK else BK.FOLD, Modifier.weight(0.8f).height(52.dp), onClick = {
+        Box(Modifier.fillMaxWidth().height(158.dp)) {
+            if (canRaise) {
+                val pt = g.potTotal()
+                fun pre(f: Double) = (((st.curBet + f * (pt + toCall)) / g.step()).roundToInt() * g.step()).coerceIn(mn, mx)
+                listOf("MIN" to mn, "½ POT" to pre(0.5), "POT" to pre(1.0), "MAX" to mx).forEachIndexed { i, (l, x) ->
+                    val on = g.raiseTo == x
+                    Box(
+                        Modifier.offset(x = (i % 2 * 44).dp, y = (10 + i / 2 * 30).dp).size(40.dp, 26.dp).clip(RoundedCornerShape(99.dp))
+                            .background(if (on) C.gold.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.45f))
+                            .border(1.dp, if (on) C.gold else Color.White.copy(alpha = 0.16f), RoundedCornerShape(99.dp)).tap { g.raiseTo = x; g.bump() },
+                        contentAlignment = Alignment.Center,
+                    ) { T(l, 9.5.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true) }
+                }
+                RoundBtn(26.dp, RB_DARK, Modifier.offset(84.dp, 68.dp), on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) { T("⋯", 13.sp, Color.White, FontWeight.Black, lineHeight = 13.sp) }
+            }
+            RoundBtn(64.dp, RB_RAISE, Modifier.offset(101.dp, 2.dp), enabled = canRaise, onClick = { g.raiseOpen = false; g.heroAction("raise") }) {
+                val to = g.raiseTo.coerceIn(mn, mx)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    T(if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE", 10.5.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1, fit = true)
+                    T(g.fm(to), 13.sp, C.goldInk, num = true, lineHeight = 14.sp, maxLines = 1, fit = true)
+                }
+            }
+            RoundBtn(60.dp, if (toCall == 0 && !foldArm) RB_DARK else RB_FOLD, Modifier.offset(22.dp, 96.dp), onClick = {
                 if (toCall == 0 && !foldArm) foldArm = true else g.heroAction("fold")
-            }) { T(if (foldArm) L("FOLD?", "FOLD?", "FOLD?") else "FOLD", 13.sp, Color.White, num = true, maxLines = 1, fit = true) }
-            GBtn(BK.CALL, Modifier.weight(1.2f).height(52.dp), ring = ring, onClick = { g.heroAction("call") }) {
+            }) { T(if (foldArm) "FOLD?" else "FOLD", 12.sp, Color.White, num = true, maxLines = 1, fit = true) }
+            RoundBtn(78.dp, RB_CALL, Modifier.offset(94.dp, 80.dp), ring = ring, onClick = { g.heroAction("call") }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     when {
-                        toCall == 0 -> T("CHECK", 15.sp, Color.White, num = true, maxLines = 1, fit = true)
-                        toCall >= s.stack -> { T("ALL-IN", 13.sp, Color.White, num = true, lineHeight = 14.sp, maxLines = 1, fit = true); T(g.fm(s.stack), 13.sp, Color.White, num = true, lineHeight = 14.sp, maxLines = 1, fit = true) }
-                        else -> { T("CALL", 13.sp, Color.White, num = true, lineHeight = 14.sp, maxLines = 1, fit = true); T(g.fm(toCall), 13.sp, Color.White, num = true, lineHeight = 14.sp, maxLines = 1, fit = true) }
+                        toCall == 0 -> T("CHECK", 14.sp, Color.White, num = true, maxLines = 1, fit = true)
+                        toCall >= s.stack -> { T("ALL-IN", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1, fit = true); T(g.fm(s.stack), 14.sp, Color.White, num = true, lineHeight = 15.sp, maxLines = 1, fit = true) }
+                        else -> { T("CALL", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1, fit = true); T(g.fm(toCall), 15.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1, fit = true) }
                     }
                 }
             }
@@ -876,16 +898,21 @@ private fun ActBox() {
     }
 }
 
+private val RB_CALL = Color(0xFF3CC982) to Color(0xFF13703F)
+private val RB_FOLD = Color(0xFFE4575A) to Color(0xFF8E1E22)
+private val RB_RAISE = Color(0xFFF7D774) to Color(0xFFC08C1A)
+private val RB_DARK = Color(0xFF34414F) to Color(0xFF141B24)
+
+/** Round action button for the corner cluster. */
 @Composable
-private fun PreBtn(label: String, on: Boolean, kind: BK, modifier: Modifier, onClick: () -> Unit) {
-    GBtn(if (on) kind else BK.DARK, modifier.height(52.dp), on = on, onClick = onClick) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(13.dp).clip(RoundedCornerShape(4.dp)).background(if (on) Color.White else Color.Transparent).border(1.5.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
-                if (on) T("✓", 9.sp, Color.Black, FontWeight.Black, lineHeight = 9.sp)
-            }
-            T(label, 10.5.sp, Color.White, num = true, maxLines = 2, lineHeight = 11.sp, align = TextAlign.Center)
-        }
-    }
+private fun RoundBtn(size: Dp, col: Pair<Color, Color>, modifier: Modifier, enabled: Boolean = true, on: Boolean = false, ring: Color? = null, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        modifier.size(size).alpha(if (enabled) 1f else 0.38f).shadow(6.dp, CircleShape).clip(CircleShape)
+            .background(Brush.radialGradient(listOf(col.first, col.second), Offset(size.value * 0.35f * LocalDensity.current.density, size.value * 0.3f * LocalDensity.current.density), size.value * 1.1f * LocalDensity.current.density))
+            .border(if (on || ring != null) 3.dp else 1.5.dp, ring ?: if (on) Color.White else Color.White.copy(alpha = 0.3f), CircleShape)
+            .then(if (enabled) Modifier.tap(onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) { content() }
 }
 
 @Composable
@@ -940,8 +967,36 @@ private fun MyCards() {
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             // the two hole cards side by side, both fully visible
+            // drag the cards to the middle of the table to fold
+            val me = st.seats[0]
+            val canFold = g.gm() && g.playing() && st.done == null && both && !me.folded && !me.out && !me.allin
+            var home by remember { mutableStateOf(Offset.Zero) }
+            var dragBy by remember { mutableStateOf(Offset.Zero) }
             Row(
-                Modifier.then(if (g.gm() && g.look.hide) Modifier.pointerInput(Unit) { detectTapGestures(onPress = { Ui.peek = true; tryAwaitRelease(); Ui.peek = false }) } else Modifier),
+                Modifier
+                    .onGloballyPositioned { home = it.boundsInRoot().center }
+                    .graphicsLayer { translationX = dragBy.x; translationY = dragBy.y; rotationZ = (dragBy.x / 40f).coerceIn(-12f, 12f) }
+                    .then(if (canFold) Modifier.pointerInput(st.handNo) {
+                        detectDragGestures(
+                            onDragStart = { Ui.foldDrag = Offset.Zero },
+                            onDragEnd = {
+                                val hot = Ui.foldHot
+                                dragBy = Offset.Zero; Ui.foldDrag = null; Ui.foldHot = false
+                                if (hot) {
+                                    if (st.turn == 0) g.heroAction("fold")
+                                    else { g.preCF = st.handNo; g.preCall = -1; g.bump(); g.toast(L("Až budeš na tahu: check, jinak fold", "On your turn: check, otherwise fold", "Wenn du dran bist: Check, sonst Fold")) }
+                                }
+                            },
+                            onDragCancel = { dragBy = Offset.Zero; Ui.foldDrag = null; Ui.foldHot = false },
+                            onDrag = { ch, d ->
+                                ch.consume()
+                                dragBy += d
+                                Ui.foldDrag = dragBy
+                                Ui.foldHot = Ui.foldR > 0f && (home + dragBy - Ui.foldZone).getDistance() < Ui.foldR * 1.25f
+                            },
+                        )
+                    } else Modifier)
+                    .then(if (g.gm() && g.look.hide) Modifier.pointerInput(Unit) { detectTapGestures(onPress = { Ui.peek = true; tryAwaitRelease(); Ui.peek = false }) } else Modifier),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 for (i in 0..1) {
