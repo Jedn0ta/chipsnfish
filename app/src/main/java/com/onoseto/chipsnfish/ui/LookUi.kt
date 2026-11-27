@@ -98,7 +98,20 @@ private fun Tile(on: Boolean, onClick: () -> Unit, content: @Composable () -> Un
 fun LookSettings() {
     watch()
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Column(Modifier.width(212.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { FeltPicker(); TableSize() }
+        Column(Modifier.width(212.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            FeltPicker(); TableSize()
+            Label(L("Moje karty", "My cards", "Meine Karten"))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(false to L("Lícem nahoru", "Face up", "Offen"), true to L("Skryté · podržet", "Hidden · hold", "Verdeckt · halten")).forEach { (v, l) ->
+                    val on = Game.look.hide == v
+                    Box(
+                        Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) LobbyBlue.copy(alpha = 0.25f) else Color.Transparent)
+                            .border(1.dp, if (on) LobbyBlue else Color.White.copy(alpha = 0.18f), RoundedCornerShape(99.dp))
+                            .tap { Game.look.hide = v; saveLook() }.padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) { T(l, 11.5.sp, if (on) Color.White else GlassMuted, FontWeight.Bold, maxLines = 1) }
+                }
+            }
+        }
         Column(Modifier.weight(0.85f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Label(tr("Rub karet"))
             val keys = remember { C.BACKS.keys.toList() }

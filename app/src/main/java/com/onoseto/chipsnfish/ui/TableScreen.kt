@@ -114,7 +114,7 @@ class Geo(val w: Float, val h: Float, n: Int, zoom: Double, playing: Boolean) {
         val per0 = 2 * (w + h)
         var ss = min(1f, (per0 * 0.62f) / (max(1, n) * 150 * sc0))
         ss = max(0.7f, ss)
-        val rcol = 146f
+        val rcol = 194f
         val cardW = 150 * sc0 * ss
         val cardH = 66 * sc0 * ss
         x0 = cardW / 2 + 4; x1 = w - rcol - cardW / 2 - 2
@@ -333,8 +333,8 @@ fun TableView() {
             if (com.onoseto.chipsnfish.online.Social.open) Box(Modifier.align(Alignment.TopStart).padding(start = 46.dp, top = 2.dp).zIndex(21f)) { SocialPop() }
         }
         // right column
-        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(124.dp).fillMaxHeight().zIndex(8f)) { ActBox() }
-        if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 130.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
+        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(172.dp).fillMaxHeight().zIndex(8f)) { ActBox() }
+        if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 178.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
         // beginner coach (practice game)
         if (playing && Game.bot() && Game.gameCfg.coach) Box(Modifier.align(Alignment.BottomStart).padding(start = 46.dp, bottom = 2.dp).zIndex(7f)) { CoachPanel() }
         // advisor
@@ -920,7 +920,7 @@ private fun MyCards() {
     watch()
     val g = Game
     val st = g.st
-    val cw = 92.dp
+    val cw = 82.dp
     val both = !st.hero.contains(null)
     val nx = g.firstEmpty()
     val folded = st.seats[0].folded
@@ -932,18 +932,23 @@ private fun MyCards() {
         if (eq != null && !folded && g.advisorOn()) e = " · ${((if (eq.allFolded) 1.0 else eq.eq) * 100).roundToInt()} %"
         I18n.cat(Cards.CAT[c] + " " + Cards.rl((sc shr 16) and 15)) + e
     } else if (st.hero.any { it != null }) tr("vyber druhou kartu") else tr("vyber své karty")
-    Box(Modifier.fillMaxWidth().height(152.dp), contentAlignment = Alignment.TopCenter) {
+    // optional: keep my cards face down, press and hold to look
+    val hidden = g.gm() && g.look.hide && both && !Ui.peek
+    Box(Modifier.fillMaxWidth().height(cw * 1.4f + 22.dp), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier.fillMaxWidth().alpha(if (folded && g.playing()) 0.45f else 1f),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            // the two hole cards held as a small fan
-            Box(Modifier.size(124.dp, cw * 1.4f + 4.dp)) {
-                for (i in 0..1) Box(Modifier.align(if (i == 0) Alignment.TopStart else Alignment.TopEnd).padding(top = if (i == 0) 3.dp else 0.dp).rotate(if (i == 0) -4f else 4f)) {
+            // the two hole cards side by side, both fully visible
+            Row(
+                Modifier.then(if (g.gm() && g.look.hide) Modifier.pointerInput(Unit) { detectTapGestures(onPress = { Ui.peek = true; tryAwaitRelease(); Ui.peek = false }) } else Modifier),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                for (i in 0..1) {
                     val c = st.hero[i]
                     when {
                         c == null -> CardSlot(cw, "+", next = nx == i, modifier = Modifier.tap { openCardSlot(i) })
-                        g.gm() -> DealIn("${st.handNo}-h$i-$c") { CardView(c, cw, glow = true) }
+                        g.gm() -> DealIn("${st.handNo}-h$i-$c") { if (hidden) CardBack(cw) else CardView(c, cw, glow = true) }
                         else -> {
                             Box(Modifier.pointerInput(i) {
                                 detectTapGestures(
@@ -955,8 +960,18 @@ private fun MyCards() {
                     }
                 }
             }
-            if (both && !g.gm() && !Ui.peek) T(tr("podrž = ukázat"), 11.sp, C.muted, FontWeight.Bold, maxLines = 1)
-            else T(info.replace(" · ", "  "), 11.5.sp, C.gold, FontWeight.Bold, maxLines = 1, fit = true, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.weight(1f)) {
+                    if (both && ((!g.gm() && !Ui.peek) || hidden)) T(tr("podrž = ukázat"), 11.sp, C.muted, FontWeight.Bold, maxLines = 1, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    else T(info.replace(" · ", "  "), 11.5.sp, C.gold, FontWeight.Bold, maxLines = 1, fit = true, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
+                // eye: hide / show my cards
+                if (g.gm()) Box(
+                    Modifier.size(22.dp).clip(CircleShape).background(if (g.look.hide) C.gold.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.08f))
+                        .tap { g.look.hide = !g.look.hide; g.saveLook(); g.bump(); g.toast(if (g.look.hide) L("Karty lícem dolů · podrž je pro ukázání", "Cards face down · press and hold to look", "Karten verdeckt · gedrückt halten zum Ansehen") else L("Karty lícem nahoru", "Cards face up", "Karten offen")) },
+                    contentAlignment = Alignment.Center,
+                ) { T(if (g.look.hide) "🙈" else "👁", 12.sp) }
+            }
         }
     }
 }
