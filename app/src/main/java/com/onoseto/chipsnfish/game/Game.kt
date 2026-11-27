@@ -641,9 +641,16 @@ object Game {
         val fin: () -> Unit = { finishHand() }
         val deal: () -> Unit = { dealNext() }
         val bot: () -> Unit = { botMove() }
+        // nobody can bet any more (all-in): turn the cards face up and deal the rest slowly so everyone sees it
+        val runout = st.turn < 0 && live().size > 1 && live().count { !it.allin } <= 1 && bd < 5
+        if (runout && st.reveal.isNullOrEmpty()) {
+            st.reveal = mutableMapOf()
+            st.seats.forEachIndexed { k, s -> if (k > 0 && !s.folded && !s.out) st.hole[k]?.let { st.reveal!![k] = it } }
+            toast(L("All-in! Karty se otáčí a dorozdává se do konce.", "All-in! Cards are turned over and the board runs out.", "All-in! Karten werden aufgedeckt, das Board läuft durch."))
+        }
         val (ms, fn) = when {
             live().size <= 1 -> (500 * sp) to fin
-            st.turn < 0 -> (if (bd < 5) 800 * sp else 650 * sp) to (if (bd < 5) deal else fin)
+            st.turn < 0 -> (if (bd < 5) (if (runout) 1500 else 800) * sp else 900 * sp) to (if (bd < 5) deal else fin)
             st.turn > 0 -> ((500 + Math.random() * 700) * sp) to bot
             else -> return
         }

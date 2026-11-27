@@ -1,5 +1,6 @@
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
@@ -91,13 +92,33 @@ fun Modifier.glass(shape: Shape, tint: Color = Color(0x2A2A5CA8), lift: Dp = 14.
         .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0.06f), Color(0x667FC4FF))), shape)
 }
 
-/** The blue card room with drifting lights, darkened top and bottom. */
+/** Dark blue suede with slowly drifting smoke. */
 @Composable
 fun LobbyBackground() {
-    Box(Modifier.fillMaxSize().background(Color(0xFF050B1A))) {
-        Image(painterResource(R.drawable.lobby_bg), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        LobbyBokeh()
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x99030814), 0.35f to Color.Transparent, 1f to Color(0xCC030814))))
+    val tile = remember {
+        // fine suede grain, tiled
+        val n = 96
+        val px = IntArray(n * n) { val v = (Math.random() * 255).toInt(); val a = (8 + Math.random() * 22).toInt(); (a shl 24) or (v shl 16) or (v shl 8) or v }
+        android.graphics.Bitmap.createBitmap(px, n, n, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+    }
+    val grain = remember(tile) { androidx.compose.ui.graphics.ShaderBrush(androidx.compose.ui.graphics.ImageShader(tile, androidx.compose.ui.graphics.TileMode.Repeated, androidx.compose.ui.graphics.TileMode.Repeated)) }
+    val t = rememberInfiniteTransition(label = "smoke").animateFloat(0f, 1f, infiniteRepeatable(tween(60000, easing = LinearEasing)), label = "s")
+    val puffs = remember { List(7) { floatArrayOf(Math.random().toFloat(), Math.random().toFloat(), 0.35f + Math.random().toFloat() * 0.35f, Math.random().toFloat(), 0.05f + Math.random().toFloat() * 0.06f) } }
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(Brush.radialGradient(listOf(Color(0xFF16346F), Color(0xFF09183A), Color(0xFF030814)), Offset(size.width * 0.5f, size.height * 0.42f), size.width * 0.62f))
+        // smoke: big soft drifting puffs
+        puffs.forEach { p ->
+            val ph = (t.value + p[3]) % 1f
+            val a = ph * 6.283f
+            val x = (p[0] + 0.12f * kotlin.math.sin(a) + 0.25f * ph) % 1.2f * size.width - size.width * 0.1f
+            val y = (p[1] + 0.08f * kotlin.math.cos(a * 1.3f)) * size.height
+            val r = p[2] * size.width * (0.9f + 0.15f * kotlin.math.sin(a * 2f))
+            val alpha = p[4] * (0.6f + 0.4f * kotlin.math.sin(ph * 3.1416f))
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF8DB8FF).copy(alpha = alpha), Color(0xFF8DB8FF).copy(alpha = alpha * 0.35f), Color.Transparent), Offset(x, y), r), r, Offset(x, y))
+        }
+        drawRect(grain, alpha = 0.55f)
+        // vignette
+        drawRect(Brush.radialGradient(listOf(Color.Transparent, Color(0xB3020610)), Offset(size.width * 0.5f, size.height * 0.45f), size.width * 0.75f))
     }
 }
 

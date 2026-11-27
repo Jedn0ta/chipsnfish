@@ -331,7 +331,6 @@ private fun MenuScreen(onExit: () -> Unit) {
     val gOn = gs != null && gs.over == null
     Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }) {
         LobbyBackground()
-        LobbyLife()
         // top bar
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FishLogo(Modifier.size(32.dp))
