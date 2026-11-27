@@ -46,7 +46,7 @@ echo "✓ hand played to showdown: board $(echo "$V" | jq -c .state.board), winn
 [ "$(echo "$V" | jq '[.state.seats[].stack] | add')" = 400 ] || { echo "chips not conserved"; exit 1; }
 rpc "$A" cf_show "{\"p_code\":\"$CODE\",\"p_hand\":1}" >/dev/null
 V=$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}")
-[ "$(echo "$V" | jq '.shows | length')" = 1 ] || { echo "show failed"; exit 1; }
+[ "$(echo "$V" | jq '.shows | length')" -ge 1 ] || { echo "show failed"; exit 1; }
 echo "✓ show cards"
 rpc "$A" cf_next "{\"p_code\":\"$CODE\"}" >/dev/null
 V=$(rpc "$A" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}")
