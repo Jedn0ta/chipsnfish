@@ -51,6 +51,8 @@ object Game {
     var mode = "coach"
     val P: MutableMap<String, Player> = LinkedHashMap()
     var H: MutableList<HandRec> = mutableListOf()
+    /** finished online games with friends */
+    var G: MutableList<GameRec> = mutableListOf()
     lateinit var st: GState
     private val undoStack = ArrayDeque<String>()
     var look = Look()
@@ -100,6 +102,7 @@ object Game {
         P.clear()
         runCatching { json.decodeFromString<Map<String, Player>>(getS("hr3-players") ?: "{}") }.getOrNull()?.let { P.putAll(it) }
         H = runCatching { json.decodeFromString<MutableList<HandRec>>(getS("hr3-hands") ?: "[]") }.getOrNull() ?: mutableListOf()
+        G = runCatching { json.decodeFromString<MutableList<GameRec>>(getS("hr7-games") ?: "[]") }.getOrNull() ?: mutableListOf()
         look = runCatching { json.decodeFromString<Look>(getS("hr-look") ?: "{}") }.getOrNull() ?: Look()
         zoom = getS("hr4-zoom")?.toDoubleOrNull() ?: 1.0
         layouts = runCatching { json.decodeFromString<MutableMap<String, List<Double>>>(getS("hr4-layouts") ?: "{}") }.getOrNull() ?: mutableMapOf()
@@ -129,6 +132,7 @@ object Game {
         }
         setS("hr3-players", json.encodeToString(P.toMap()))
         setS("hr3-hands", json.encodeToString(H.take(400)))
+        setS("hr7-games", json.encodeToString(G.take(300)))
     }
 
     fun saveLook() = setS("hr-look", json.encodeToString(look))

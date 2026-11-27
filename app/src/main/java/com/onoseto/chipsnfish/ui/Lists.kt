@@ -63,9 +63,15 @@ fun PlayersView() {
         a.name.lowercase().compareTo(b.name.lowercase())
     }
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        var showGames by remember { mutableStateOf(false) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             T(L("Statistiky", "Statistics", "Statistiken"), 26.sp, Color.White, FontWeight.ExtraBold)
-            T(L("${list.size} hráčů · přibývají sami", "${list.size} players · added automatically", "${list.size} Spieler · kommen automatisch dazu"), 12.sp, GlassMuted, modifier = Modifier.padding(bottom = 5.dp))
+            Pill(L("Hráči", "Players", "Spieler"), !showGames) { showGames = false }
+            Pill(L("Hry s přáteli · ${g.G.size}", "Games with friends · ${g.G.size}", "Spiele mit Freunden · ${g.G.size}"), showGames) { showGames = true }
+        }
+        if (showGames) { GamesRow(); return@Column }
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            T(L("${list.size} hráčů · přibývají sami", "${list.size} players · added automatically", "${list.size} Spieler · kommen automatisch dazu"), 12.sp, GlassMuted)
             Spacer(Modifier.weight(1f))
             T(L("VPIP hraje · PFR zvyšuje · AF útočí", "VPIP plays · PFR raises · AF attacks", "VPIP spielt · PFR erhöht · AF greift an"), 11.sp, GlassMuted, modifier = Modifier.padding(bottom = 6.dp))
         }
@@ -83,6 +89,52 @@ fun PlayersView() {
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp),
         ) {
             items(list.size, key = { list[it].id }) { i -> PlayerCard(list[i], seatIdx(list[i].id) >= 0) }
+        }
+    }
+}
+
+/** All online games with friends, newest first. */
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.GamesRow() {
+    watch()
+    val gs = Game.G
+    if (gs.isEmpty()) {
+        Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
+            T(L("Zatím žádná hra s přáteli", "No games with friends yet", "Noch keine Spiele mit Freunden"), 22.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
+            T(L("Každá online hra se sem uloží sama – kdo hrál, jak to dopadlo a kolik jsi vyhrál.", "Every online game is saved here – who played, how it ended and what you won.", "Jedes Online-Spiel landet hier – wer spielte, wie es ausging und was du gewonnen hast."), 14.sp, Color.White.copy(alpha = 0.75f), align = TextAlign.Center)
+        }
+        return
+    }
+    androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp)) {
+        items(gs.take(200), key = { it.id }) { r -> GameCard(r) }
+    }
+}
+
+@Composable
+private fun GameCard(r: com.onoseto.chipsnfish.game.GameRec) {
+    watch()
+    val g = Game
+    val sh = RoundedCornerShape(topStart = 22.dp, topEnd = 6.dp, bottomEnd = 22.dp, bottomStart = 6.dp)
+    Column(
+        Modifier.width(210.dp).fillMaxHeight().glass(sh, if (r.place == 1) Color(0x3D2F7BFF) else Color(0x2A2A5CA8), lift = 8.dp).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        T(java.text.SimpleDateFormat("d. M. yyyy · HH:mm", I18n.locale).format(java.util.Date(r.t)), 11.sp, GlassMuted, FontWeight.Bold)
+        T((if (r.cup) "🏆 " else "") + r.name.ifBlank { L("Stůl ${r.code}", "Table ${r.code}", "Tisch ${r.code}") }, 16.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true)
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            T(when (r.place) { 0 -> L("odešel", "left", "verlassen"); 1 -> L("1. místo", "1st", "1. Platz"); else -> L("${r.place}. místo", "${r.place}th", "${r.place}. Platz") },
+                22.sp, if (r.place == 1) LobbyBlue else Color.White, num = true)
+            T(L("z ${r.n}", "of ${r.n}", "von ${r.n}"), 12.sp, GlassMuted, modifier = Modifier.padding(bottom = 3.dp))
+        }
+        T((if (r.net > 0) "+" else "") + g.fm(r.net) + L(" žetonů · ${r.hands} hand", " chips · ${r.hands} hands", " Chips · ${r.hands} Hände"), 12.5.sp,
+            if (r.net >= 0) Color(0xFF6CF0A8) else Color(0xFFFF8A80), FontWeight.Bold)
+        Spacer(Modifier.weight(1f))
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            r.players.forEach { p ->
+                val pl = g.P[p.pid] ?: com.onoseto.chipsnfish.game.Player(p.pid, p.name)
+                Avatar(pl, 28.dp, border = 1.5.dp)
+            }
         }
     }
 }
@@ -124,6 +176,7 @@ private fun PlayerCard(p: com.onoseto.chipsnfish.game.Player, sat: Boolean) {
                 }
             }
         } else T(L("Zatím bez odehraných hand", "No hands played yet", "Noch keine Hände"), 11.sp, GlassMuted)
+        if (p.games > 0) T(L("${p.games}× spolu online", "${p.games} games together", "${p.games} Spiele zusammen"), 10.sp, LobbyBlue, FontWeight.Bold, maxLines = 1)
         T(L("bluff ${(Reads.baseBluff(p) * 100).roundToInt()} % · chycen ${p.caught}× · silná ${p.showed}×", "bluff ${(Reads.baseBluff(p) * 100).roundToInt()} % · caught ${p.caught}× · strong ${p.showed}×", "Bluff ${(Reads.baseBluff(p) * 100).roundToInt()} % · erwischt ${p.caught}× · stark ${p.showed}×"),
             10.sp, GlassMuted, maxLines = 1, fit = true)
     }

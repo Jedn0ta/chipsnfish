@@ -567,6 +567,49 @@ private fun GlassPill(text: String, hot: Boolean = false, onClick: () -> Unit) {
     ) { T(text, 13.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true) }
 }
 
+/** Glass chart of my results: chips won or lost over the last hands. */
+@Composable
+private fun ResultsChart() {
+    watch()
+    val hs = Game.H.take(40).reversed()
+    val pts = run { var acc = 0; listOf(0) + hs.map { acc += it.net; acc } }
+    val total = pts.last()
+    val games = Game.G.size
+    val won = Game.G.count { it.place == 1 }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.06f))
+            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp)).padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            T(L("POSLEDNÍ HANDY", "LAST HANDS", "LETZTE HÄNDE"), 8.5.sp, Color.White.copy(alpha = 0.55f), FontWeight.ExtraBold, letter = 1.sp, modifier = Modifier.weight(1f))
+            if (hs.isNotEmpty()) T((if (total > 0) "+" else "") + Game.fm(total), 13.sp, if (total >= 0) Color(0xFF6CF0A8) else Color(0xFFFF8A80), num = true)
+        }
+        if (hs.size < 2) {
+            Box(Modifier.fillMaxWidth().height(46.dp), contentAlignment = Alignment.Center) {
+                T(L("Zahraj si a uvidíš tu svůj graf", "Play a few hands to see your chart", "Spiel ein paar Hände für dein Diagramm"), 11.sp, Color.White.copy(alpha = 0.5f), align = TextAlign.Center)
+            }
+        } else androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(46.dp)) {
+            val mn = minOf(0, pts.min()).toFloat(); val mx = maxOf(0, pts.max()).toFloat()
+            val span = (mx - mn).coerceAtLeast(1f)
+            fun px(i: Int) = i * size.width / (pts.size - 1)
+            fun py(v: Int) = size.height - (v - mn) / span * size.height
+            val line = androidx.compose.ui.graphics.Path()
+            pts.forEachIndexed { i, v -> if (i == 0) line.moveTo(px(i), py(v)) else line.lineTo(px(i), py(v)) }
+            val fill = androidx.compose.ui.graphics.Path().apply { addPath(line); lineTo(size.width, py(0)); lineTo(0f, py(0)); close() }
+            val up = total >= 0
+            val col = if (up) Color(0xFF6CC4FF) else Color(0xFFFF8A80)
+            drawPath(fill, Brush.verticalGradient(listOf(col.copy(alpha = 0.45f), col.copy(alpha = 0.02f))))
+            drawLine(Color.White.copy(alpha = 0.25f), androidx.compose.ui.geometry.Offset(0f, py(0)), androidx.compose.ui.geometry.Offset(size.width, py(0)), 1f,
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4f, 4f)))
+            drawPath(line, col, style = androidx.compose.ui.graphics.drawscope.Stroke(2.2f * density, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            val last = androidx.compose.ui.geometry.Offset(px(pts.size - 1), py(total))
+            drawCircle(col.copy(alpha = 0.35f), 6f * density, last); drawCircle(Color.White, 2.5f * density, last)
+        }
+        if (games > 0) T(L("Hry s přáteli: $games · vyhráno $won", "Games with friends: $games · won $won", "Spiele mit Freunden: $games · gewonnen $won"), 10.sp, Color.White.copy(alpha = 0.6f), FontWeight.Bold, maxLines = 1, fit = true)
+    }
+}
+
 /** My avatar, name and what I have. */
 @Composable
 private fun ProfileBlock() {
@@ -581,6 +624,7 @@ private fun ProfileBlock() {
     }
     val F = com.onoseto.chipsnfish.online.Fame
     val S = com.onoseto.chipsnfish.online.Social
+    ResultsChart()
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         StatChip(L("žetony", "chips", "Chips"), S.bank?.let { Game.fm(it) } ?: "–", Modifier.weight(1f))
         StatChip(L("čest", "honor", "Ehre"), Game.fm(F.honor ?: 0), Modifier.weight(1f))

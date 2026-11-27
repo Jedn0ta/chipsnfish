@@ -72,6 +72,29 @@ object Online {
     private val learnedShows = HashSet<String>()
     var shownHand by mutableIntStateOf(0)
     private var overSeen = false
+    private var myPlace = 0
+    private var startStack = 0
+    private var recorded: String? = null
+
+    /** Saves this online game into my personal records (and counts games together with each friend). */
+    private fun recordGame(s: GState, finished: Boolean) {
+        val c = code ?: return
+        val key = "$c:${s.handNo}:${s.seats.size}"
+        if (recorded == key || s.handNo <= 0) return
+        recorded = key
+        val myIdx = s.seats.indexOfFirst { it.pid == me }
+        if (myIdx < 0) return
+        val mine = s.seats[myIdx]
+        val place = if (!finished) 0 else if (mine.stack > 0) 1 else if (myPlace > 0) myPlace else s.seats.count { it.stack > 0 } + 1
+        val others = s.seats.filter { it.pid != me }
+        others.forEach { o -> Game.P[o.pid]?.let { it.games++ } }
+        Game.G.add(0, com.onoseto.chipsnfish.game.GameRec(
+            id = Game.uid("g"), t = System.currentTimeMillis(), code = c, name = name, n = s.seats.size,
+            players = s.seats.map { RecSeat(it.pid, Game.P[it.pid]?.name ?: "?", null, false, emptyList(), "none", null) },
+            place = place, net = mine.stack - (if (startStack > 0) startStack else s.startStack), hands = s.handNo, cup = cup,
+        ))
+        Game.saveLocal()
+    }
 
     val me get() = Supa.uid
     val isHost get() = host == me && me.isNotEmpty()
@@ -141,6 +164,7 @@ object Online {
     }
 
     fun leaveLocal() {
+        myPlace = 0; startStack = 0
         Social.resetTable()
         Nearby.unadvertise()
         pollJob?.cancel(); pollJob = null
@@ -230,7 +254,9 @@ object Online {
         }
         for (st in v.seats) if (Game.P[st.pid] == null) Game.P[st.pid] = Player(st.pid, "?", stored = st.pid != me)
         Game.setOnlineView(v)
-        if (s.over != null && !overSeen) { overSeen = true; Social.loadBank() } else if (s.over == null) overSeen = false
+        if (s.over != null && !overSeen) { overSeen = true; Social.loadBank(); recordGame(s, true) } else if (s.over == null) overSeen = false
+        if (s.phase == "play" && s.handNo == 1 && startStack == 0) startStack = s.startStack
+        s.seats.firstOrNull { it.pid == me }?.let { mineS -> if (mineS.stack <= 0 && myPlace == 0 && s.done != null) myPlace = s.seats.count { it.stack > 0 } + 1 }
         learn(v, s)
         rev++
     }
@@ -326,6 +352,7 @@ object Online {
 
     fun leave(after: () -> Unit = {}) {
         val c = code ?: return
+        raw?.let { r -> if (r.phase == "play" && r.over == null) recordGame(r, false) }
         Game.scope.launch {
             runCatching { Supa.rpc("cf_leave", args("p_code" to c)) }
             leaveLocal(); Game.leaveOnline(); after()

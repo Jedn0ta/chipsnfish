@@ -142,11 +142,6 @@ fun OnlineSheet(a: OnlineArg) {
             Picks((0 until 7).map { it.toString() to Cards.lvlStr(it) }, level.toString(), small = true) { level = it.toInt() }
             Label(tr("Zvyšování blindů"))
             Picks(listOf("0", "5", "10", "15", "20").map { it to if (it == "0") tr("Nikdy") else L("$it hand", "$it hands", "$it Hände") }, every.toString(), small = true) { every = it.toInt() }
-            val gs = O.groups.orEmpty()
-            if (gs.isNotEmpty()) {
-                Label(L("Skupina", "Group", "Gruppe"))
-                Picks(listOf("" to L("Bez skupiny", "No group", "Keine Gruppe")) + gs.map { it.id to it.name }, gid ?: "", small = true) { gid = it.ifEmpty { null } }
-            }
             Spacer(Modifier.height(4.dp))
             Btn(L("▶ Založit stůl", "▶ Create table", "▶ Tisch erstellen"), modifier = Modifier.fillMaxWidth(), enabled = !O.busy, height = 46.dp) {
                 Game.gameCfg = Game.gameCfg.copy(stack = stack, level = level, every = every, advisor = adv); Game.saveCfg()
@@ -194,47 +189,10 @@ private fun TableRow(code: String, name: String, players: Int, status: String, o
 fun GroupsSheet() {
     watch()
     val O = Online
-    var tab by remember { mutableStateOf("friends") }
-    SheetHead(L("Přátelé a skupiny", "Friends & groups", "Freunde & Gruppen")) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("friends" to L("Přátelé", "Friends", "Freunde"), "groups" to L("Skupiny", "Groups", "Gruppen")).forEach { (k, l) ->
-                val on = tab == k
-                Box(Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) C.ink else Color.Transparent).border(1.dp, if (on) C.ink else C.line, RoundedCornerShape(99.dp)).tap { tab = k }.padding(horizontal = 12.dp, vertical = 5.dp)) {
-                    T(l, 13.sp, if (on) C.room else C.muted, FontWeight.Bold)
-                }
-            }
-        }
-    }
+    SheetHead(L("Přátelé", "Friends", "Freunde"))
     if (!SupaCfg.configured) { NotConfigured(); return }
-    LaunchedEffect(Unit) { O.loadLists(); O.loadFriends() }
-    if (tab == "friends") { FriendsTab(); return }
-    Note(L("Skupina je parta, se kterou hraješ pravidelně. Pošli členům pozvánku a pak ve skupině uvidí každý rozehraný stůl.",
-        "A group is the crew you play with regularly. Send members an invite, then everyone sees the running tables in the group.",
-        "Eine Gruppe ist die Runde, mit der du regelmäßig spielst. Schick eine Einladung, dann sehen alle die laufenden Tische der Gruppe."))
-    val gs = O.groups
-    if (gs == null) Note(L("Načítám…", "Loading…", "Lade…"))
-    else if (gs.isEmpty()) Note("<b>" + L("Zatím nejsi v žádné skupině.", "You're not in any group yet.", "Du bist noch in keiner Gruppe.") + "</b>")
-    gs?.forEach { g ->
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).tap { Ui.open("group", GroupArg(g.id), Ui.sheet) }.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                T(g.name, 16.sp, weight = FontWeight.ExtraBold)
-                T(L("${g.members.size} členů", "${g.members.size} members", "${g.members.size} Mitglieder") + if (g.tables.isNotEmpty()) " · " + L("${g.tables.size} stůl", "${g.tables.size} table(s)", "${g.tables.size} Tisch(e)") else "", 12.sp, if (g.tables.isNotEmpty()) C.win else C.muted)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { g.members.take(5).forEach { m -> Avatar(Player(m.uid, m.name, img = m.img ?: ""), 28.dp, ring = C.panel2, border = 2.dp) } }
-            T("›", 18.sp, C.gold, num = true)
-        }
-    }
-    var nm by remember { mutableStateOf("") }
-    Label(L("Nová skupina", "New group", "Neue Gruppe"))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Field(nm, { nm = it.take(40) }, Modifier.weight(1f), placeholder = L("Např. Páteční poker", "e.g. Friday poker", "z. B. Freitagspoker"))
-        Btn(L("Vytvořit", "Create", "Erstellen"), height = 44.dp) {
-            O.createGroup(nm.ifBlank { "Poker" }) { id -> nm = ""; Ui.open("group", GroupArg(id), Ui.sheet) }
-        }
-    }
+    LaunchedEffect(Unit) { O.loadFriends() }
+    FriendsTab()
 }
 
 @Composable

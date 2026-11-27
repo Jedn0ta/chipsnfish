@@ -43,6 +43,8 @@ data class Player(
     var bot: Boolean = false,
     var bt: String? = null,
     var hat: String = "",
+    /** online games played together with this player */
+    var games: Int = 0,
 )
 
 @Serializable
@@ -112,6 +114,21 @@ data class RecSeat(
     val actions: List<Act>,
     val reveal: String = "none",
     val cards: List<Int?>? = null,
+)
+
+/** One whole online game with friends, as I played it. */
+@Serializable
+data class GameRec(
+    val id: String,
+    val t: Long,
+    val code: String,
+    val name: String = "",
+    val players: List<RecSeat> = emptyList(),
+    val place: Int = 0,          // 0 = left before the end
+    val n: Int = 0,
+    val net: Int = 0,
+    val hands: Int = 0,
+    val cup: Boolean = false,
 )
 
 @Serializable
