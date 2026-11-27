@@ -131,7 +131,7 @@ class Geo(val w: Float, val h: Float, n: Int, zoom: Double, playing: Boolean) {
         sc = sc0 * ss
         // top-right corner: my hole cards; bottom-right corner: action buttons — seats keep out of both
         zone = if (playing) floatArrayOf(w - 182, -20f, w + 20, 140f) else null
-        zone2 = if (playing) floatArrayOf(w - 184, h - 166, w + 20, h + 20) else null
+        zone2 = if (playing) floatArrayOf(w - 204, h - 176, w + 20, h + 20) else null
     }
 
     fun pt(s0: Double): Offset {
@@ -368,7 +368,7 @@ fun TableView() {
             if (com.onoseto.chipsnfish.online.Social.open) Box(Modifier.align(Alignment.TopStart).padding(start = 46.dp, top = 2.dp).zIndex(21f)) { SocialPop() }
         }
         // right column
-        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(172.dp).fillMaxHeight().zIndex(8f)) { ActBox() }
+        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(200.dp).fillMaxHeight().zIndex(8f)) { ActBox() }
         if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 178.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
         // beginner coach (practice game)
         if (playing && Game.bot() && Game.gameCfg.coach) Box(Modifier.align(Alignment.BottomStart).padding(start = 46.dp, bottom = 2.dp).zIndex(7f)) { CoachPanel() }
@@ -825,15 +825,16 @@ private fun ActBox() {
                 hc()
                 val me = st.seats[0]
                 if (st.done == null && st.turn >= 0 && !me.folded && !me.out && !me.allin && me.stack > 0) {
-                    Box(Modifier.fillMaxWidth().height(158.dp)) {
-                        T(L("PŘEDVOLBA", "PRE-SELECT", "VORWAHL"), 9.5.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp, modifier = Modifier.offset(0.dp, 60.dp))
+                    Box(Modifier.fillMaxWidth().height(170.dp)) {
                         val cf = g.preCF == st.handNo; val ca = g.preCall == st.handNo
-                        RoundBtn(60.dp, if (cf) RB_FOLD else RB_DARK, Modifier.offset(22.dp, 96.dp), on = cf, onClick = { g.preCF = if (cf) -1 else st.handNo; if (g.preCF >= 0) g.preCall = -1; g.bump() }) {
-                            T((if (cf) "✓ " else "") + "CHECK\nFOLD", 9.5.sp, Color.White, num = true, maxLines = 2, lineHeight = 11.sp, align = TextAlign.Center)
+                        T(L("PŘEDVOLBA", "PRE-SELECT", "VORWAHL"), 9.5.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp, modifier = Modifier.align(Alignment.BottomEnd).offset(y = (-60).dp))
+                        GBtn(if (cf) BK.FOLD else BK.DARK, Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp).size(70.dp, 54.dp), on = cf, onClick = { g.preCF = if (cf) -1 else st.handNo; if (g.preCF >= 0) g.preCall = -1; g.bump() }) {
+                            T((if (cf) "✓ " else "") + "CHECK\nFOLD", 10.5.sp, Color.White, num = true, maxLines = 2, lineHeight = 12.sp, align = TextAlign.Center)
                         }
-                        RoundBtn(78.dp, if (ca) RB_CALL else RB_DARK, Modifier.offset(94.dp, 80.dp), on = ca, onClick = { g.preCall = if (ca) -1 else st.handNo; if (g.preCall >= 0) g.preCF = -1; g.bump() }) {
+                        GBtn(if (ca) BK.CALL else BK.DARK, Modifier.align(Alignment.BottomEnd).size(86.dp, 54.dp), on = ca, onClick = { g.preCall = if (ca) -1 else st.handNo; if (g.preCall >= 0) g.preCF = -1; g.bump() }) {
                             T((if (ca) "✓ " else "") + "CALL\nANY", 11.sp, Color.White, num = true, maxLines = 2, lineHeight = 13.sp, align = TextAlign.Center)
                         }
+                    }
                     }
                 }
                 return@Column
@@ -871,65 +872,50 @@ private fun ActBox() {
         }
         hc()
         if (undo) ColBtn(tr("↶ Zpět"), BK.DARK, h = 32.dp) { g.undo() }
-        // corner cluster: big CALL in the corner, FOLD beside it, RAISE above it, bet sizes in the free quarter
+        // corner controls
         val (mn, _) = g.minMax(s)
         val canRaise = mx > st.curBet
         LaunchedEffect(k, st.betStreet, st.curBet) { if (g.raiseTo !in mn..mx) g.raiseTo = mn }
         var foldArm by remember(st.handNo, st.betStreet, st.turn) { mutableStateOf(false) }
         LaunchedEffect(foldArm) { if (foldArm) { delay(2500); foldArm = false } }
-        Box(Modifier.fillMaxWidth().height(158.dp)) {
-            if (canRaise) {
-                val pt = g.potTotal()
-                fun pre(f: Double) = (((st.curBet + f * (pt + toCall)) / g.step()).roundToInt() * g.step()).coerceIn(mn, mx)
-                listOf("MIN" to mn, "½ POT" to pre(0.5), "POT" to pre(1.0), "MAX" to mx).forEachIndexed { i, (l, x) ->
-                    val on = g.raiseTo == x
-                    Box(
-                        Modifier.offset(x = (i % 2 * 44).dp, y = (10 + i / 2 * 30).dp).size(40.dp, 26.dp).clip(RoundedCornerShape(99.dp))
-                            .background(if (on) C.gold.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.45f))
-                            .border(1.dp, if (on) C.gold else Color.White.copy(alpha = 0.16f), RoundedCornerShape(99.dp)).tap { g.raiseTo = x; g.bump() },
-                        contentAlignment = Alignment.Center,
-                    ) { T(l, 9.5.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1) }
-                }
-                RoundBtn(26.dp, RB_DARK, Modifier.offset(84.dp, 68.dp), on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) { T("⋯", 13.sp, Color.White, FontWeight.Black, lineHeight = 13.sp) }
-            }
-            RoundBtn(64.dp, RB_RAISE, Modifier.offset(101.dp, 2.dp), enabled = canRaise, onClick = { g.raiseOpen = false; g.heroAction("raise") }) {
-                val to = g.raiseTo.coerceIn(mn, mx)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    T(if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE", 10.5.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1)
-                    T(g.fm(to), 13.sp, C.goldInk, num = true, lineHeight = 14.sp, maxLines = 1)
-                }
-            }
-            RoundBtn(60.dp, if (toCall == 0 && !foldArm) RB_DARK else RB_FOLD, Modifier.offset(22.dp, 96.dp), onClick = {
-                if (toCall == 0 && !foldArm) foldArm = true else g.heroAction("fold")
-            }) { T(if (foldArm) "FOLD?" else "FOLD", 12.sp, Color.White, num = true, maxLines = 1) }
-            RoundBtn(78.dp, RB_CALL, Modifier.offset(94.dp, 80.dp), ring = ring, onClick = { g.heroAction("call") }) {
+        // controls stacked along the corner: CALL in the corner, FOLD (and ⋯) along the bottom edge,
+        // RAISE and the bet sizes up along the right edge
+        Box(Modifier.fillMaxWidth().height(170.dp)) {
+            GBtn(BK.CALL, Modifier.align(Alignment.BottomEnd).size(86.dp, 54.dp), ring = ring, onClick = { g.heroAction("call") }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     when {
-                        toCall == 0 -> T("CHECK", 14.sp, Color.White, num = true, maxLines = 1)
+                        toCall == 0 -> T("CHECK", 15.sp, Color.White, num = true, maxLines = 1)
                         toCall >= s.stack -> { T("ALL-IN", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1); T(g.fm(s.stack), 14.sp, Color.White, num = true, lineHeight = 15.sp, maxLines = 1) }
-                        else -> { T("CALL", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1); T(g.fm(toCall), 15.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1) }
+                        else -> { T("CALL", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1); T(g.fm(toCall), 14.sp, Color.White, num = true, lineHeight = 15.sp, maxLines = 1) }
                     }
                 }
             }
+            GBtn(if (toCall == 0 && !foldArm) BK.DARK else BK.FOLD, Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp).size(70.dp, 54.dp), onClick = {
+                if (toCall == 0 && !foldArm) foldArm = true else g.heroAction("fold")
+            }) { T(if (foldArm) "FOLD?" else "FOLD", 13.sp, Color.White, num = true, maxLines = 1) }
+            GBtn(BK.RAISE, Modifier.align(Alignment.BottomEnd).offset(y = (-58).dp).size(86.dp, 46.dp), enabled = canRaise, onClick = { g.raiseOpen = false; g.heroAction("raise") }) {
+                val to = g.raiseTo.coerceIn(mn, mx)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    T(if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE", 11.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1)
+                    T(g.fm(to), 13.sp, C.goldInk, num = true, lineHeight = 14.sp, maxLines = 1)
+                }
+            }
+            if (canRaise) {
+                val pt = g.potTotal()
+                fun pre(f: Double) = (((st.curBet + f * (pt + toCall)) / g.step()).roundToInt() * g.step()).coerceIn(mn, mx)
+                listOf("MAX" to mx, "POT" to pre(1.0), "½ POT" to pre(0.5), "MIN" to mn).forEachIndexed { i, (l, x) ->
+                    val on = g.raiseTo == x
+                    Box(
+                        Modifier.align(Alignment.BottomEnd).offset(x = (-(i % 2) * 44).dp, y = (-108 - (i / 2) * 30).dp).size(42.dp, 26.dp).clip(RoundedCornerShape(8.dp))
+                            .background(if (on) C.gold.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.45f))
+                            .border(1.dp, if (on) C.gold else Color.White.copy(alpha = 0.16f), RoundedCornerShape(8.dp)).tap { g.raiseTo = x; g.bump() },
+                        contentAlignment = Alignment.Center,
+                    ) { T(l, 9.5.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1) }
+                }
+                GBtn(BK.DARK, Modifier.align(Alignment.BottomEnd).offset(x = (-164).dp).size(34.dp, 54.dp), on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) { T("⋯", 16.sp, Color.White, FontWeight.Black) }
+            }
         }
     }
-}
-
-private val RB_CALL = Color(0xFF3CC982) to Color(0xFF13703F)
-private val RB_FOLD = Color(0xFFE4575A) to Color(0xFF8E1E22)
-private val RB_RAISE = Color(0xFFF7D774) to Color(0xFFC08C1A)
-private val RB_DARK = Color(0xFF34414F) to Color(0xFF141B24)
-
-/** Round action button for the corner cluster. */
-@Composable
-private fun RoundBtn(size: Dp, col: Pair<Color, Color>, modifier: Modifier, enabled: Boolean = true, on: Boolean = false, ring: Color? = null, onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(
-        modifier.size(size).alpha(if (enabled) 1f else 0.38f).shadow(6.dp, CircleShape).clip(CircleShape)
-            .background(Brush.radialGradient(listOf(col.first, col.second), Offset(size.value * 0.35f * LocalDensity.current.density, size.value * 0.3f * LocalDensity.current.density), size.value * 1.1f * LocalDensity.current.density))
-            .border(if (on || ring != null) 3.dp else 1.5.dp, ring ?: if (on) Color.White else Color.White.copy(alpha = 0.3f), CircleShape)
-            .then(if (enabled) Modifier.tap(onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) { content() }
 }
 
 @Composable
