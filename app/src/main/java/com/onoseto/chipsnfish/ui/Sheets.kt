@@ -1105,6 +1105,10 @@ private fun AboutSheet() {
                 "Poker-Helfer und Texas-Hold'em-Spiel. Der Berater-Modus berechnet Chancen, Outs und Bluffs beim Live-Spiel mit Freunden, der Spielmodus ist Training gegen den Computer. Alle Daten bleiben nur auf diesem Gerät."), 13.sp)
         }
     }
+    Label(L("Karty", "Cards", "Karten"))
+    Note(L("Anglické karty: Vector Playing Cards, Byron Knoll (volné dílo). Francouzské karty a ruby: SVG-cards, David Bellot (licence LGPL 2.1, github.com/htdebeer/SVG-cards).",
+        "English cards: Vector Playing Cards by Byron Knoll (public domain). French cards and backs: SVG-cards by David Bellot (LGPL 2.1, github.com/htdebeer/SVG-cards).",
+        "Englische Karten: Vector Playing Cards, Byron Knoll (gemeinfrei). Französische Karten und Rückseiten: SVG-cards, David Bellot (LGPL 2.1, github.com/htdebeer/SVG-cards)."))
     Label(tr("Rybí hlášky"))
     val lines = g.fishLines()
     if (lines.isEmpty()) Note(tr("Ryba mlčí. Přidej jí hlášku."))

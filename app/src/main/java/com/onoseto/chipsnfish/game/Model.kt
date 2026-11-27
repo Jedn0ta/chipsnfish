@@ -157,7 +157,7 @@ data class HandRec(
 data class ChipDef(val k: String, val l: String, val c: Long, var v: Int, var off: Boolean = false)
 
 @Serializable
-data class Look(var felt: String = "blue", var back: String = "cred", var face: String = "picture", var hide: Boolean = false)
+data class Look(var felt: String = "blue", var back: String = "red", var face: String = "picture", var hide: Boolean = false)
 
 @Serializable
 data class GameCfg(

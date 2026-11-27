@@ -5,6 +5,7 @@ package com.onoseto.chipsnfish.ui
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.ColumnScope
@@ -975,11 +976,31 @@ private fun ActBox() {
             GBtn(if (toCall == 0 && !foldArm) BK.DARK else BK.FOLD, Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp).size(70.dp, 54.dp), onClick = {
                 if (toCall == 0 && !foldArm) foldArm = true else g.heroAction("fold")
             }) { T(if (foldArm) "FOLD?" else "FOLD", 13.sp, Color.White, num = true, maxLines = 1) }
-            GBtn(BK.RAISE, Modifier.align(Alignment.BottomEnd).offset(y = (-58).dp).size(86.dp, 46.dp), enabled = canRaise, onClick = { g.raiseOpen = false; g.heroAction("raise") }) {
-                val to = g.raiseTo.coerceIn(mn, mx)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    T(if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE", 11.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1)
-                    T(g.fm(to), 13.sp, C.goldInk, num = true, lineHeight = 14.sp, maxLines = 1)
+            // RAISE: tap = bet, slide up / down = more / less, hold = exact amount
+            Box(Modifier.align(Alignment.BottomEnd).offset(y = (-58).dp).size(86.dp, 46.dp)) {
+                GBtn(BK.RAISE, Modifier.fillMaxSize(), enabled = canRaise, on = g.raiseOpen, onClick = { }) {
+                    val to = g.raiseTo.coerceIn(mn, mx)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        T((if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE") + " ↕", 11.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1)
+                        T(g.fm(to), 14.sp, C.goldInk, num = true, lineHeight = 15.sp, maxLines = 1)
+                    }
+                }
+                if (canRaise) {
+                    val stepPx = with(LocalDensity.current) { 9.dp.toPx() }
+                    Box(Modifier.matchParentSize()
+                        .pointerInput(k, st.betStreet) { detectTapGestures(onTap = { g.raiseOpen = false; g.heroAction("raise") }, onLongPress = { g.heroAction("raiseopen") }) }
+                        .pointerInput(k, st.betStreet) {
+                            var acc = 0f
+                            detectVerticalDragGestures(onDragStart = { acc = 0f }) { ch, dy ->
+                                ch.consume()
+                                acc -= dy
+                                val n = (acc / stepPx).toInt()
+                                if (n != 0) {
+                                    acc -= n * stepPx
+                                    g.raiseTo = (g.raiseTo.coerceIn(mn, mx) + n * st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump()
+                                }
+                            }
+                        })
                 }
             }
             if (canRaise) {
@@ -994,7 +1015,11 @@ private fun ActBox() {
                         contentAlignment = Alignment.Center,
                     ) { T(l, 9.5.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1) }
                 }
-                GBtn(BK.DARK, Modifier.align(Alignment.BottomEnd).offset(x = (-164).dp).size(34.dp, 54.dp), on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) { T("⋯", 16.sp, Color.White, FontWeight.Black) }
+                // fine-tune the bet by one big blind
+                Column(Modifier.align(Alignment.BottomEnd).offset(x = (-164).dp).width(34.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    GBtn(BK.DARK, Modifier.fillMaxWidth().height(26.dp), enabled = g.raiseTo < mx, onClick = { g.raiseTo = (g.raiseTo + st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("+", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
+                    GBtn(BK.DARK, Modifier.fillMaxWidth().height(26.dp), enabled = g.raiseTo > mn, onClick = { g.raiseTo = (g.raiseTo - st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("−", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
+                }
             }
         }
     }

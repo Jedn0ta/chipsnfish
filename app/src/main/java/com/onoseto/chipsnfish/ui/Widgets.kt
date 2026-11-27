@@ -149,7 +149,7 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
     val s = c and 3
     val col = suitColor(s, face)
     val w = cw.value
-    val real = face == "picture"
+    val real = face in CardImg.DECKS
     val shape = RoundedCornerShape(cw * (if (real) 0.08f else 0.13f))
     Box(
         modifier
@@ -160,7 +160,7 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
             .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F3EC), Color(0xFFEDE8DD))))
     ) {
         if (real) {
-            androidx.compose.foundation.Image(CardImg.bitmap(c), null, Modifier.fillMaxSize(),
+            androidx.compose.foundation.Image(CardImg.bitmap(c, face), null, Modifier.fillMaxSize(),
                 contentScale = androidx.compose.ui.layout.ContentScale.FillBounds, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
             return@Box
         }
@@ -185,19 +185,10 @@ fun backCols(back: String): Triple<Color, Color, Color> = when (back) {
 @Composable
 fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifier) {
     watch()
-    val shape = RoundedCornerShape(cw * 0.13f)
-    Box(modifier.size(cw, cw * 1.4f).clip(shape).background(Color.White).padding(maxOf(1.dp, cw * 0.045f)).clip(RoundedCornerShape(cw * 0.1f))) {
-        if (back == "cred" || back == "cblue") {
-            val main = if (back == "cblue") Color(0xFF1C4596) else Color(0xFFB0222B)
-            Canvas(Modifier.fillMaxSize()) { with(CardArt) { classicBack(main) } }
-        } else if (back == "fish") {
-            Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF173A52), Color(0xFF0B1A26)))), contentAlignment = Alignment.Center) {
-                FishLogo(Modifier.size(cw * 0.7f))
-            }
-        } else {
-            val (a, b, t) = backCols(back)
-            Canvas(Modifier.fillMaxSize()) { with(CardArt) { back(a, b, t) } }
-        }
+    val shape = RoundedCornerShape(cw * 0.08f)
+    Box(modifier.size(cw, cw * 1.4f).shadow(cw * 0.06f, shape).clip(shape).background(Color.White).border(0.6.dp, Color(0xFFCFCAC0), shape)) {
+        androidx.compose.foundation.Image(CardImg.back(back), null, Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.FillBounds, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
     }
 }
 
