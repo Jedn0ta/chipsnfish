@@ -996,8 +996,9 @@ private fun ActBox() {
         LaunchedEffect(k, st.betStreet, st.curBet) { if (g.raiseTo !in mn..mx) g.raiseTo = mn }
         var foldArm by remember(st.handNo, st.betStreet, st.turn) { mutableStateOf(false) }
         LaunchedEffect(foldArm) { if (foldArm) { delay(2500); foldArm = false } }
-        // controls stacked along the corner: CALL in the corner, FOLD (and ⋯) along the bottom edge,
-        // RAISE and the bet sizes up along the right edge
+        // corner controls: CALL in the corner, RAISE beside it on the bottom edge (slide it up for more),
+        // FOLD above CALL. Bet sizes appear only after tapping RAISE.
+        var betOpen by remember(k, st.handNo, st.betStreet) { mutableStateOf(false) }
         Box(Modifier.fillMaxWidth().height(170.dp)) {
             GBtn(BK.CALL, Modifier.align(Alignment.BottomEnd).size(86.dp, 54.dp), ring = ring, onClick = { g.heroAction("call") }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1008,25 +1009,30 @@ private fun ActBox() {
                     }
                 }
             }
-            GBtn(if (toCall == 0 && !foldArm) BK.DARK else BK.FOLD, Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp).size(70.dp, 54.dp), onClick = {
+            GBtn(if (toCall == 0 && !foldArm) BK.DARK else BK.FOLD, Modifier.align(Alignment.BottomEnd).offset(y = (-58).dp).size(86.dp, 44.dp), onClick = {
                 if (toCall == 0 && !foldArm) foldArm = true else g.heroAction("fold")
             }) { T(if (foldArm) "FOLD?" else "FOLD", 13.sp, Color.White, num = true, maxLines = 1) }
-            // RAISE: tap = bet, slide up / down = more / less, hold = exact amount
-            Box(Modifier.align(Alignment.BottomEnd).offset(y = (-58).dp).size(86.dp, 46.dp)) {
-                GBtn(BK.RAISE, Modifier.fillMaxSize(), enabled = canRaise, on = g.raiseOpen, onClick = { }) {
+            // RAISE: first tap shows the sizes, next tap bets; slide up / down = more / less; hold = exact amount
+            Box(Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp).size(82.dp, 54.dp)) {
+                GBtn(BK.RAISE, Modifier.fillMaxSize(), enabled = canRaise, on = betOpen, onClick = { }) {
                     val to = g.raiseTo.coerceIn(mn, mx)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         T((if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE") + " ↕", 11.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1)
-                        T(g.fm(to), 14.sp, C.goldInk, num = true, lineHeight = 15.sp, maxLines = 1)
+                        T(g.fm(to), 15.sp, C.goldInk, num = true, lineHeight = 16.sp, maxLines = 1)
                     }
                 }
                 if (canRaise) {
                     val stepPx = with(LocalDensity.current) { 9.dp.toPx() }
                     Box(Modifier.matchParentSize()
-                        .pointerInput(k, st.betStreet) { detectTapGestures(onTap = { g.raiseOpen = false; g.heroAction("raise") }, onLongPress = { g.heroAction("raiseopen") }) }
+                        .pointerInput(k, st.betStreet) {
+                            detectTapGestures(
+                                onTap = { if (!betOpen) betOpen = true else { betOpen = false; g.raiseOpen = false; g.heroAction("raise") } },
+                                onLongPress = { g.heroAction("raiseopen") },
+                            )
+                        }
                         .pointerInput(k, st.betStreet) {
                             var acc = 0f
-                            detectVerticalDragGestures(onDragStart = { acc = 0f }) { ch, dy ->
+                            detectVerticalDragGestures(onDragStart = { acc = 0f; betOpen = true }) { ch, dy ->
                                 ch.consume()
                                 acc -= dy
                                 val n = (acc / stepPx).toInt()
@@ -1038,22 +1044,31 @@ private fun ActBox() {
                         })
                 }
             }
-            if (canRaise) {
+            // bet sizes, shown above RAISE once it was tapped
+            if (canRaise && betOpen) {
                 val pt = g.potTotal()
                 fun pre(f: Double) = (((st.curBet + f * (pt + toCall)) / g.step()).roundToInt() * g.step()).coerceIn(mn, mx)
-                listOf("MAX" to mx, "POT" to pre(1.0), "½ POT" to pre(0.5), "MIN" to mn).forEachIndexed { i, (l, x) ->
-                    val on = g.raiseTo == x
-                    Box(
-                        Modifier.align(Alignment.BottomEnd).offset(x = (-(i % 2) * 44).dp, y = (-108 - (i / 2) * 30).dp).size(42.dp, 26.dp).clip(RoundedCornerShape(8.dp))
-                            .background(if (on) C.gold.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.45f))
-                            .border(1.dp, if (on) C.gold else Color.White.copy(alpha = 0.16f), RoundedCornerShape(8.dp)).tap { g.raiseTo = x; g.bump() },
-                        contentAlignment = Alignment.Center,
-                    ) { T(l, 9.5.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1) }
-                }
-                // fine-tune the bet by one big blind
-                Column(Modifier.align(Alignment.BottomEnd).offset(x = (-164).dp).width(34.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    GBtn(BK.DARK, Modifier.fillMaxWidth().height(26.dp), enabled = g.raiseTo < mx, onClick = { g.raiseTo = (g.raiseTo + st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("+", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
-                    GBtn(BK.DARK, Modifier.fillMaxWidth().height(26.dp), enabled = g.raiseTo > mn, onClick = { g.raiseTo = (g.raiseTo - st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("−", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
+                Column(
+                    Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp, y = (-58).dp).width(82.dp).clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xE60E1622)).border(1.dp, C.gold.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(3.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    listOf(listOf("MIN" to mn, "½" to pre(0.5)), listOf("POT" to pre(1.0), "MAX" to mx)).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            row.forEach { (l, x) ->
+                                val on = g.raiseTo == x
+                                Box(
+                                    Modifier.weight(1f).height(26.dp).clip(RoundedCornerShape(7.dp)).background(if (on) C.gold.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.07f))
+                                        .border(1.dp, if (on) C.gold else Color.White.copy(alpha = 0.14f), RoundedCornerShape(7.dp)).tap { g.raiseTo = x; g.bump() },
+                                    contentAlignment = Alignment.Center,
+                                ) { T(l, 10.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1) }
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        GBtn(BK.DARK, Modifier.weight(1f).height(26.dp), enabled = g.raiseTo > mn, onClick = { g.raiseTo = (g.raiseTo - st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("−", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
+                        GBtn(BK.DARK, Modifier.weight(1f).height(26.dp), enabled = g.raiseTo < mx, onClick = { g.raiseTo = (g.raiseTo + st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("+", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
+                    }
                 }
             }
         }
