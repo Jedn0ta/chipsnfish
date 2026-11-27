@@ -1106,8 +1106,8 @@ private fun AboutSheet() {
         }
     }
     Label(L("Karty", "Cards", "Karten"))
-    Note(L("Anglické karty: Vector Playing Cards, Byron Knoll (volné dílo). Francouzské karty a ruby: SVG-cards, David Bellot (licence LGPL 2.1, github.com/htdebeer/SVG-cards).",
-        "English cards: Vector Playing Cards by Byron Knoll (public domain). French cards and backs: SVG-cards by David Bellot (LGPL 2.1, github.com/htdebeer/SVG-cards).",
+    Note(L("Anglické karty: Vector Playing Cards, Byron Knoll (volné dílo). Francouzské karty a ruby: SVG-cards, David Bellot (licence LGPL 2.1, github.com/htdebeer/SVG-cards). Kasino karty a ruby: Public Domain and CC0 Playing Cards (CC0).",
+        "English cards: Vector Playing Cards by Byron Knoll (public domain). French cards and backs: SVG-cards by David Bellot (LGPL 2.1, github.com/htdebeer/SVG-cards). Casino cards and backs: Public Domain and CC0 Playing Cards (CC0).",
         "Englische Karten: Vector Playing Cards, Byron Knoll (gemeinfrei). Französische Karten und Rückseiten: SVG-cards, David Bellot (LGPL 2.1, github.com/htdebeer/SVG-cards)."))
     Label(tr("Rybí hlášky"))
     val lines = g.fishLines()

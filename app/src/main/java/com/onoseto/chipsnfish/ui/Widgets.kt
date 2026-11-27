@@ -185,10 +185,28 @@ fun backCols(back: String): Triple<Color, Color, Color> = when (back) {
 @Composable
 fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifier) {
     watch()
-    val shape = RoundedCornerShape(cw * 0.08f)
-    Box(modifier.size(cw, cw * 1.4f).shadow(cw * 0.06f, shape).clip(shape).background(Color.White).border(0.6.dp, Color(0xFFCFCAC0), shape)) {
-        androidx.compose.foundation.Image(CardImg.back(back), null, Modifier.fillMaxSize(),
-            contentScale = androidx.compose.ui.layout.ContentScale.FillBounds, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
+    CardImg.BACKS[back]?.let { id ->
+        // real artwork
+        val shape = RoundedCornerShape(cw * 0.08f)
+        Box(modifier.size(cw, cw * 1.4f).shadow(cw * 0.06f, shape).clip(shape).background(Color.White).border(0.6.dp, Color(0xFFCFCAC0), shape)) {
+            androidx.compose.foundation.Image(CardImg.res(id), null, Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds, filterQuality = androidx.compose.ui.graphics.FilterQuality.High)
+        }
+        return
+    }
+    val shape = RoundedCornerShape(cw * 0.13f)
+    Box(modifier.size(cw, cw * 1.4f).clip(shape).background(Color.White).padding(maxOf(1.dp, cw * 0.045f)).clip(RoundedCornerShape(cw * 0.1f))) {
+        if (back == "cred" || back == "cblue") {
+            val main = if (back == "cblue") Color(0xFF1C4596) else Color(0xFFB0222B)
+            Canvas(Modifier.fillMaxSize()) { with(CardArt) { classicBack(main) } }
+        } else if (back == "fish") {
+            Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF173A52), Color(0xFF0B1A26)))), contentAlignment = Alignment.Center) {
+                FishLogo(Modifier.size(cw * 0.7f))
+            }
+        } else {
+            val (a, b, t) = backCols(back)
+            Canvas(Modifier.fillMaxSize()) { with(CardArt) { back(a, b, t) } }
+        }
     }
 }
 

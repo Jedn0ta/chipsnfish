@@ -51,8 +51,9 @@ object C {
         "black" to listOf(0xFF44494F, 0xFF26292D, 0xFF121416, 0xFF050607),
     )
     val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Vínová", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
-    val BACKS = linkedMapOf("red" to "Červený", "blue" to "Modrý", "green" to "Zelený", "black" to "Černý", "maroon" to "Vínový", "navy" to "Tmavě modrý")
-    val FACES = linkedMapOf("picture" to "Anglické", "french" to "Francouzské")
+    /** One colour per design – what differs is the pattern. */
+    val BACKS = linkedMapOf("b_lattice" to "Mřížka", "b_rosette" to "Rozeta", "b_red" to "Tečky", "cred" to "Medailony", "red" to "Diamant", "fish" to "Rybí")
+    val FACES = linkedMapOf("casino" to "Kasino", "picture" to "Anglické", "french" to "Francouzské", "classic" to "Velké indexy", "jumbo" to "Extra velké", "four" to "Čtyřbarevné")
 
     /** Suggested table colours: hue, intensity (0 = charcoal). */
     val FELT_PRESETS = listOf(150f to 1f, 213f to 1f, 350f to 1f, 268f to 1f, 41f to 1f, 213f to 0f)

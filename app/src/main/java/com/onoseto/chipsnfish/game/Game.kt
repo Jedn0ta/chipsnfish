@@ -137,9 +137,12 @@ object Game {
         H = runCatching { json.decodeFromString<MutableList<HandRec>>(getS("hr3-hands") ?: "[]") }.getOrNull() ?: mutableListOf()
         G = runCatching { json.decodeFromString<MutableList<GameRec>>(getS("hr7-games") ?: "[]") }.getOrNull() ?: mutableListOf()
         look = runCatching { json.decodeFromString<Look>(getS("hr-look") ?: "{}") }.getOrNull() ?: Look()
-        // only real card artwork now: map older choices onto it
-        if (look.face !in setOf("picture", "french")) look.face = "picture"
-        look.back = when (look.back) { "cred" -> "red"; "cblue" -> "blue"; in setOf("red", "blue", "green", "black", "maroon", "navy") -> look.back; else -> "red" }
+        if (look.face !in com.onoseto.chipsnfish.ui.C.FACES) look.face = "picture"
+        look.back = when (look.back) {
+            in com.onoseto.chipsnfish.ui.C.BACKS -> look.back
+            "cblue" -> "cred"; "blue", "green", "black", "gold" -> "red"
+            else -> "b_lattice"
+        }
         zoom = getS("hr4-zoom")?.toDoubleOrNull() ?: 1.0
         layouts = runCatching { json.decodeFromString<MutableMap<String, List<Double>>>(getS("hr4-layouts") ?: "{}") }.getOrNull() ?: mutableMapOf()
         gameCfg = runCatching { json.decodeFromString<GameCfg>(getS("hr6-cfg") ?: "{}") }.getOrNull() ?: GameCfg()
