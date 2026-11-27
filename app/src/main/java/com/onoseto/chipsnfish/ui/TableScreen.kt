@@ -112,7 +112,7 @@ class Geo(val w: Float, val h: Float, n: Int, zoom: Double, playing: Boolean) {
         val per0 = 2 * (w + h)
         var ss = min(1f, (per0 * 0.62f) / (max(1, n) * 150 * sc0))
         ss = max(0.7f, ss)
-        val rcol = 112f
+        val rcol = 138f
         val cardW = 150 * sc0 * ss
         val cardH = 66 * sc0 * ss
         x0 = cardW / 2 + 4; x1 = w - rcol - cardW / 2 - 2
@@ -327,18 +327,18 @@ fun TableView() {
         // emoji bubbles, flying drinks, emoji/drink panel
         SocialFx(geo, w, h)
         if (com.onoseto.chipsnfish.online.Social.available()) {
-            SocialBtn(Modifier.align(Alignment.BottomStart).padding(start = 2.dp, bottom = if (playing && Game.advisorOn()) 46.dp else 2.dp).zIndex(7f))
-            if (com.onoseto.chipsnfish.online.Social.open) Box(Modifier.align(Alignment.BottomStart).padding(start = 46.dp, bottom = 2.dp).zIndex(21f)) { SocialPop() }
+            SocialBtn(Modifier.align(Alignment.TopStart).padding(start = 2.dp, top = 2.dp).zIndex(7f))
+            if (com.onoseto.chipsnfish.online.Social.open) Box(Modifier.align(Alignment.TopStart).padding(start = 46.dp, top = 2.dp).zIndex(21f)) { SocialPop() }
         }
         // right column
-        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(90.dp).zIndex(8f)) { ActBox() }
-        if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 96.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
+        Box(Modifier.align(Alignment.BottomEnd).padding(end = 0.dp, bottom = 0.dp).width(116.dp).zIndex(8f)) { ActBox() }
+        if (playing && Game.raiseOpen && st.turn >= 0) Box(Modifier.align(Alignment.BottomEnd).padding(end = 122.dp, bottom = 2.dp).width(360.dp).zIndex(9f)) { RaisePop() }
         // beginner coach (practice game)
         if (playing && Game.bot() && Game.gameCfg.coach) Box(Modifier.align(Alignment.BottomStart).padding(start = 46.dp, bottom = 2.dp).zIndex(7f)) { CoachPanel() }
         // advisor
         if (playing && Game.advisorOn()) {
             Box(
-                Modifier.align(Alignment.BottomStart).padding(2.dp).size(40.dp).zIndex(7f).clip(RoundedCornerShape(10.dp))
+                Modifier.align(Alignment.TopStart).padding(start = 2.dp, top = if (com.onoseto.chipsnfish.online.Social.available()) 48.dp else 2.dp).size(40.dp).zIndex(7f).clip(RoundedCornerShape(10.dp))
                     .background(C.panel.copy(alpha = 0.92f)).border(1.dp, C.line, RoundedCornerShape(10.dp))
                     .tap {
                         Game.ensureEq()
@@ -376,14 +376,18 @@ private fun Center(geo: Geo) {
             val scl = min(1f, (geo.x1 - geo.x0 - 30) / (5 * geo.cw + 24 + 10))
             Column(Modifier.graphicsLayer(scaleX = scl, scaleY = scl), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val pm = Game.potMiddle(); val tot = Game.potTotal()
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     Modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.42f)).border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ChipPile(pm, 3, 14.dp)
+                    ChipPile(pm, 5, 18.dp)
                     T("POT", 11.sp, Color.White.copy(alpha = 0.6f), FontWeight.ExtraBold, letter = 1.3.sp)
                     T(Game.fm(pm), 21.sp, C.gold, num = true)
                     if (tot > pm && pm > 0) T(L("celkem ", "total ", "gesamt ") + Game.fm(tot), 11.sp, Color.White.copy(alpha = 0.6f), FontWeight.SemiBold)
+                }
+                // whose turn it is, right next to the pot
+                if (st.done == null && st.turn >= 0 && st.over == null) TurnWho(st.turn)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in 2..6) {
@@ -775,7 +779,6 @@ private fun ActBox() {
         if (g.gm()) {
             if (st.turn != 0) {
                 hc()
-                TurnWho(st.turn)
                 ColBtn(if (st.curBet > 0) "RAISE" else "BET", BK.RAISE, enabled = false) {}
                 ColBtn(if (st.curBet > st.seats[0].bet) "CALL" else "CHECK", BK.CALL, enabled = false) {}
                 val me = st.seats[0]
@@ -823,7 +826,6 @@ private fun ActBox() {
         }
         hc()
         if (undo) ColBtn(tr("↶ Zpět"), BK.DARK, h = 32.dp) { g.undo() }
-        TurnWho(k)
         GBtn(BK.RAISE, Modifier.fillMaxWidth().height(48.dp), enabled = mx > st.curBet, on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) {
             T(if (st.curBet == 0) "BET" else "RAISE", 15.sp, C.goldInk, num = true, letter = 0.5.sp, maxLines = 1, fit = true)
         }
@@ -857,17 +859,17 @@ private fun ColBtn(text: String, kind: BK, h: Dp = 50.dp, enabled: Boolean = tru
 private fun TurnWho(k: Int) {
     watch()
     val me = k == 0
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (me) C.gold.copy(alpha = 0.08f) else C.panel)
-            .border(1.dp, if (me) C.gold.copy(alpha = 0.6f) else C.line, RoundedCornerShape(10.dp)).padding(vertical = 3.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        Modifier.height(30.dp).clip(RoundedCornerShape(99.dp)).background(if (me) C.gold.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.35f))
+            .border(1.dp, if (me) C.gold.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.12f), RoundedCornerShape(99.dp)).padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
     ) {
-        T(tr(if (me) "Na tahu jsi" else "Na tahu").uppercase(), 9.5.sp, C.muted, FontWeight.ExtraBold, letter = 1.sp, maxLines = 1)
-        if (k >= 0) T(if (me) tr("Ty").uppercase() else Game.pl(Game.st.seats[k]).name, 17.sp, C.gold, num = true, maxLines = 1)
-        else T("…", 17.sp, C.gold, num = true)
+        val name = if (k < 0) "…" else if (me) tr("Ty").uppercase() else Game.pl(Game.st.seats[k]).name
+        if (!me) T(L("NA TAHU", "TO ACT", "AM ZUG"), 10.sp, Color.White.copy(alpha = 0.55f), FontWeight.ExtraBold, letter = 1.sp, maxLines = 1)
+        T(if (me) L("HRAJEŠ TY", "YOUR TURN", "DU BIST DRAN") else name, 15.sp, C.gold, num = true, maxLines = 1)
         if (k >= 0 && Game.online()) {
             val left = secondsLeft(Game.st.turnAt)
-            if (left <= 30) T(L("zbývá ${left}s", "${left}s left", "noch ${left}s"), 11.sp, if (left <= 10) C.lose else C.muted, FontWeight.Bold)
+            if (left <= 30) T("${left}s", 11.sp, if (left <= 10) C.lose else C.muted, FontWeight.Bold)
         }
     }
 }
@@ -877,7 +879,7 @@ private fun MyCards() {
     watch()
     val g = Game
     val st = g.st
-    val cw = 56.dp
+    val cw = 70.dp
     val both = !st.hero.contains(null)
     val nx = g.firstEmpty()
     val folded = st.seats[0].folded
@@ -889,13 +891,14 @@ private fun MyCards() {
         if (eq != null && !folded && g.advisorOn()) e = " · ${((if (eq.allFolded) 1.0 else eq.eq) * 100).roundToInt()} %"
         I18n.cat(Cards.CAT[c] + " " + Cards.rl((sc shr 16) and 15)) + e
     } else if (st.hero.any { it != null }) tr("vyber druhou kartu") else tr("vyber své karty")
-    Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.TopEnd) {
+    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.wrapContentSize(Alignment.TopEnd, unbounded = true).requiredWidth(cw * 2 + 4.dp).alpha(if (folded && g.playing()) 0.45f else 1f),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
+            Modifier.fillMaxWidth().alpha(if (folded && g.playing()) 0.45f else 1f),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                for (i in 0..1) {
+            // the two hole cards held as a small fan
+            Box(Modifier.size(116.dp, cw * 1.4f + 4.dp)) {
+                for (i in 0..1) Box(Modifier.align(if (i == 0) Alignment.TopStart else Alignment.TopEnd).padding(top = if (i == 0) 3.dp else 0.dp).rotate(if (i == 0) -4f else 4f)) {
                     val c = st.hero[i]
                     when {
                         c == null -> CardSlot(cw, "+", next = nx == i, modifier = Modifier.tap { openCardSlot(i) })
@@ -1115,7 +1118,6 @@ private fun OnlineBox(): Boolean {
             T("👀 " + L("Sleduješ hru", "Watching", "Du schaust zu"), 12.sp, C.ink, FontWeight.ExtraBold, align = TextAlign.Center, maxLines = 1, fit = true)
             T(L("vypadl jsi · ve hře ještě $left", "you're out · $left still in", "du bist raus · noch $left im Spiel"), 10.5.sp, C.muted, align = TextAlign.Center)
         }
-        if (st.done == null && st.turn >= 0) TurnWho(st.turn)
         if (st.done != null && O.isHost) ColBtn(tr("Další hand") + " ▶", BK.RAISE, h = 52.dp, enabled = !O.busy) { O.next() }
         ColBtn(L("Opustit stůl", "Leave table", "Tisch verlassen"), BK.DARK, h = 40.dp) { leave() }
         return true

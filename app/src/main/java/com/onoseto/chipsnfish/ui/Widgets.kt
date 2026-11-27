@@ -150,12 +150,12 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
     val col = suitColor(s, face)
     val w = cw.value
     val real = face == "picture"
-    val shape = RoundedCornerShape(cw * (if (real) 0.06f else 0.13f))
+    val shape = RoundedCornerShape(cw * (if (real) 0.08f else 0.13f))
     Box(
         modifier
             .size(cw, cw * 1.4f)
             .shadow(cw * 0.1f, shape, ambientColor = Color.Black, spotColor = Color.Black)
-            .then(if (glow) Modifier.border(2.dp, C.gold.copy(alpha = 0.8f), shape) else if (real) Modifier else Modifier.border(0.6.dp, Color(0xFFCFCAC0), shape))
+            .then(if (glow) Modifier.border(2.dp, C.gold.copy(alpha = 0.8f), shape) else Modifier.border(0.6.dp, Color(0xFFCFCAC0), shape))
             .clip(shape)
             .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F3EC), Color(0xFFEDE8DD))))
     ) {
