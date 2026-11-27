@@ -784,18 +784,21 @@ private fun SettingsSheet(d: SettingsArg) {
     val g = Game
     val st = g.st
     val ctx = LocalContext.current
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        T(tr("Nastavení").uppercase(), 24.sp, num = true)
-        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("game" to "Hra", "chips" to "Žetony", "table" to "Stůl", "data" to "Já a data", "lang" to "Jazyk", "update" to "Aktualizace").filter { (it.first != "game" || g.gm()) }.forEach { (k, l) ->
-                val on = d.tab == k
-                Box(Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) C.ink else Color.Transparent).border(1.dp, if (on) C.ink else C.line, RoundedCornerShape(99.dp)).tap { d.tab = k; Ui.redraw() }.padding(horizontal = 11.dp, vertical = 5.dp)) {
-                    T(tr(l), 12.5.sp, if (on) C.room else C.muted, FontWeight.Bold)
-                }
-            }
-        }
-        Spacer(Modifier.width(36.dp))
+    if (d.tab == "chips" || d.tab == "table") d.tab = "look"
+    if (d.tab == "lang") d.tab = "game"
+    if (d.tab == "game" && !g.gm() && !g.online() && !g.playing()) d.tab = "look"
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    // left: setting groups as small glass cards (same style as the lobby buttons)
+    Column(Modifier.width(168.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        T(L("Nastavení", "Settings", "Einstellungen"), 22.sp, Color.White, FontWeight.ExtraBold)
+        listOf(
+            Triple("game", L("Hra", "Game", "Spiel"), L("rádce, nová hra", "coach, new game", "Coach, neues Spiel")),
+            Triple("look", L("Stůl a žetony", "Table & chips", "Tisch & Chips"), L("barvy, karty, hodnoty", "colours, cards, values", "Farben, Karten, Werte")),
+            Triple("data", L("Já a data", "Me & data", "Ich & Daten"), L("profil, záloha", "profile, backup", "Profil, Backup")),
+            Triple("update", L("Aktualizace", "Updates", "Updates"), L("nová verze", "new version", "neue Version")),
+        ).forEach { (k, l, sub) -> SettingsTabCard(l, sub, d.tab == k) { d.tab = k; Ui.redraw() } }
     }
+    Column(Modifier.weight(1f).padding(top = 4.dp, end = 30.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     when (d.tab) {
         "game" -> {
             if (g.online()) OnlineSettingsGame()
@@ -864,21 +867,7 @@ private fun SettingsSheet(d: SettingsArg) {
                 Note(tr("Restart vrátí žetony na start a blindy na první úroveň. Hráči a záznam hand zůstanou."))
             }
         }
-        "chips" -> {
-            Note(tr("Hodnoty podle vaší sady. Co nemáte, zaškrtni „Nepoužívat“. Měnit můžeš kdykoli, i během hry."))
-            g.chips.forEach { c ->
-                var v by remember(c.k) { mutableStateOf(c.v.toString()) }
-                Row(Modifier.fillMaxWidth().height(44.dp).alpha(if (c.off) 0.55f else 1f).clip(RoundedCornerShape(10.dp)).background(C.panel2).padding(horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ChipIcon(c, 28.dp)
-                    T(tr(c.l), 14.sp, weight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Checkbox(c.off, { c.off = it; g.saveChips(); g.bump(); Ui.redraw() }, colors = CheckboxDefaults.colors(checkedColor = C.gold, checkmarkColor = C.goldInk))
-                    T(tr("Nepoužívat"), 12.5.sp, C.muted)
-                    Field(v, { t -> v = t.filter { it.isDigit() }.take(6); v.toIntOrNull()?.let { if (it >= 1) { c.v = it; g.saveChips(); g.bump() } } }, Modifier.width(96.dp), number = true, big = true, minH = 36.dp)
-                }
-            }
-        }
-        "table" -> {
+        "look" -> {
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Label(tr("Barva stolu"))
@@ -911,6 +900,24 @@ private fun SettingsSheet(d: SettingsArg) {
                     Label(tr("Rozmístění u stolu"))
                     Note(L("Hráče i sebe posuneš tažením podél okraje stolu, umístění se uloží samo.", "Drag players (and yourself) along the table edge; positions save automatically.", "Spieler am Tischrand entlang ziehen; Positionen werden gespeichert."))
                     Btn(tr("Obnovit výchozí rozmístění"), BK.GHOST, Modifier.fillMaxWidth(), height = 38.dp) { st.pos = g.defaultPos(st.n); g.saveLayout(); Ui.close(); g.update(); g.toast(tr("Rozmístění obnoveno")) }
+                }
+            }
+            Label(L("Žetony · hodnoty podle vaší sady", "Chips · values of your set", "Chips · Werte eures Sets"))
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                g.chips.forEach { c ->
+                    var v by remember(c.k) { mutableStateOf(c.v.toString()) }
+                    Column(
+                        Modifier.width(128.dp).alpha(if (c.off) 0.5f else 1f).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 5.dp, bottomEnd = 18.dp, bottomStart = 5.dp))
+                            .background(Color.White.copy(alpha = 0.07f)).border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(topStart = 18.dp, topEnd = 5.dp, bottomEnd = 18.dp, bottomStart = 5.dp)).padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            ChipIcon(c, 24.dp)
+                            T(tr(c.l), 12.5.sp, Color.White, FontWeight.Bold, maxLines = 1, fit = true, modifier = Modifier.weight(1f))
+                        }
+                        Field(v, { t -> v = t.filter { it.isDigit() }.take(6); v.toIntOrNull()?.let { if (it >= 1) { c.v = it; g.saveChips(); g.bump() } } }, Modifier.fillMaxWidth(), number = true, big = true, minH = 34.dp)
+                        SmallPill(if (c.off) L("Nepoužívat ✓", "Not used ✓", "Nicht genutzt ✓") else L("Používat", "In use", "In Benutzung"), !c.off) { c.off = !c.off; g.saveChips(); g.bump(); Ui.redraw() }
+                    }
                 }
             }
         }
@@ -972,18 +979,28 @@ private fun SettingsSheet(d: SettingsArg) {
             }
         }
 
-        "update" -> UpdateTab()
-        else -> {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(Triple("cs", "Čeština", "CZ"), Triple("en", "English", "EN"), Triple("de", "Deutsch", "DE")).forEach { (c, l, f) ->
-                    val on = I18n.lang == c
-                    Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(if (on) C.gold else C.panel2).border(1.dp, if (on) C.gold else C.line, RoundedCornerShape(12.dp)).tap { g.setLang(c); Ui.redraw() }.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        T(f, 26.sp, if (on) C.goldInk else C.ink, num = true)
-                        T(l, 14.sp, if (on) C.goldInk else C.muted, FontWeight.Bold)
-                    }
-                }
-            }
+        else -> UpdateTab()
+    }
+    }
+    }
+}
+
+/** A small glass card in the settings menu (same look as the lobby buttons, smaller). */
+@Composable
+private fun SettingsTabCard(title: String, sub: String, on: Boolean, onClick: () -> Unit) {
+    watch()
+    val sh = RoundedCornerShape(topStart = 18.dp, topEnd = 5.dp, bottomEnd = 18.dp, bottomStart = 5.dp)
+    Row(
+        Modifier.fillMaxWidth().height(48.dp)
+            .glass(sh, if (on) Color(0x552F7BFF) else Color(0x2A2A5CA8), lift = 6.dp)
+            .then(if (on) Modifier.border(1.5.dp, androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF9AD6FF), Color(0xFF2F7BFF))), sh) else Modifier)
+            .tap(onClick).padding(start = 12.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.width(3.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(if (on) LobbyBlue else Color.White.copy(alpha = 0.22f)))
+        Column(Modifier.weight(1f)) {
+            T(title, 14.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true, lineHeight = 16.sp)
+            T(sub, 10.sp, if (on) LobbyBlue else Color.White.copy(alpha = 0.55f), FontWeight.SemiBold, maxLines = 1, fit = true, lineHeight = 12.sp)
         }
     }
 }
