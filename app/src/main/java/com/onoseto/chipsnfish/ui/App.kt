@@ -86,9 +86,11 @@ fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
     @Suppress("UNUSED_VARIABLE") val rev = Game.rev
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
         val scale = min(constraints.maxWidth / DW, constraints.maxHeight / DH)
-        CompositionLocalProvider(LocalDensity provides Density(scale, 1f)) {
+        val bd = rememberBackdrop()
+        CompositionLocalProvider(LocalDensity provides Density(scale, 1f), LocalBackdrop provides bd) {
             Box(
-                Modifier.size(DW.dp, DH.dp).background(Brush.radialGradient(listOf(C.room2, C.room), Offset(DW * scale * 0.4f, DH * scale * 0.45f), DW * scale * 0.7f)),
+                Modifier.size(DW.dp, DH.dp).background(Brush.radialGradient(listOf(C.room2, C.room), Offset(DW * scale * 0.4f, DH * scale * 0.45f), DW * scale * 0.7f))
+                    .onGloballyPositioned { bd.origin = it.positionInRoot(); bd.size = it.size },
             ) {
                 if (!Ui.splash) MainLayout()
                 if (Ui.menu && !Ui.splash) MenuScreen(onExit)
@@ -133,6 +135,8 @@ fun AppRoot(onExit: () -> Unit, setKeepOn: (Boolean) -> Unit) {
 @Composable
 private fun MainLayout() {
     watch()
+    Box(Modifier.fillMaxSize()) {
+    if (Ui.view != "table") LobbyBackground()
     Column(Modifier.fillMaxSize()) {
         TopBar()
         Box(Modifier.fillMaxWidth().weight(1f)) {
@@ -142,6 +146,7 @@ private fun MainLayout() {
                 else -> TableView()
             }
         }
+    }
     }
 }
 
@@ -304,40 +309,6 @@ private fun BlindGroup() {
 
 // ---------------- lobby ----------------
 
-/** The lobby picture and where it sits on screen, so glass panels can show it blurred behind them. */
-private class Backdrop(val img: androidx.compose.ui.graphics.ImageBitmap) {
-    var origin by mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
-    var size by mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
-}
-private val LocalBackdrop = androidx.compose.runtime.staticCompositionLocalOf<Backdrop?> { null }
-
-/** Frosted glass: the blurred lobby behind, a light sheen and a thin bright edge. */
-private fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape, tint: Color = Color(0x2A2A5CA8), lift: androidx.compose.ui.unit.Dp = 14.dp): Modifier = composed {
-    val bd = LocalBackdrop.current
-    var pos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-    this
-        .onGloballyPositioned { pos = it.positionInRoot() }
-        .shadow(lift, shape, ambientColor = Color(0xFF020814), spotColor = Color(0xFF000000))
-        .clip(shape)
-        .drawBehind {
-            if (bd != null && bd.size.width > 0) {
-                val iw = bd.img.width; val ih = bd.img.height
-                val sc = kotlin.math.max(bd.size.width / iw.toFloat(), bd.size.height / ih.toFloat())
-                val dw = iw * sc; val dh = ih * sc
-                val ox = bd.origin.x + (bd.size.width - dw) / 2 - pos.x
-                val oy = bd.origin.y + (bd.size.height - dh) / 2 - pos.y
-                drawImage(bd.img, androidx.compose.ui.unit.IntOffset.Zero, androidx.compose.ui.unit.IntSize(iw, ih),
-                    androidx.compose.ui.unit.IntOffset(ox.toInt(), oy.toInt()), androidx.compose.ui.unit.IntSize(dw.toInt(), dh.toInt()))
-            }
-            drawRect(tint)
-            drawRect(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.03f), Color.White.copy(alpha = 0.07f)),
-                start = androidx.compose.ui.geometry.Offset.Zero, end = androidx.compose.ui.geometry.Offset(size.width, size.height)))
-        }
-        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0.06f), Color(0x667FC4FF))), shape)
-}
-
-private val LobbyBlue = Color(0xFF7FC4FF)
-
 @Composable
 private fun MenuScreen(onExit: () -> Unit) {
     watch()
@@ -345,17 +316,8 @@ private fun MenuScreen(onExit: () -> Unit) {
     val O = com.onoseto.chipsnfish.online.Online
     val gs = g.gameSaved()
     val gOn = gs != null && gs.over == null
-    val blur = androidx.compose.ui.graphics.ImageBitmap.imageResource(com.onoseto.chipsnfish.R.drawable.lobby_bg_blur)
-    val bd = remember(blur) { Backdrop(blur) }
-    androidx.compose.runtime.CompositionLocalProvider(LocalBackdrop provides bd) {
-    Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }
-        .onGloballyPositioned { bd.origin = it.positionInRoot(); bd.size = it.size }) {
-        androidx.compose.foundation.Image(
-            androidx.compose.ui.res.painterResource(com.onoseto.chipsnfish.R.drawable.lobby_bg), null,
-            Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-        )
-        LobbyBokeh()
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0x99030814), 0.35f to Color.Transparent, 1f to Color(0xCC030814))))
+    Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }) {
+        LobbyBackground()
         // top bar
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FishLogo(Modifier.size(32.dp))
@@ -364,6 +326,7 @@ private fun MenuScreen(onExit: () -> Unit) {
                 T("CHIPS&FISH", 22.sp, Color.White, num = true, letter = 1.5.sp, lineHeight = 24.sp)
             }
             Spacer(Modifier.weight(1f))
+            OnlinePill()
             LobbyWallet()
             LobbyIconBtn("gear") { Ui.openSettings() }
             LobbyIconBtn("power") { g.saveLocal(); onExit() }
@@ -405,22 +368,21 @@ private fun MenuScreen(onExit: () -> Unit) {
         ) {
             LobbyRow(L("Trénink", "Practice", "Training"),
                 if (gOn) L("Pokračovat · hand #${gs!!.handNo}", "Continue · hand #${gs!!.handNo}", "Weiter · Hand #${gs!!.handNo}") else L("Proti počítači", "Vs the computer", "Gegen den Computer"),
-                hot = gOn, indent = 26.dp, extra = if (gOn) L("Nový", "New", "Neu") else null, onExtra = { O.stopPolling(); Ui.openGameSetup() }) {
+                hot = gOn, extra = if (gOn) L("Nový", "New", "Neu") else null, onExtra = { O.stopPolling(); Ui.openGameSetup() }) {
                 O.stopPolling()
                 if (gOn) { g.switchMode("game"); Ui.hideMenu(); Ui.goView("table") } else Ui.openGameSetup()
             }
             LobbyRow(L("Přátelé", "Friends", "Freunde"),
-                O.friends?.count { it.online }?.takeIf { it > 0 }?.let { L("$it online", "$it online", "$it online") } ?: L("Kódy a pozvánky", "Codes & invites", "Codes & Einladungen"), indent = 8.dp) { Ui.open("groups") }
-            LobbyRow(L("Statistiky", "Statistics", "Statistiken"), L("Všichni hráči", "All players", "Alle Spieler"), indent = 8.dp) {
+                O.friends?.count { it.online }?.takeIf { it > 0 }?.let { L("$it online", "$it online", "$it online") } ?: L("Kódy a pozvánky", "Codes & invites", "Codes & Einladungen")) { Ui.open("groups") }
+            LobbyRow(L("Statistiky", "Statistics", "Statistiken"), L("Všichni hráči", "All players", "Alle Spieler")) {
                 Ui.hideMenu(); Ui.solo = true; Ui.goView("players")
             }
-            LobbyRow(L("Síň slávy", "Hall of fame", "Ruhmeshalle"), L("Žebříček a poháry", "Ranking & cups", "Rangliste & Pokale"), indent = 26.dp) { Ui.open("fame") }
+            LobbyRow(L("Síň slávy", "Hall of fame", "Ruhmeshalle"), L("Žebříček a poháry", "Ranking & cups", "Rangliste & Pokale")) { Ui.open("fame") }
             if (com.onoseto.chipsnfish.Updater.state == "available")
                 GlassPill(L("Nová verze · aktualizovat", "New version · update", "Neue Version · aktualisieren"), hot = true) {
                     Ui.open("settings", SettingsArg(tab = "update", level = 0, startStack = 0, autoBlinds = true, dealer = 0))
                 }
         }
-    }
     }
 }
 
@@ -533,7 +495,7 @@ private fun LobbyRow(title: String, sub: String, hot: Boolean = false, indent: a
     val pressed by src.collectIsPressedAsState()
     val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.96f else 1f, label = "row")
     Row(
-        Modifier.padding(end = indent).fillMaxWidth().height(54.dp).graphicsLayer(scaleX = sc, scaleY = sc)
+        Modifier.fillMaxWidth().height(54.dp).graphicsLayer(scaleX = sc, scaleY = sc)
             .glass(sh, if (hot) Color(0x3D2F7BFF) else Color(0x2A2A5CA8), lift = 10.dp)
             .then(if (hot) Modifier.border(1.5.dp, Brush.linearGradient(listOf(Color(0xFF9AD6FF), Color(0xFF2F7BFF))), sh) else Modifier)
             .clickable(src, null, onClick = onClick).padding(start = 16.dp, end = 10.dp),
@@ -565,6 +527,28 @@ private fun GlassBtn(text: String, modifier: Modifier = Modifier, onClick: () ->
 @Composable
 private fun LobbyIconBtn(icon: String, onClick: () -> Unit) {
     Box(Modifier.size(38.dp).glass(androidx.compose.foundation.shape.CircleShape, lift = 6.dp).tap(onClick), contentAlignment = Alignment.Center) { Icon24(icon, Color.White) }
+}
+
+/** Who of my friends is online right now (top of the lobby). */
+@Composable
+private fun OnlinePill() {
+    watch()
+    val fs = com.onoseto.chipsnfish.online.Online.friends ?: return
+    val on = fs.filter { it.online }
+    Row(
+        Modifier.height(38.dp).glass(RoundedCornerShape(99.dp), lift = 6.dp).tap { Ui.open("groups") }.padding(start = 10.dp, end = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.size(9.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (on.isEmpty()) Color(0xFF6B7A90) else Color(0xFF3CE08A)))
+        if (on.isEmpty()) T(L("Nikdo z přátel není online", "No friends online", "Keine Freunde online"), 12.5.sp, Color.White.copy(alpha = 0.75f), FontWeight.Bold, maxLines = 1)
+        else {
+            Box {
+                on.take(3).forEachIndexed { i, f -> Box(Modifier.padding(start = (i * 16).dp)) { Avatar(com.onoseto.chipsnfish.game.Player(f.uid, f.name, img = f.img), 24.dp, ring = Color(0xFF3CE08A), border = 1.5.dp) } }
+            }
+            T(if (on.size == 1) L("${on[0].name} je online", "${on[0].name} is online", "${on[0].name} ist online") else L("${on.size} přátelé online", "${on.size} friends online", "${on.size} Freunde online"),
+                12.5.sp, Color.White, FontWeight.Bold, maxLines = 1)
+        }
+    }
 }
 
 /** Wallet chips and honor points as one glass pill. */
@@ -601,21 +585,6 @@ private fun FriendsOnlineRow() {
     }
 }
 
-/** Slowly drifting cool light specks over the lobby picture. */
-@Composable
-private fun LobbyBokeh() {
-    val t = rememberInfiniteTransition(label = "bokeh").animateFloat(0f, 1f, infiniteRepeatable(tween(30000, easing = LinearEasing)), label = "b")
-    val dots = remember { List(16) { floatArrayOf(Math.random().toFloat(), Math.random().toFloat() * 0.6f, 4f + Math.random().toFloat() * 10f, Math.random().toFloat()) } }
-    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-        dots.forEach { d ->
-            val ph = (t.value + d[3]) % 1f
-            val x = (d[0] + ph * 0.08f) % 1f * size.width
-            val y = d[1] * size.height + kotlin.math.sin(ph * 6.283f) * 8f
-            val a = 0.04f + 0.09f * kotlin.math.sin(ph * 3.1416f)
-            drawCircle(Color(0xFF9ED2FF).copy(alpha = a), d[2] * density, androidx.compose.ui.geometry.Offset(x, y))
-        }
-    }
-}
 
 @Composable
 private fun Splash() {

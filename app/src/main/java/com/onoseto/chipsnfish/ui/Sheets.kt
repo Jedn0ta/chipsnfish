@@ -92,15 +92,13 @@ fun SheetHost() {
     val wide = sh.kind in setOf("card", "settings", "gamesetup", "online", "groups", "analysis", "seat", "player", "fame")
     val compact = sh.kind == "confirm"
     Box(
-        Modifier.fillMaxSize().zIndex(40f).background(Color.Black.copy(alpha = 0.65f)).tap { Ui.close() }.padding(8.dp),
+        Modifier.fillMaxSize().zIndex(40f).background(Color(0xB3020814)).tap { Ui.close() }.padding(8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier.widthIn(max = if (wide) 780.dp else if (compact) 480.dp else 620.dp).fillMaxWidth()
                 .then(if (compact) Modifier.heightIn(max = 344.dp) else Modifier.height(344.dp))
-                .shadow(20.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
-                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF17242D), C.panel, Color(0xFF0F181E))))
-                .border(1.dp, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(C.gold.copy(alpha = 0.45f), C.line, C.line)), RoundedCornerShape(18.dp))
+                .glass(RoundedCornerShape(24.dp), Color(0x8C0A1530), lift = 24.dp)
                 .tap { },
         ) {
         Column(
@@ -584,8 +582,8 @@ private fun PlayerBlock(
 fun SmallPill(text: String, on: Boolean, onClick: () -> Unit) {
     watch()
     val shape = RoundedCornerShape(99.dp)
-    Box(Modifier.clip(shape).background(if (on) C.gold else C.panel2).border(1.dp, if (on) C.gold else C.line, shape).tap(onClick).padding(horizontal = 9.dp, vertical = 4.dp)) {
-        T(text, 11.5.sp, if (on) C.goldInk else C.ink, FontWeight.Bold, maxLines = 1, fit = true)
+    Box(Modifier.clip(shape).background(if (on) Color(0xFF2F7BFF) else Color.White.copy(alpha = 0.07f)).border(1.dp, if (on) Color(0xFF8AD2FF) else Color.White.copy(alpha = 0.18f), shape).tap(onClick).padding(horizontal = 9.dp, vertical = 4.dp)) {
+        T(text, 11.5.sp, Color.White, FontWeight.Bold, maxLines = 1, fit = true)
     }
 }
 

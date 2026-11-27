@@ -5,13 +5,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 
 object C {
-    val room = Color(0xFF080D12)
-    val room2 = Color(0xFF15222B)
-    val panel = Color(0xFF121C23)
-    val panel2 = Color(0xFF1A2832)
-    val line = Color(0xFF2B3D49)
+    val room = Color(0xFF050B1A)
+    val room2 = Color(0xFF0D1B36)
+    val panel = Color(0xFF0E1A33)
+    val panel2 = Color(0xFF16264A)
+    val line = Color(0xFF2A4170)
     val ink = Color(0xFFF1F4F2)
-    val muted = Color(0xFF9AABB3)
+    val muted = Color(0xFFA3B6D6)
     val gold = Color(0xFFF2C14E)
     val gold2 = Color(0xFFC8901D)
     val goldInk = Color(0xFF2B1C02)
@@ -25,7 +25,7 @@ object C {
     val leather2 = Color(0xFF1C0F09)
     val leatherHi = Color(0xFF56331F)
     val stitch = Color(0x59F0C88C)
-    val seatLine = Color(0xFF3A4F5C)
+    val seatLine = Color(0xFF3A5A8C)
 
     fun type(t: String): Color = when (t) {
         "rock" -> Color(0xFF8FB4E8)

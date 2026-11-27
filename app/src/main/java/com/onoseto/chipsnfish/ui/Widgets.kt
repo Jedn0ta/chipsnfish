@@ -369,7 +369,7 @@ fun GBtn(
     content: @Composable () -> Unit,
 ) {
     watch()
-    val shape = RoundedCornerShape(11.dp)
+    val shape = RoundedCornerShape(14.dp)
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.95f else 1f, label = "press")
@@ -377,9 +377,10 @@ fun GBtn(
     val bg: Brush = when (kind) {
         BK.FOLD -> Brush.verticalGradient(listOf(Color(0xFFE25A4B), C.fold, Color(0xFF8E2418)))
         BK.CALL -> Brush.verticalGradient(listOf(Color(0xFF3CCB7A), C.call, Color(0xFF16733F)))
-        BK.RAISE, BK.GOLD -> Brush.verticalGradient(listOf(Color(0xFFFFD976), C.gold, C.gold2))
-        BK.DARK -> Brush.verticalGradient(listOf(Color(0xFF4E5C66), Color(0xFF2C363E), Color(0xFF1E262C)))
-        BK.GHOST -> Brush.verticalGradient(listOf(Color(0xFF213240), C.panel2))
+        BK.RAISE -> Brush.verticalGradient(listOf(Color(0xFFFFD976), C.gold, C.gold2))
+        BK.GOLD -> Brush.verticalGradient(listOf(Color(0xFF6CC4FF), Color(0xFF2F7BFF), Color(0xFF1C47C9)))
+        BK.DARK -> Brush.verticalGradient(listOf(Color(0xFF2A3E66), Color(0xFF18284A), Color(0xFF101C38)))
+        BK.GHOST -> Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.05f)))
         BK.BLUE -> Brush.verticalGradient(listOf(Color(0xFF6CC4FF), Color(0xFF2F7BFF), Color(0xFF1C47C9)))
         BK.DANGER -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
     }
@@ -393,7 +394,7 @@ fun GBtn(
             .clip(shape)
             .background(bg)
             .then(if (on) Modifier.border(3.dp, Color.White, shape) else Modifier)
-            .then(if (kind == BK.GHOST) Modifier.border(1.dp, C.line, shape) else Modifier)
+            .then(if (kind == BK.GHOST) Modifier.border(1.dp, Color.White.copy(alpha = 0.28f), shape) else Modifier)
             .then(if (kind == BK.DANGER) Modifier.border(1.dp, C.lose, shape) else Modifier)
             .clickable(src, null, enabled = enabled) { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); onClick() }
             .drawBehind {
@@ -414,7 +415,7 @@ fun DealIn(key: Any?, content: @Composable () -> Unit) {
 }
 
 fun btnInk(kind: BK): Color = when (kind) {
-    BK.RAISE, BK.GOLD -> C.goldInk
+    BK.RAISE -> C.goldInk
     BK.GHOST -> C.ink
     BK.DANGER -> C.lose
     else -> Color.White
@@ -434,11 +435,11 @@ fun Pill(text: String, on: Boolean, enabled: Boolean = true, onClick: () -> Unit
     val shape = RoundedCornerShape(99.dp)
     Box(
         Modifier.alpha(if (enabled) 1f else 0.5f).clip(shape)
-            .background(if (on) C.gold else C.panel2)
-            .border(1.dp, if (on) C.gold else C.line, shape)
+            .background(if (on) Color(0xFF2F7BFF) else Color.White.copy(alpha = 0.07f))
+            .border(1.dp, if (on) Color(0xFF8AD2FF) else Color.White.copy(alpha = 0.18f), shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp)
-    ) { T(text, 13.sp, if (on) C.goldInk else C.ink, FontWeight.Bold, maxLines = 1, fit = true) }
+    ) { T(text, 13.sp, Color.White, FontWeight.Bold, maxLines = 1, fit = true) }
 }
 
 @Composable

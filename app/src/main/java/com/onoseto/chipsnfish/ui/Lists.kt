@@ -2,6 +2,8 @@
 
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
@@ -46,7 +48,6 @@ import kotlin.math.roundToInt
 fun PlayersView() {
     watch()
     @Suppress("UNUSED_VARIABLE") val rev = Game.rev
-    @Suppress("UNUSED_VARIABLE") val r2 = Ui.sheetRev
     val g = Game
     val st = g.st
     val inGame = st.phase != "setup"
@@ -58,55 +59,72 @@ fun PlayersView() {
             if ((ia >= 0) != (ib >= 0)) return@sortedWith if (ia >= 0) -1 else 1
             if (ia >= 0) return@sortedWith ia - ib
         }
+        if (a.hands != b.hands) return@sortedWith b.hands - a.hands
         a.name.lowercase().compareTo(b.name.lowercase())
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        item {
-            Row(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                T(L("STATISTIKY", "STATISTICS", "STATISTIKEN"), 30.sp, num = true)
-                T(L("${list.size} hráčů · přibývají sami, jak s nimi hraješ", "${list.size} players · added automatically as you play", "${list.size} Spieler · kommen beim Spielen automatisch dazu"), 12.5.sp, C.muted)
-                Spacer(Modifier.weight(1f))
-            }
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            T(L("Statistiky", "Statistics", "Statistiken"), 26.sp, Color.White, FontWeight.ExtraBold)
+            T(L("${list.size} hráčů · přibývají sami", "${list.size} players · added automatically", "${list.size} Spieler · kommen automatisch dazu"), 12.sp, GlassMuted, modifier = Modifier.padding(bottom = 5.dp))
+            Spacer(Modifier.weight(1f))
+            T(L("VPIP hraje · PFR zvyšuje · AF útočí", "VPIP plays · PFR raises · AF attacks", "VPIP spielt · PFR erhöht · AF greift an"), 11.sp, GlassMuted, modifier = Modifier.padding(bottom = 6.dp))
         }
-        if (list.isEmpty()) item {
-            Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, C.line, RoundedCornerShape(14.dp)).padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                T(L("Zatím tu nikdo není", "Nobody here yet", "Noch niemand hier"), 16.sp, weight = FontWeight.Bold)
-                T(L("Každý, s kým si zahraješ, i všichni tví přátelé se tu objeví sami i se statistikami.", "Everyone you play with and all your friends show up here by themselves, with their stats.", "Alle, mit denen du spielst, und alle deine Freunde erscheinen hier automatisch mit Statistiken."), 13.sp, C.muted, align = TextAlign.Center)
+        if (list.isEmpty()) {
+            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                T(L("Zatím tu nikdo není", "Nobody here yet", "Noch niemand hier"), 16.sp, Color.White, FontWeight.Bold)
+                T(L("Každý, s kým si zahraješ, i všichni tví přátelé se tu objeví sami i se statistikami.", "Everyone you play with and all your friends show up here by themselves, with their stats.", "Alle, mit denen du spielst, und alle deine Freunde erscheinen hier automatisch mit Statistiken."), 13.sp, GlassMuted, align = TextAlign.Center)
             }
+            return@Column
         }
-        var shownOthers = false
-        list.forEachIndexed { i, p ->
-            val sat = seatIdx(p.id) >= 0
-            if (inGame && i == 0 && sat) item { Label(tr("U stolu · v pořadí míst"), Modifier.widthIn(max = 760.dp).fillMaxWidth()) }
-            if (inGame && !sat && !shownOthers && i > 0) { shownOthers = true; item { Label(tr("Ostatní hráči"), Modifier.widthIn(max = 760.dp).fillMaxWidth()) } }
-            item(key = p.id) {
-                val t = Reads.effType(p)
-                Row(
-                    Modifier.widthIn(max = 760.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(12.dp))
-                        .tap { Ui.open("player", PlayerArg(p.id)) }.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Avatar(p, 46.dp)
-                    Column(Modifier.weight(1f)) {
-                        T(p.name + if (sat) " " + tr("· u stolu") else "", 15.sp, weight = FontWeight.Bold, maxLines = 1)
-                        if (p.hands > 0) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("vpip", "pfr", "af", "hands").forEach { k ->
-                                val v = g.statFmt(k, g.statVal(p, k))
-                                T(if (k == "hands") "$v ${tr("hand")}" else "${g.statLabel(k)} $v", 12.sp, C.muted, modifier = Modifier.tap { Ui.tip = g.statTip(p, k) })
-                            }
-                        } else T(tr("Zatím žádná uložená hand"), 12.sp, C.muted)
-                        T(L("Sklon k bluffu ${(Reads.baseBluff(p) * 100).roundToInt()} % · ${p.caught}× chycen · ${p.showed}× silná", "Bluff tendency ${(Reads.baseBluff(p) * 100).roundToInt()} % · ${p.caught}× caught · ${p.showed}× strong", "Bluff-Neigung ${(Reads.baseBluff(p) * 100).roundToInt()} % · ${p.caught}× erwischt · ${p.showed}× stark"), 12.sp, C.muted)
+        androidx.compose.foundation.lazy.grid.LazyHorizontalGrid(
+            androidx.compose.foundation.lazy.grid.GridCells.Fixed(2), Modifier.fillMaxWidth().weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp),
+        ) {
+            items(list.size, key = { list[it].id }) { i -> PlayerCard(list[i], seatIdx(list[i].id) >= 0) }
+        }
+    }
+}
+
+/** One player as a glass card: avatar, type, the four key numbers. */
+@Composable
+private fun PlayerCard(p: com.onoseto.chipsnfish.game.Player, sat: Boolean) {
+    watch()
+    val g = Game
+    val t = Reads.effType(p)
+    val friend = com.onoseto.chipsnfish.online.Online.isFriend(p.id)
+    Column(
+        Modifier.width(184.dp).fillMaxHeight()
+            .glass(RoundedCornerShape(topStart = 22.dp, topEnd = 6.dp, bottomEnd = 22.dp, bottomStart = 6.dp), if (sat) Color(0x3D2F7BFF) else Color(0x2A2A5CA8), lift = 8.dp)
+            .tap { Ui.open("player", PlayerArg(p.id)) }.padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Avatar(p, 38.dp, border = 2.dp)
+            Column(Modifier.weight(1f)) {
+                T(p.name, 14.5.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.clip(RoundedCornerShape(99.dp)).background(C.type(t)).padding(horizontal = 6.dp, vertical = 1.dp)) {
+                        T(Reads.PROF.getValue(t).s, 9.5.sp, Color(0xFF111111), FontWeight.ExtraBold, maxLines = 1)
                     }
-                    Box(Modifier.clip(RoundedCornerShape(99.dp)).background(C.type(t)).padding(horizontal = 8.dp, vertical = 3.dp)) { T(Reads.PROF.getValue(t).s, 10.5.sp, Color(0xFF111111), FontWeight.ExtraBold) }
+                    if (friend) T("★", 11.sp, LobbyBlue, FontWeight.Bold)
+                    if (sat) T(L("u stolu", "seated", "am Tisch"), 9.5.sp, LobbyBlue, FontWeight.Bold)
                 }
             }
         }
-        item {
-            Note(L("Podrž kteroukoli statistiku a uvidíš, co znamená. Statistiky se plní z uložených hand. Po 8 handách aplikace sama odhadne typ hráče. VPIP = jak často jde dobrovolně do hry, PFR = jak často zvyšuje preflop, AF = poměr útoků k callům po flopu.",
-                "Tap any stat to see what it means. Stats fill up from saved hands. After 8 hands the app estimates the player type. VPIP = how often they voluntarily play, PFR = how often they raise preflop, AF = ratio of attacks to calls after the flop.",
-                "Tippe eine Statistik an, um sie erklärt zu bekommen. Statistiken füllen sich aus gespeicherten Händen. Nach 8 Händen schätzt die App den Spielertyp. VPIP = wie oft freiwillig gespielt, PFR = wie oft preflop erhöht, AF = Verhältnis Angriffe zu Calls nach dem Flop."),
-                Modifier.widthIn(max = 760.dp).fillMaxWidth())
-        }
+        if (p.hands > 0) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("vpip", "pfr", "af", "hands").forEach { k ->
+                Column(
+                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.07f)).tap { Ui.tip = g.statTip(p, k) }.padding(vertical = 3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    T(g.statFmt(k, g.statVal(p, k)), 12.5.sp, Color.White, num = true, maxLines = 1, fit = true)
+                    T(if (k == "hands") tr("hand") else g.statLabel(k), 8.sp, GlassMuted, FontWeight.Bold, maxLines = 1)
+                }
+            }
+        } else T(L("Zatím bez odehraných hand", "No hands played yet", "Noch keine Hände"), 11.sp, GlassMuted)
+        T(L("bluff ${(Reads.baseBluff(p) * 100).roundToInt()} % · chycen ${p.caught}× · silná ${p.showed}×", "bluff ${(Reads.baseBluff(p) * 100).roundToInt()} % · caught ${p.caught}× · strong ${p.showed}×", "Bluff ${(Reads.baseBluff(p) * 100).roundToInt()} % · erwischt ${p.caught}× · stark ${p.showed}×"),
+            10.sp, GlassMuted, maxLines = 1, fit = true)
     }
 }
 
@@ -119,30 +137,33 @@ fun RecordsView() {
     val n = h.size
     val w = h.count { it.result == "win" }
     val net = h.sumOf { it.net }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        item { T(tr("Záznam").uppercase(), 30.sp, num = true, modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth()) }
-        item {
-            Row(Modifier.widthIn(max = 760.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Stat3(n.toString(), tr("hand"), C.ink, Modifier.weight(1f))
-                Stat3(w.toString(), tr("vyhráno"), C.ink, Modifier.weight(1f))
-                Stat3((if (net > 0) "+" else "") + g.fm(net), tr("žetony celkem"), if (net >= 0) C.win else C.lose, Modifier.weight(1f))
-            }
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            T(tr("Záznam"), 26.sp, Color.White, FontWeight.ExtraBold)
+            Spacer(Modifier.weight(1f))
+            Stat3(n.toString(), tr("hand"), Color.White, Modifier.width(110.dp))
+            Stat3(w.toString(), tr("vyhráno"), Color.White, Modifier.width(110.dp))
+            Stat3((if (net > 0) "+" else "") + g.fm(net), tr("žetony celkem"), if (net >= 0) C.win else C.lose, Modifier.width(130.dp))
         }
-        if (n == 0) item {
-            Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, C.line, RoundedCornerShape(14.dp)).padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                T(tr("Zatím žádná hand"), 16.sp, weight = FontWeight.Bold)
-                T(L("Odehraj handu u stolu v režimu Rádce a dej „Uložit handu“.", "Play a hand at the table in Advisor mode and choose “Save hand”.", "Spiele eine Hand im Berater-Modus und wähle „Hand speichern“."), 13.sp, C.muted, align = TextAlign.Center)
+        if (n == 0) {
+            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                T(tr("Zatím žádná hand"), 16.sp, Color.White, FontWeight.Bold)
+                T(L("Odehrané handy se sem ukládají samy.", "Played hands are saved here automatically.", "Gespielte Hände landen hier automatisch."), 13.sp, GlassMuted, align = TextAlign.Center)
             }
+            return@Column
         }
-        items(h.take(150), key = { it.id }) { r -> RecCard(r) }
+        androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp)) {
+            items(h.take(150), key = { it.id }) { r -> RecCard(r) }
+        }
     }
 }
 
 @Composable
 private fun Stat3(v: String, l: String, col: Color, modifier: Modifier) {
     watch()
-    Column(modifier.clip(RoundedCornerShape(12.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp)) {
-        T(v, 28.sp, col, num = true); T(l.uppercase(), 11.sp, C.muted, FontWeight.Bold)
+    Column(modifier.glass(RoundedCornerShape(16.dp), lift = 6.dp).padding(horizontal = 12.dp, vertical = 5.dp)) {
+        T(v, 18.sp, col, num = true, maxLines = 1, fit = true); T(l.uppercase(), 9.sp, GlassMuted, FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -155,7 +176,8 @@ private fun RecCard(r: HandRec) {
     val wn = r.winner?.let { w -> r.seats.find { it.pid == w }?.name }
     val (rl, rc) = when (r.result) { "win" -> tr("Výhra") to C.win; "lose" -> tr("Prohra") to C.lose; else -> tr("Dělba") to C.gold }
     Column(
-        Modifier.widthIn(max = 760.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(12.dp)).padding(12.dp),
+        Modifier.width(300.dp).fillMaxHeight().glass(RoundedCornerShape(topStart = 22.dp, topEnd = 6.dp, bottomEnd = 22.dp, bottomStart = 6.dp), lift = 8.dp)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -164,9 +186,9 @@ private fun RecCard(r: HandRec) {
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
-                r.hero.forEach { c -> if (c == null) CardSlot(30.dp, "") else CardView(c, 30.dp) }
-                Spacer(Modifier.width(8.dp))
-                r.board.forEach { c -> if (c == null) CardSlot(30.dp, "") else CardView(c, 30.dp) }
+                r.hero.forEach { c -> if (c == null) CardSlot(24.dp, "") else CardView(c, 24.dp) }
+                Spacer(Modifier.width(5.dp))
+                r.board.forEach { c -> if (c == null) CardSlot(24.dp, "") else CardView(c, 24.dp) }
             }
             T((if (r.net > 0) "+" else "") + g.fm(r.net), 18.sp, if (r.net >= 0) C.win else C.lose, num = true)
         }
@@ -174,7 +196,7 @@ private fun RecCard(r: HandRec) {
         T((if (open) "▾ " else "▸ ") + tr("Akce hráčů"), 13.sp, C.muted, FontWeight.Bold, modifier = Modifier.tap { open = !open })
         if (open) r.seats.forEach { s ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                T(s.name + (s.mood?.joinToString("", " ") ?: ""), 13.sp, modifier = Modifier.width(130.dp))
+                T(s.name + (s.mood?.joinToString("", " ") ?: ""), 12.sp, modifier = Modifier.width(80.dp), maxLines = 1)
                 FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     s.cards?.takeIf { it.firstOrNull() != null }?.let { cs -> Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { cs.forEach { c -> if (c != null) CardView(c, 20.dp) } } }
                     if (s.actions.isEmpty()) T("–", 12.sp, C.muted)

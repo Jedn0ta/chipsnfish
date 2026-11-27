@@ -361,28 +361,33 @@ private fun FriendsTab() {
         }
         return
     }
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     fs.forEach { f ->
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+        Column(
+            Modifier.width(178.dp).glass(RoundedCornerShape(topStart = 20.dp, topEnd = 6.dp, bottomEnd = 20.dp, bottomStart = 6.dp), if (f.online) Color(0x3326D07C) else Color(0x2A2A5CA8), lift = 6.dp)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Avatar(Player(f.uid, f.name, img = f.img), 40.dp, ring = if (f.online) C.win else C.line) {
-                Box(Modifier.align(Alignment.BottomEnd).size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (f.online) C.win else Color(0xFF55646E)).border(2.dp, C.panel2, androidx.compose.foundation.shape.CircleShape))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Avatar(Player(f.uid, f.name, img = f.img, hat = Game.P[f.uid]?.hat ?: ""), 36.dp, ring = if (f.online) C.win else Color.White.copy(alpha = 0.3f), border = 2.dp) {
+                    Box(Modifier.align(Alignment.BottomEnd).size(11.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (f.online) C.win else Color(0xFF55646E)).border(2.dp, Color(0xFF0E1A33), androidx.compose.foundation.shape.CircleShape))
+                }
+                Column(Modifier.weight(1f)) {
+                    T(f.name, 14.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true)
+                    T(when {
+                        f.table != null -> L("u stolu ${f.table}", "at table ${f.table}", "an Tisch ${f.table}")
+                        f.online -> L("online", "online", "online")
+                        else -> L("offline", "offline", "offline")
+                    }, 11.sp, if (f.table != null || f.online) C.win else GlassMuted, FontWeight.Bold, maxLines = 1)
+                }
+                T("✕", 12.sp, GlassMuted, modifier = Modifier.tap {
+                    Ui.confirm(L("Odebrat z přátel?", "Remove friend?", "Freund entfernen?"), f.name, L("Odebrat", "Remove", "Entfernen")) { O.removeFriend(f.uid); Ui.open("groups") }
+                }.padding(4.dp))
             }
-            Column(Modifier.weight(1f)) {
-                T(f.name, 15.sp, weight = FontWeight.Bold, maxLines = 1)
-                T(when {
-                    f.table != null -> L("hraje u stolu ${f.table}", "playing at table ${f.table}", "spielt an Tisch ${f.table}")
-                    f.online -> L("je v aplikaci", "in the app", "in der App")
-                    else -> L("není připojený", "offline", "offline")
-                }, 12.sp, if (f.table != null || f.online) C.win else C.muted)
-            }
-            if (f.table != null && f.table != O.code) Btn(L("Přisednout", "Join", "Beitreten"), BK.CALL, height = 36.dp) { O.join(f.table) { goTable() } }
-            if (O.code != null && f.table != O.code) Btn(L("Pozvat", "Invite", "Einladen"), BK.GOLD, height = 36.dp) { O.inviteFriend(f) }
-            T("✕", 14.sp, C.muted, modifier = Modifier.tap {
-                Ui.confirm(L("Odebrat z přátel?", "Remove friend?", "Freund entfernen?"), f.name, L("Odebrat", "Remove", "Entfernen")) { O.removeFriend(f.uid); Ui.open("groups") }
-            }.padding(6.dp))
+            if (f.table != null && f.table != O.code) Btn(L("Přisednout", "Join", "Beitreten"), BK.CALL, Modifier.fillMaxWidth(), height = 32.dp) { O.join(f.table) { goTable() } }
+            else if (O.code != null && f.table != O.code) Btn(L("Pozvat ke stolu", "Invite", "Einladen"), BK.GOLD, Modifier.fillMaxWidth(), height = 32.dp) { O.inviteFriend(f) }
         }
+    }
     }
 }
 
