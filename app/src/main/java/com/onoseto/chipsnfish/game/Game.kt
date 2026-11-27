@@ -143,6 +143,8 @@ object Game {
             "cblue" -> "cred"; "blue", "green", "black", "gold" -> "red"
             else -> "b_lattice"
         }
+        // once: switch everybody to the new default red lattice back
+        if (getS("hr-look-v3") == null) { look.back = "b_lattice"; setS("hr-look-v3", "1"); saveLook() }
         zoom = getS("hr4-zoom")?.toDoubleOrNull() ?: 1.0
         layouts = runCatching { json.decodeFromString<MutableMap<String, List<Double>>>(getS("hr4-layouts") ?: "{}") }.getOrNull() ?: mutableMapOf()
         gameCfg = runCatching { json.decodeFromString<GameCfg>(getS("hr6-cfg") ?: "{}") }.getOrNull() ?: GameCfg()
