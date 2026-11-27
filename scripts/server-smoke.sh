@@ -75,5 +75,47 @@ F=$(rpc "$A" cf_fame '{"p_period":"week","p_scope":"all"}')
 [ "$(echo "$F" | jq '.top | length')" -ge 1 ] || { echo "hall of fame failed: $F"; exit 1; }
 echo "✓ practice earnings and hall of fame (honor points from the test hand: $(echo "$F" | jq -c '[.top[] | select(.name | startswith("Test")) | .pts]'))"
 rpc "$A" cf_ping '{}' >/dev/null; echo "✓ keep-alive ping"
-rpc "$B" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null; rpc "$A" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null
+rpc "$A" cf_say_text "{\"p_code\":\"$CODE\",\"p_text\":\"GG\"}" >/dev/null
+[ "$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}" | jq -r '.chat[-1].m')" = "t:GG" ] || { echo "text chat failed"; exit 1; }
+echo "✓ text chat"
+FC=$(rpc "$B" cf_friend_code '{}' | jq -r .)
+rpc "$A" cf_friend_add_code "{\"p_code\":\"$FC\"}" >/dev/null
+[ "$(rpc "$A" cf_friends '{}' | jq length)" -ge 1 ] || { echo "friend code failed"; exit 1; }
+echo "✓ friend code $FC"
+rpc "$A" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null; rpc "$B" cf_leave "{\"p_code\":\"$CODE\"}" >/dev/null
+# three players: peek after fold, ask for a card
+C=$(signup); rpc "$C" cf_profile '{"p_name":"Test C","p_img":""}' >/dev/null
+rpc "$C" cf_set_peek '{"p":true}' >/dev/null
+T3=$(rpc "$A" cf_create '{"p_name":"smoke 3","p_cfg":{"stack":200,"level":0,"every":0,"advisor":true},"p_gid":null}' | jq -r .)
+rpc "$B" cf_join "{\"p_code\":\"$T3\"}" >/dev/null; rpc "$C" cf_join "{\"p_code\":\"$T3\"}" >/dev/null
+rpc "$A" cf_start "{\"p_code\":\"$T3\"}" >/dev/null
+tok_of() { local u=$1; if [ "$u" = "$UA" ]; then echo "$A"; elif [ "$u" = "$UB" ]; then echo "$B"; else echo "$C"; fi; }
+V=$(rpc "$A" cf_view "{\"p_code\":\"$T3\",\"p_ver\":0}"); UC=$(rpc "$C" cf_view "{\"p_code\":\"$T3\",\"p_ver\":0}" | jq -r .me)
+H=$(echo "$V" | jq -r .state.handNo); T=$(echo "$V" | jq -r .state.turn); P=$(echo "$V" | jq -r ".state.seats[$T].pid")
+if [ "$P" = "$UC" ]; then
+  rpc "$C" cf_move "{\"p_code\":\"$T3\",\"p_hand\":$H,\"p_type\":\"call\",\"p_to\":0}" >/dev/null
+  V=$(rpc "$A" cf_view "{\"p_code\":\"$T3\",\"p_ver\":0}"); T=$(echo "$V" | jq -r .state.turn); P=$(echo "$V" | jq -r ".state.seats[$T].pid")
+fi
+FT=$(tok_of "$P")
+rpc "$FT" cf_move "{\"p_code\":\"$T3\",\"p_hand\":$H,\"p_type\":\"fold\",\"p_to\":0}" >/dev/null
+PK=$(rpc "$FT" cf_view "{\"p_code\":\"$T3\",\"p_ver\":0}" | jq -c .peek)
+[ "$(echo "$PK" | jq length)" = 1 ] && [ "$(echo "$PK" | jq -r '.[0].uid')" = "$UC" ] || { echo "peek failed: $PK"; exit 1; }
+echo "✓ folded player sees only the cards of the player who allows it"
+rpc "$A" cf_ask_card "{\"p_code\":\"$T3\",\"p_to\":\"$UC\"}" >/dev/null
+[ "$(rpc "$C" cf_view "{\"p_code\":\"$T3\",\"p_ver\":0}" | jq '.asks | length')" = 1 ] || { echo "ask not delivered"; exit 1; }
+rpc "$C" cf_ask_answer "{\"p_code\":\"$T3\",\"p_from\":\"$UA\",\"p_idx\":0}" >/dev/null
+[ "$(rpc "$B" cf_view "{\"p_code\":\"$T3\",\"p_ver\":0}" | jq '.ones | length')" = 1 ] || { echo "shown card missing"; exit 1; }
+echo "✓ ask to show a card"
+# a duel 20 minutes from now, accepted
+I=$(rpc "$A" cf_invite_at "{\"p_uid\":\"$UB\",\"p_code\":\"$T3\",\"p_at\":\"$(date -u -d '+20 minutes' +%Y-%m-%dT%H:%M:%SZ)\",\"p_kind\":\"duel\"}" | jq -r .)
+[ "$(rpc "$B" cf_inbox '{}' | jq -r "[.[] | select(.id == $I)][0].kind")" = "duel" ] || { echo "scheduled duel missing"; exit 1; }
+rpc "$B" cf_invite_answer "{\"p_id\":$I,\"p_yes\":true}" >/dev/null
+[ "$(rpc "$A" cf_outbox '{}' | jq -r "[.[] | select(.id == $I)][0].ans")" = "yes" ] || { echo "duel answer missing"; exit 1; }
+echo "✓ duel at a set time, accepted"
+[ "$(rpc "$A" cf_advent_days '{}' | jq -r 'type')" = "array" ] || { echo "advent failed"; exit 1; }
+echo "✓ advent calendar"
+for t in "$A" "$B" "$C"; do rpc "$t" cf_leave "{\"p_code\":\"$T3\"}" >/dev/null || true; done
+# clean up: delete the test accounts' profiles
+for t in "$A" "$B" "$C"; do rpc "$t" cf_delete_me '{}' >/dev/null; done
+echo "✓ test profiles deleted"
 echo "ALL SERVER TESTS PASSED"
