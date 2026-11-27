@@ -835,7 +835,6 @@ private fun ActBox() {
                             T((if (ca) "✓ " else "") + "CALL\nANY", 11.sp, Color.White, num = true, maxLines = 2, lineHeight = 13.sp, align = TextAlign.Center)
                         }
                     }
-                    }
                 }
                 return@Column
             }
