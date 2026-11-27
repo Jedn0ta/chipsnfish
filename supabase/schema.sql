@@ -408,6 +408,14 @@ begin
     st := cf_set(st, 'betStreet', to_jsonb(case when n + c >= 5 then 3 when n + c = 4 then 2 else 1 end));
     st := cf_start_street(st);
   end loop;
+  -- showdown: everyone who didn't fold shows their cards to the whole table
+  if st->'done' is not null and st->>'done' is not null and coalesce((st->'done'->>'sd')::boolean, false) then
+    insert into cf_shows(code, uid, hand, cards)
+      select p_code, (x.s->>'pid')::uuid, cf_gi(st, 'handNo'), sec.hole->((x.i - 1)::text)
+      from jsonb_array_elements(st->'seats') with ordinality x(s, i)
+      where not coalesce((x.s->>'folded')::boolean, false) and sec.hole->((x.i - 1)::text) is not null
+    on conflict do nothing;
+  end if;
   return st;
 end $$;
 
