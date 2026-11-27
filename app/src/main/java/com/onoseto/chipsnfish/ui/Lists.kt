@@ -70,9 +70,10 @@ fun PlayersView() {
             T(L("VPIP hraje · PFR zvyšuje · AF útočí", "VPIP plays · PFR raises · AF attacks", "VPIP spielt · PFR erhöht · AF greift an"), 11.sp, GlassMuted, modifier = Modifier.padding(bottom = 6.dp))
         }
         if (list.isEmpty()) {
-            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                T(L("Zatím tu nikdo není", "Nobody here yet", "Noch niemand hier"), 16.sp, Color.White, FontWeight.Bold)
-                T(L("Každý, s kým si zahraješ, i všichni tví přátelé se tu objeví sami i se statistikami.", "Everyone you play with and all your friends show up here by themselves, with their stats.", "Alle, mit denen du spielst, und alle deine Freunde erscheinen hier automatisch mit Statistiken."), 13.sp, GlassMuted, align = TextAlign.Center)
+            Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
+                T(L("Zatím tu nikdo není", "Nobody here yet", "Noch niemand hier"), 22.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
+                T(L("Každý, s kým si zahraješ, se tu objeví sám.", "Everyone you play with shows up here by themselves.", "Alle, mit denen du spielst, erscheinen hier automatisch."), 14.sp, Color.White.copy(alpha = 0.75f), align = TextAlign.Center)
+                T(L("I všichni tví přátelé, i se statistikami a stylem hry.", "So do all your friends, with stats and playing style.", "Auch alle deine Freunde, mit Statistik und Spielstil."), 12.5.sp, GlassMuted, align = TextAlign.Center)
             }
             return@Column
         }
@@ -146,9 +147,9 @@ fun RecordsView() {
             Stat3((if (net > 0) "+" else "") + g.fm(net), tr("žetony celkem"), if (net >= 0) C.win else C.lose, Modifier.width(130.dp))
         }
         if (n == 0) {
-            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                T(tr("Zatím žádná hand"), 16.sp, Color.White, FontWeight.Bold)
-                T(L("Odehrané handy se sem ukládají samy.", "Played hands are saved here automatically.", "Gespielte Hände landen hier automatisch."), 13.sp, GlassMuted, align = TextAlign.Center)
+            Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
+                T(tr("Zatím žádná hand"), 22.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
+                T(L("Odehrané handy se sem ukládají samy.", "Played hands are saved here automatically.", "Gespielte Hände landen hier automatisch."), 14.sp, Color.White.copy(alpha = 0.75f), align = TextAlign.Center)
             }
             return@Column
         }

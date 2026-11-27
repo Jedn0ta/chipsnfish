@@ -121,7 +121,7 @@ fun OnlineSheet(a: OnlineArg) {
     var stack by remember { mutableStateOf(if (c.stack in listOf(100, 200, 300)) c.stack else 100) }
     var level by remember { mutableStateOf(c.level) }
     var every by remember { mutableStateOf(c.every) }
-    var adv by remember { mutableStateOf(true) }
+    var adv by remember { mutableStateOf(c.advisor) }
     var gid by remember { mutableStateOf(a.gid) }
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -149,7 +149,7 @@ fun OnlineSheet(a: OnlineArg) {
             }
             Spacer(Modifier.height(4.dp))
             Btn(L("▶ Založit stůl", "▶ Create table", "▶ Tisch erstellen"), modifier = Modifier.fillMaxWidth(), enabled = !O.busy, height = 46.dp) {
-                Game.gameCfg = Game.gameCfg.copy(stack = stack, level = level, every = every); Game.saveCfg()
+                Game.gameCfg = Game.gameCfg.copy(stack = stack, level = level, every = every, advisor = adv); Game.saveCfg()
                 O.create(tname, stack, level, every, adv, gid) { goTable() }
             }
         }
@@ -356,11 +356,10 @@ private fun FriendsTab() {
     AddFriendBar()
     if (fs == null) { Note(L("Načítám…", "Loading…", "Lade…")); return }
     if (fs.isEmpty()) {
-        BoxPanel {
-            T(L("Zatím nemáš žádné přátele", "No friends yet", "Noch keine Freunde"), 15.sp, weight = FontWeight.ExtraBold)
-            Note(L("Pošli kamarádovi svůj <b>kód přítele</b> (Sdílet), nebo zadej jeho kód nahoře. Přidat jde i u stolu: klepni na hráče a dej <b>Přidat do přátel</b>. Pak ho odsud pozveš ke stolu.",
-                "Send a friend your <b>friend code</b> (Share) or enter theirs above. You can also tap a player at the table and choose <b>Add to friends</b>. Then invite them to a table from here.",
-                "Schick einem Freund deinen <b>Freundescode</b> (Teilen) oder gib seinen oben ein. Am Tisch geht es auch: Spieler antippen, <b>Zu Freunden</b>. Dann lädst du ihn von hier an einen Tisch ein."))
+        Column(Modifier.fillMaxWidth().padding(top = 36.dp, bottom = 20.dp, start = 40.dp, end = 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            T(L("Zatím nemáš žádné přátele", "No friends yet", "Noch keine Freunde"), 20.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
+            T(L("Pošli kamarádovi svůj kód přítele, nebo zadej jeho kód nahoře.", "Send a friend your friend code, or enter theirs above.", "Schick einem Freund deinen Freundescode oder gib seinen oben ein."), 14.sp, Color.White.copy(alpha = 0.75f), align = TextAlign.Center)
+            T(L("Přidat jde i u stolu: klepni na hráče a dej ★ Přidat do přátel.", "At a table: tap a player and choose ★ Add friend.", "Am Tisch: Spieler antippen und ★ Zu Freunden wählen."), 12.5.sp, GlassMuted, align = TextAlign.Center)
         }
         return
     }

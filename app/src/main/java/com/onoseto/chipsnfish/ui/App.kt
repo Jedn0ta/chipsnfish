@@ -255,8 +255,8 @@ private fun TopBar() {
             T("#${st.handNo}", 15.sp, C.muted, num = true)
             BlindGroup()
         }
-        // hand rankings – always one tap away during the game
-        Row(
+        // hand rankings – one tap away, only while a game is on
+        if (Ui.view == "table" && playing) Row(
             Modifier.height(32.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp))
                 .tap { Ui.open("hands") }.padding(horizontal = 9.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -330,6 +330,8 @@ private fun MenuScreen(onExit: () -> Unit) {
     val O = com.onoseto.chipsnfish.online.Online
     val gs = g.gameSaved()
     val gOn = gs != null && gs.over == null
+    // a finished online game is closed when you come back to the lobby
+    LaunchedEffect(O.code, O.status) { if (O.code != null && O.status == "over") O.leave() }
     Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }) {
         LobbyBackground()
         // top bar

@@ -802,7 +802,7 @@ private fun SettingsSheet(d: SettingsArg) {
     when (d.tab) {
         "game" -> {
             if (g.online()) OnlineSettingsGame()
-            else if (g.gm()) {
+            else if (g.bot() && g.playing() && g.st.over == null) {
                 SummaryRow(listOf(
                     tr("Soupeřů") to "${st.seats.drop(1).count { !it.out }} / ${st.n - 1}",
                     tr("Blindy teď") to Cards.lvlStr(st.curLevel),
@@ -818,54 +818,7 @@ private fun SettingsSheet(d: SettingsArg) {
                         Ui.confirm(tr("Ukončit hru?"), tr("Hra proti počítači skončí a aplikace se zavře."), tr("Ukončit hru")) { g.endGameVsComputer(); Ui.exitRequest++ }
                     }
                 }
-            } else {
-                if (g.playing()) {
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.gold.copy(alpha = 0.08f)).border(1.dp, C.gold.copy(alpha = 0.35f), RoundedCornerShape(12.dp)).padding(10.dp)) {
-                        T("🔒 " + tr("Hra běží, nastavení je zamčené. Blindy zvýšíš tlačítkem nahoře. Pro jiné nastavení dej restart."), 13.sp)
-                    }
-                    Summary(listOf(tr("Hráčů") to "${st.n}", tr("Blindy teď") to Cards.lvlStr(st.curLevel), tr("Start žetony") to g.fm(st.startStack), tr("Blindy") to tr(if (st.autoBlinds) "automaticky" else "ručně")))
-                } else {
-                    Label(tr("Startovní blindy"))
-                    LevelGrid(sel = d.level) { d.level = it; Ui.redraw() }
-                    var stack by remember { mutableStateOf(d.startStack.toString()) }
-                    var bmin by remember { mutableStateOf(st.blindMin.toString()) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Column(Modifier.weight(1f)) { Label(tr("Startovní žetony na hráče")); Field(stack, { v -> stack = v.filter { it.isDigit() }.take(7); stack.toIntOrNull()?.let { d.startStack = it } }, number = true) }
-                        Column(Modifier.weight(1f)) { Label(tr("Zvýšení blindů každých … minut (0 = bez odpočtu)")); Field(bmin, { v -> bmin = v.filter { it.isDigit() }.take(3); st.blindMin = bmin.toIntOrNull() ?: 0; g.saveLocal() }, number = true) }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(d.autoBlinds, { d.autoBlinds = it; Ui.redraw() }, colors = CheckboxDefaults.colors(checkedColor = C.gold, checkmarkColor = C.goldInk))
-                        T(tr("Blindy platit automaticky"), 14.sp)
-                    }
-                    Label(tr("Kdo začíná jako dealer"))
-                    Picks(st.seats.mapIndexed { i, s -> i.toString() to g.pl(s).name }, d.dealer.toString()) { d.dealer = it.toInt(); Ui.redraw() }
-                    Btn(tr("Uložit nastavení"), modifier = Modifier.fillMaxWidth()) {
-                        st.startLevel = d.level; st.level = d.level; st.curLevel = d.level
-                        st.sb = Cards.lvl(d.level)[0]; st.bb = Cards.lvl(d.level)[1]
-                        st.startStack = max(1, d.startStack); st.autoBlinds = d.autoBlinds; st.dealer = d.dealer.coerceIn(0, st.n - 1); st.cfgDone = true
-                        g.syncSeats(); st.pos = null
-                        st.seats.forEach { it.stack = st.startStack }
-                        Ui.close(); g.update(); g.toast(tr("Nastavení uloženo"))
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn(tr("☰ Hlavní menu"), BK.GHOST, Modifier.weight(1f)) { Ui.close(); Ui.showMenu() }
-                    Btn(tr("Ukončit hru"), BK.DANGER, Modifier.weight(1f)) {
-                        Ui.confirm(tr("Ukončit hru?"), tr("Stůl se vyčistí a aplikace se zavře. Hráči a záznam hand zůstanou uložené."), tr("Ukončit hru")) { g.restart(false); Ui.exitRequest++ }
-                    }
-                }
-                Btn(tr("♠ Výherní kombinace"), BK.GHOST, Modifier.fillMaxWidth()) { Ui.open("hands", null, Ui.sheet) }
-                Label(tr("Restart"))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn(tr("Restart se stejnými hráči"), BK.GHOST, Modifier.weight(1f)) {
-                        Ui.confirm(tr("Restart se stejnými hráči?"), tr("Hráči zůstanou na svých místech, žetony se vrátí na start a blindy na první úroveň."), tr("Restartovat")) { g.restart(true); g.toast(tr("Restart hotov · nastav a začni hru")) }
-                    }
-                    Btn(tr("Restart celé hry"), BK.DANGER, Modifier.weight(1f)) {
-                        Ui.confirm(tr("Restart celé hry?"), tr("Stůl se vyčistí a posadí se noví hráči. Uložení hráči a záznam hand zůstanou v databázi."), tr("Restartovat")) { g.restart(false); g.toast(tr("Restart hotov · nastav a začni hru")) }
-                    }
-                }
-                Note(tr("Restart vrátí žetony na start a blindy na první úroveň. Hráči a záznam hand zůstanou."))
-            }
+            } else DefaultTableSettings()
         }
         "look" -> {
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -982,6 +935,38 @@ private fun SettingsSheet(d: SettingsArg) {
         else -> UpdateTab()
     }
     }
+    }
+}
+
+/** Defaults used when you open a new table with friends or start practice. */
+@Composable
+private fun DefaultTableSettings() {
+    watch()
+    val c = Game.gameCfg
+    fun save(f: (com.onoseto.chipsnfish.game.GameCfg) -> com.onoseto.chipsnfish.game.GameCfg) { Game.gameCfg = f(Game.gameCfg); Game.saveCfg(); Ui.redraw() }
+    T(L("Výchozí nastavení nového stolu", "Defaults for a new table", "Standard für einen neuen Tisch"), 16.sp, Color.White, FontWeight.ExtraBold)
+    Note(L("Použije se, když zakládáš stůl s přáteli nebo trénink. Při zakládání to můžeš ještě změnit.", "Used when you open a table with friends or start practice. You can still change it then.", "Gilt für neue Tische mit Freunden und das Training. Beim Eröffnen noch änderbar."))
+    Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Label(tr("Startovní žetony"))
+            Picks(listOf("100" to "100", "200" to "200", "300" to "300"), (if (c.stack in listOf(100, 200, 300)) c.stack else 100).toString(), small = true) { v -> save { it.copy(stack = v.toInt()) } }
+            Label(tr("Startovní blindy"))
+            Picks((0 until 7).map { it.toString() to Cards.lvlStr(it) }, c.level.toString(), small = true) { v -> save { it.copy(level = v.toInt()) } }
+            Label(tr("Zvyšování blindů"))
+            Picks(listOf("0" to tr("Nikdy"), "5" to "5 hand", "10" to "10 hand", "15" to "15 hand", "20" to "20 hand"), c.every.toString(), small = true) { v -> save { it.copy(every = v.toInt()) } }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Label(L("Trénink · počet soupeřů", "Practice · opponents", "Training · Gegner"))
+            Picks((1..9).map { it.toString() to it.toString() }, c.opp.toString(), small = true) { v -> save { it.copy(opp = v.toInt()) } }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.material3.Switch(c.advisor, { v -> save { it.copy(advisor = v) } }, colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF2F7BFF)))
+                Column {
+                    T(L("Rádce u stolu s přáteli", "Advisor at friends' tables", "Berater am Freundestisch"), 14.sp, weight = FontWeight.Bold)
+                    T(L("žárovka se šancemi z veřejných informací", "the bulb with odds from public info", "Glühbirne mit Chancen aus öffentlichen Infos"), 11.sp, C.muted, maxLines = 1)
+                }
+            }
+            CoachSwitch(c.coach) { v -> save { it.copy(coach = v) } }
+        }
     }
 }
 

@@ -111,7 +111,10 @@ object Game {
         mode = if (getS("hr-mode")?.trim('"') == "game") "game" else "coach"
         var s = loadState(if (mode == "game") "hr6-game" else "hr4-state")
         if (mode == "game" && !stValid(s)) { mode = "coach"; s = loadState("hr4-state") }
-        if (s == null || s.seats.isEmpty() || s.seats.drop(1).any { P[it.pid] == null }) sampleState() else st = s
+        if (mode == "coach") {
+            // the old live-advisor mode isn't offered any more: never come back to a half-played table there
+            st = freshState(); st.seats = mutableListOf(seatObj("hero", st.startStack))
+        } else if (s == null || s.seats.isEmpty() || s.seats.drop(1).any { P[it.pid] == null }) sampleState() else st = s
         syncSeats()
     }
 
