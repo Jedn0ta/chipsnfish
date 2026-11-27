@@ -915,9 +915,10 @@ begin
     'cfg', t.cfg, 'status', t.status, 'me', u,
     'state', case when t.ver <> p_ver then t.state else null end,
     'hole', jsonb_build_object('hand', v_hand, 'cards', v_hole),
-    'players', (select coalesce(jsonb_agg(jsonb_build_object('uid', uid, 'name', name, 'img', case when p_ver = 0 or t.ver <> p_ver then img else null end,
-                  'on', seen > now() - interval '15 seconds', 'pending', pending, 'left', left_at is not null) order by joined), '[]')
-                from cf_players where code = t.code),
+    'players', (select coalesce(jsonb_agg(jsonb_build_object('uid', cp.uid, 'name', cp.name, 'img', case when p_ver = 0 or t.ver <> p_ver then cp.img else null end,
+                  'on', cp.seen > now() - interval '15 seconds', 'pending', cp.pending, 'left', cp.left_at is not null,
+                  'hat', coalesce((select pr.hat from cf_profiles pr where pr.uid = cp.uid), '')) order by cp.joined), '[]')
+                from cf_players cp where cp.code = t.code),
     'shows', (select coalesce(jsonb_agg(jsonb_build_object('uid', s.uid, 'cards', s.cards)), '[]') from cf_shows s where s.code = t.code and s.hand = v_hand)
   ) || cf_social(t.code);
 end $$;
@@ -952,7 +953,8 @@ begin
   if found then bonus := 200; else select bank into b from cf_profiles where uid = u; end if;
   return jsonb_build_object('bank', b, 'bonus', bonus,
     'honor', (select coalesce(sum(h.pts), 0) from cf_honor h where h.uid = u),
-    'cups', (select count(*) from cf_trophies x where x.uid = u));
+    'cups', (select count(*) from cf_trophies x where x.uid = u),
+    'hat', (select pr.hat from cf_profiles pr where pr.uid = u));
 end $$;
 
 -- chips won in practice games vs the computer go to the wallet (at most 300 a call, 1500 a day)
@@ -1105,6 +1107,76 @@ create or replace function cf_social(p_code text) returns jsonb language sql sta
 $$;
 
 -- ---------------------------------------------------------------------
+-- hats (worn on the avatar, kept forever) and a short text chat
+-- ---------------------------------------------------------------------
+alter table cf_profiles add column if not exists hat text not null default '';
+create table if not exists cf_hats (
+  id bigserial primary key, uid uuid not null, kind text not null, from_uid uuid, t timestamptz not null default now());
+create index if not exists cf_hats_uid on cf_hats(uid);
+alter table cf_hats enable row level security;
+revoke all on cf_hats from anon, authenticated;
+
+create or replace function cf_hat_price(k text) returns int language sql immutable as $$
+  select case k when 'cap' then 100 when 'straw' then 150 when 'grad' then 200 when 'top' then 300
+                when 'helmet' then 120 when 'crown' then 1000 end
+$$;
+
+-- buy a hat: for someone at the table (p_code + p_to), for myself (p_self), or for a computer player (only pays)
+create or replace function cf_hat_buy(p_code text, p_to uuid, p_kind text, p_self boolean) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); c text := upper(p_code); pr int := cf_hat_price(p_kind); b int; who uuid;
+begin
+  if pr is null then raise exception 'bad hat'; end if;
+  who := case when coalesce(p_self, false) then u else p_to end;
+  if c is not null then
+    if not exists (select 1 from cf_players where code = c and uid = u and left_at is null) then raise exception 'not at table'; end if;
+    if who is null or not exists (select 1 from cf_players where code = c and uid = who and left_at is null) then raise exception 'player not at table'; end if;
+  end if;
+  perform cf_wallet();
+  update cf_profiles set bank = bank - pr where uid = u and bank >= pr returning bank into b;
+  if not found then raise exception 'no money'; end if;
+  if who is not null then
+    insert into cf_profiles(uid) values (who) on conflict do nothing;
+    insert into cf_hats(uid, kind, from_uid) values (who, p_kind, u);
+    update cf_profiles set hat = p_kind where uid = who;
+    if c is not null then
+      insert into cf_drinks(code, from_uid, to_uid, kind, price) values (c, u, who, 'hat:' || p_kind, pr);
+      update cf_tables set ver = ver + 1 where code = c;
+    end if;
+  end if;
+  return jsonb_build_object('bank', b, 'hat', (select hat from cf_profiles where uid = u));
+end $$;
+
+-- my hats and the one I'm wearing; p_kind '' = take it off
+create or replace function cf_hat_wear(p_kind text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  if coalesce(p_kind, '') <> '' and not exists (select 1 from cf_hats where uid = u and kind = p_kind) then raise exception 'not your hat'; end if;
+  update cf_profiles set hat = coalesce(p_kind, '') where uid = u;
+  update cf_tables t set ver = ver + 1 where exists (select 1 from cf_players p where p.code = t.code and p.uid = u and p.left_at is null);
+end $$;
+
+create or replace function cf_my_hats() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'hat', coalesce((select hat from cf_profiles where uid = cf_me()), ''),
+    'hats', (select coalesce(jsonb_agg(distinct kind), '[]') from cf_hats where uid = cf_me()))
+$$;
+
+-- short text message (max 60 characters, one every 3 seconds); stored as 't:<text>'
+create or replace function cf_say_text(p_code text, p_text text) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); c text := upper(p_code); m text := btrim(regexp_replace(coalesce(p_text, ''), '\s+', ' ', 'g'));
+begin
+  if m = '' or char_length(m) > 60 then raise exception 'bad message'; end if;
+  if not exists (select 1 from cf_players where code = c and uid = u and left_at is null) then raise exception 'not at table'; end if;
+  if exists (select 1 from cf_chat where code = c and uid = u and t > now() - interval '3 seconds') then raise exception 'too fast'; end if;
+  insert into cf_chat(code, uid, msg) values (c, u, 't:' || m);
+  delete from cf_chat where code = c and t < now() - interval '5 minutes';
+end $$;
+
+-- ---------------------------------------------------------------------
 -- delete my online profile and everything tied to it (Google Play requirement)
 -- ---------------------------------------------------------------------
 create or replace function cf_delete_me() returns void
@@ -1124,6 +1196,7 @@ begin
   delete from cf_chat where uid = u;
   delete from cf_drinks where from_uid = u or to_uid = u;
   delete from cf_cup_votes where uid = u;
+  delete from cf_hats where uid = u;
   delete from cf_profiles where uid = u;
 end $$;
 
@@ -1140,7 +1213,8 @@ begin
                      'cf_set_advisor','cf_restart','cf_view','cf_group_create','cf_group_join','cf_group_leave',
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
-                     'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me') then
+                     'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me',
+                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

@@ -34,7 +34,7 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import kotlin.math.max
 
-class OPlayer(val uid: String, val name: String, val img: String?, val on: Boolean, val pending: Boolean, val left: Boolean)
+class OPlayer(val uid: String, val name: String, val img: String?, val on: Boolean, val pending: Boolean, val left: Boolean, val hat: String? = null)
 class OTable(val code: String, val name: String, val status: String, val players: Int, val host: Boolean = false)
 class OFriend(val uid: String, val name: String, val img: String, val online: Boolean, val table: String?)
 class OInvite(val id: Long, val code: String, val from: String, val name: String)
@@ -186,7 +186,8 @@ object Online {
             val o = e.jsonObject
             val uid = o["uid"]!!.jsonPrimitive.content
             OPlayer(uid, o["name"]?.jsonPrimitive?.contentOrNull ?: "?", o["img"]?.jsonPrimitive?.contentOrNull ?: oldImgs[uid],
-                o["on"]?.jsonPrimitive?.booleanOrNull ?: false, o["pending"]?.jsonPrimitive?.booleanOrNull ?: false, o["left"]?.jsonPrimitive?.booleanOrNull ?: false)
+                o["on"]?.jsonPrimitive?.booleanOrNull ?: false, o["pending"]?.jsonPrimitive?.booleanOrNull ?: false, o["left"]?.jsonPrimitive?.booleanOrNull ?: false,
+                o["hat"]?.jsonPrimitive?.contentOrNull)
         }
         val h = r["hole"]?.jsonObject
         holeHand = h?.get("hand")?.jsonPrimitive?.intOrNull ?: 0
@@ -224,6 +225,7 @@ object Online {
             val p = Game.P.getOrPut(op.uid) { Player(op.uid, op.name, stored = op.uid != me) }
             p.name = if (op.uid == me) Game.P.getValue("hero").name else op.name
             if (op.img != null) p.img = op.img
+            if (op.hat != null) { p.hat = op.hat; if (op.uid == me) Game.P.getValue("hero").hat = op.hat }
             if (op.uid != me) p.stored = true
         }
         for (st in v.seats) if (Game.P[st.pid] == null) Game.P[st.pid] = Player(st.pid, "?", stored = st.pid != me)

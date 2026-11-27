@@ -462,6 +462,8 @@ private fun SeatSheet(k: Int) {
             }
             if (com.onoseto.chipsnfish.online.Social.available() && com.onoseto.chipsnfish.online.SupaCfg.configured)
                 Btn("🍹 " + L("Drink", "Drink", "Drink"), BK.DARK, height = 34.dp) { Ui.close(); com.onoseto.chipsnfish.online.Social.openPanel("drink", s.pid) }
+            if (com.onoseto.chipsnfish.online.Social.available() && com.onoseto.chipsnfish.online.SupaCfg.configured)
+                Btn("🎩 " + L("Klobouk", "Hat", "Hut"), BK.DARK, height = 34.dp) { Ui.close(); com.onoseto.chipsnfish.online.Social.openPanel("hat", s.pid) }
         }
     }
     if (s.actions.isNotEmpty()) ActionChips(s.actions)

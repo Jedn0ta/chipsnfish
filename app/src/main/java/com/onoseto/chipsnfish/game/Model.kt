@@ -42,6 +42,7 @@ data class Player(
     var stored: Boolean = false,
     var bot: Boolean = false,
     var bt: String? = null,
+    var hat: String = "",
 )
 
 @Serializable

@@ -304,6 +304,12 @@ fun Avatar(p: Player, size: Dp, ring: Color? = null, shape: Shape = CircleShape,
             if (img != null) Image(img, null, Modifier.fillMaxSize().padding(border - 0.5.dp).clip(shape), contentScale = ContentScale.Crop)
             else T(initials(p.name), (size.value * 0.36f).sp, Color.White, num = true)
         }
+        // hat on the head (bought with wallet chips)
+        val hat = com.onoseto.chipsnfish.online.Social.hatIcon(p.hat)
+        if (hat.isNotEmpty() && size >= 22.dp) Box(
+            Modifier.align(Alignment.TopCenter).offset(x = size * 0.06f, y = -size * 0.42f)
+                .graphicsLayer(rotationZ = -14f, alpha = if (dim) 0.6f else 1f),
+        ) { T(hat, (size.value * 0.5f).sp, lineHeight = (size.value * 0.6f).sp) }
         overlay()
     }
 }

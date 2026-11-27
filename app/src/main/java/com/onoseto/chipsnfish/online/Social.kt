@@ -44,6 +44,34 @@ object Social {
     )
     fun drink(id: String) = DRINKS.firstOrNull { it.id == id }
 
+    /** Hats are worn on the avatar and stay (online: on the server profile). */
+    val HATS = listOf(
+        Drink("cap", "🧢", "Kšiltovka", "Cap", "Kappe", 100),
+        Drink("helmet", "⛑️", "Helma", "Helmet", "Helm", 120),
+        Drink("straw", "👒", "Slamák", "Straw hat", "Strohhut", 150),
+        Drink("grad", "🎓", "Absolventská", "Grad cap", "Doktorhut", 200),
+        Drink("top", "🎩", "Cylindr", "Top hat", "Zylinder", 300),
+        Drink("crown", "👑", "Koruna", "Crown", "Krone", 1000),
+    )
+    fun hat(id: String) = HATS.firstOrNull { it.id == id }
+    fun hatIcon(id: String) = hat(id)?.icon ?: ""
+
+    /** Quick phrases for the short chat. */
+    fun phrases() = listOf(
+        L("Pěkná hra 👍", "Nice game 👍", "Schönes Spiel 👍"), "GG", L("Hodně štěstí 🍀", "Good luck 🍀", "Viel Glück 🍀"),
+        L("Bluf! 😏", "Bluff! 😏", "Bluff! 😏"), L("To jsem nečekal 😱", "Didn't see that coming 😱", "Das kam unerwartet 😱"),
+        L("Ještě jednu?", "One more?", "Noch eine?"), L("Díky 🙏", "Thanks 🙏", "Danke 🙏"), L("Sorry 😅", "Sorry 😅", "Sorry 😅"),
+        L("Pospěš si ⏳", "Hurry up ⏳", "Beeil dich ⏳"), L("Na zdraví 🍻", "Cheers 🍻", "Prost 🍻"),
+    )
+    const val TEXT_MAX = 60
+    private val BAD = listOf("kurv", "píč", "pič", "prdel", "kokot", "debil", "zmrd", "hovn", "čurák", "curak", "mrdk", "šuk", "fuck", "shit", "bitch", "cunt", "dick", "asshole")
+    /** Short chat: one line, max 60 characters, rude words starred out. */
+    fun clean(t: String): String {
+        val one = t.replace(Regex("\\s+"), " ").trim().take(TEXT_MAX)
+        return one.split(" ").joinToString(" ") { w -> if (BAD.any { w.lowercase().contains(it) }) w.take(1) + "*".repeat((w.length - 1).coerceIn(2, 6)) else w }
+    }
+    var myHats by mutableStateOf<List<String>>(emptyList())
+
     class Bubble(val text: String, val id: Long)
     class TDrink(val id: Long, val from: String, val to: String, val kind: String, val t: Long)
     class Fly(val id: Long, val from: String, val to: String, val icon: String)
@@ -69,7 +97,8 @@ object Social {
 
     fun openPanel(t: String = "emoji", who: String? = null) {
         tab = t; target = who ?: target; open = true
-        if (t == "drink" || bank == null) loadBank()
+        if (t == "drink" || t == "hat" || bank == null) loadBank()
+        if (t == "hat") loadHats()
     }
 
     fun resetTable() {
@@ -81,7 +110,7 @@ object Social {
     /** Drinks on the table for this player, newest first (only the last 15 minutes). */
     fun drinksFor(pid: String): List<TDrink> {
         val now = System.currentTimeMillis()
-        return drinks.filter { it.to == pid && now - it.t < KEEP }.sortedByDescending { it.id }
+        return drinks.filter { it.to == pid && !it.kind.startsWith("hat:") && now - it.t < KEEP }.sortedByDescending { it.id }
     }
 
     // ---------------- sending ----------------
@@ -97,6 +126,73 @@ object Social {
                 catch (e: Exception) { Game.toast(err(e)) }
             }
         } else botsAnswer(m)
+    }
+
+    fun sendText(raw: String) {
+        val t = clean(raw)
+        if (t.isEmpty()) return
+        say(myPid(), t)
+        if (Game.online()) {
+            val c = Online.code ?: return
+            Game.scope.launch {
+                try { Supa.rpc("cf_say_text", buildJsonObject { put("p_code", c); put("p_text", t) }) }
+                catch (e: Exception) { Game.toast(err(e)) }
+            }
+        } else botsAnswer(emptyList())
+    }
+
+    /** Buy a hat for someone at the table or for yourself; it goes straight on their head. */
+    fun buyHat(to: String, kind: String, onOk: () -> Unit = {}) {
+        val d = hat(kind) ?: return
+        val b = bank
+        if (b != null && b < d.price) { Game.toast(L("V peněžence nemáš dost žetonů.", "Not enough chips in your wallet.", "Nicht genug Chips in deiner Geldbörse.")); return }
+        val self = to == myPid()
+        Game.scope.launch {
+            try {
+                val online = Game.online()
+                if (!SupaCfg.configured) throw IllegalStateException("offline")
+                Supa.ensureAuth()
+                val r = Supa.rpc("cf_hat_buy", buildJsonObject {
+                    if (online) put("p_code", Online.code) else put("p_code", JsonNull)
+                    if (online && !self) put("p_to", to) else put("p_to", JsonNull)
+                    put("p_kind", kind); put("p_self", self)
+                }).jsonObject
+                Fame.applyWallet(r)
+                if (self) { myHats = (myHats + kind).distinct() }
+                onOk()
+                if (online) Online.poll()
+                else {
+                    Game.P[to]?.hat = kind
+                    if (!self) {
+                        flies.add(Fly(localId++, myPid(), to, d.icon)); Game.saveLocal()
+                        Game.scope.launch { delay(1600); say(to, listOf("😎", "🙏", "🥳", "👍", "❤️").random()) }
+                    }
+                    Game.bump()
+                }
+            } catch (e: Exception) { Game.toast(err(e)) }
+        }
+    }
+
+    fun wearHat(kind: String) {
+        Game.scope.launch {
+            try {
+                Supa.rpc("cf_hat_wear", buildJsonObject { put("p_kind", kind) })
+                Game.P["hero"]?.hat = kind; Game.P[Online.me]?.hat = kind; Game.bump()
+                if (Game.online()) Online.poll()
+            } catch (e: Exception) { Game.toast(err(e)) }
+        }
+    }
+
+    fun loadHats() {
+        if (!SupaCfg.configured) return
+        Game.scope.launch {
+            try {
+                val o = Supa.rpc("cf_my_hats").jsonObject
+                myHats = (o["hats"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
+                val h = o["hat"]?.jsonPrimitive?.contentOrNull ?: ""
+                Game.P["hero"]?.hat = h; Game.P[Online.me]?.hat = h; Game.bump()
+            } catch (_: Exception) { }
+        }
     }
 
     fun buy(to: String, kind: String, onOk: () -> Unit = {}) {
@@ -145,6 +241,7 @@ object Social {
         return when {
             m.contains("no money") -> L("V peněžence nemáš dost žetonů.", "Not enough chips in your wallet.", "Nicht genug Chips in deiner Geldbörse.")
             m.contains("too fast") -> L("Pomaleji 🙂", "Slow down 🙂", "Langsamer 🙂")
+            m.contains("bad message") -> L("Zpráva je moc dlouhá (max 60 znaků).", "Message too long (max 60 characters).", "Nachricht zu lang (max. 60 Zeichen).")
             m == "offline" -> L("Drinky jdou koupit jen s připojením k internetu.", "Drinks need an internet connection.", "Drinks brauchen eine Internetverbindung.")
             m.contains("Could not find the function", true) || m.contains("PGRST202") ->
                 L("Na serveru chybí aktualizace (spusť znovu schema.sql).", "The server needs an update (run schema.sql again).", "Der Server braucht ein Update (schema.sql erneut ausführen).")
@@ -166,8 +263,9 @@ object Social {
                 mx = maxOf(mx, id)
                 val uid = o["uid"]?.jsonPrimitive?.contentOrNull ?: continue
                 if (first || uid == me) continue
-                val txt = (o["m"]?.jsonPrimitive?.contentOrNull ?: "").split(",").mapNotNull { it.trim().toIntOrNull() }
-                    .filter { it in EMOJI.indices }.take(MAX).joinToString("") { EMOJI[it] }
+                val raw = o["m"]?.jsonPrimitive?.contentOrNull ?: ""
+                val txt = if (raw.startsWith("t:")) clean(raw.drop(2))
+                    else raw.split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in EMOJI.indices }.take(MAX).joinToString("") { EMOJI[it] }
                 if (txt.isNotEmpty()) bubbles[uid] = Bubble(txt, id)
             }
             lastChat = maxOf(mx, 0)
@@ -181,11 +279,13 @@ object Social {
                     o["kind"]?.jsonPrimitive?.contentOrNull ?: "", now - (o["age"]?.jsonPrimitive?.long ?: 0L))
             }
             if (!first) for (d in list) if (d.id > lastDrink) {
-                val dk = drink(d.kind) ?: continue
+                val isHat = d.kind.startsWith("hat:")
+                val dk = (if (isHat) hat(d.kind.drop(4)) else drink(d.kind)) ?: continue
                 flies.add(Fly(d.id, d.from, d.to, dk.icon))
                 if (d.to == me && d.from != me) {
                     val who = Game.P[d.from]?.name ?: "?"
                     Game.toast(L("$who ti koupil(a) ${dk.icon} ${dk.cs}!", "$who bought you ${dk.icon} ${dk.en}!", "$who hat dir ${dk.icon} ${dk.de} spendiert!"))
+                    if (isHat) myHats = (myHats + d.kind.drop(4)).distinct()
                 }
             }
             lastDrink = maxOf(lastDrink, list.maxOfOrNull { it.id } ?: 0L, 0L)

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.onoseto.chipsnfish.ui
 
 import androidx.compose.animation.core.Animatable
@@ -108,7 +110,11 @@ fun SocialFx(geo: Geo, w: Float, h: Float) {
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (above) 1f else 0f))
                         .shadow(8.dp, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp)).background(Color.White)
                         .padding(horizontal = 10.dp, vertical = 3.dp),
-                ) { T(b.text, 24.sp, Color.Black, lineHeight = 32.sp, maxLines = 1) }
+                ) {
+                    val isText = b.text.any { it.isLetterOrDigit() }
+                    if (isText) T(b.text, 14.sp, Color.Black, FontWeight.Bold, lineHeight = 17.sp, maxLines = 2, align = TextAlign.Center)
+                    else T(b.text, 24.sp, Color.Black, lineHeight = 32.sp, maxLines = 1)
+                }
             }
         }
     }
@@ -142,20 +148,22 @@ fun SocialPop() {
     if (!Social.open) return
     val shape = RoundedCornerShape(14.dp)
     Column(
-        Modifier.width(392.dp).shadow(12.dp, shape).clip(shape).background(C.panel).border(1.dp, C.line, shape).padding(8.dp),
+        Modifier.width(436.dp).shadow(12.dp, shape).clip(shape).background(C.panel).border(1.dp, C.line, shape).padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             SmallPill("😀 Emoji", Social.tab == "emoji") { Social.tab = "emoji" }
-            SmallPill("🍹 " + L("Drink pro hráče", "Buy a drink", "Drink spendieren"), Social.tab == "drink") { Social.openPanel("drink") }
+            SmallPill("💬 Chat", Social.tab == "chat") { Social.tab = "chat" }
+            SmallPill("🍹 Drink", Social.tab == "drink") { Social.openPanel("drink") }
+            SmallPill("🎩 " + L("Klobouk", "Hat", "Hut"), Social.tab == "hat") { Social.openPanel("hat") }
             Spacer(Modifier.weight(1f))
-            if (Social.tab == "drink") T("💰 " + (Social.bank?.let { Game.fm(it) } ?: "…"), 14.sp, C.gold, num = true)
+            if (Social.tab == "drink" || Social.tab == "hat") T("💰 " + (Social.bank?.let { Game.fm(it) } ?: "…"), 14.sp, C.gold, num = true)
             Box(Modifier.size(28.dp).clip(CircleShape).background(C.panel2).tap { Social.open = false }, contentAlignment = Alignment.Center) {
                 T("✕", 14.sp, C.muted, FontWeight.Bold)
             }
         }
         Box(Modifier.fillMaxWidth().height(164.dp)) {
-            if (Social.tab == "emoji") EmojiTab() else DrinkTab()
+            when (Social.tab) { "emoji" -> EmojiTab(); "chat" -> ChatTab(); "hat" -> HatTab(); else -> DrinkTab() }
         }
     }
 }
@@ -192,6 +200,98 @@ private fun EmojiTab() {
     }
 }
 
+/** Row of avatars to pick who gets a drink or hat. */
+@Composable
+private fun WhoRow(target: String?, mine: Boolean = false) {
+    watch()
+    val seats = Game.st.seats.filter { !it.out }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        T(L("Komu:", "To:", "Für:"), 11.5.sp, C.muted, FontWeight.Bold)
+        seats.take(10).forEach { s ->
+            val p = Game.pl(s)
+            val on = s.pid == target
+            Box(Modifier.size(32.dp).tap { Social.target = s.pid }, contentAlignment = Alignment.Center) {
+                Avatar(p, if (on) 32.dp else 27.dp, ring = if (on) C.gold else Color.White.copy(alpha = 0.25f), border = 2.dp, dim = !on)
+            }
+        }
+        if (mine) T(L("(já = pro sebe)", "(me = for myself)", "(ich = für mich)"), 10.sp, C.muted)
+    }
+}
+
+@Composable
+private fun ChatTab() {
+    watch()
+    var txt by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).padding(start = 10.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(Modifier.weight(1f)) {
+                if (txt.isEmpty()) T(L("Krátká zpráva…", "Short message…", "Kurze Nachricht…"), 13.sp, C.muted, maxLines = 1)
+                androidx.compose.foundation.text.BasicTextField(
+                    txt, { txt = it.replace("\n", " ").take(Social.TEXT_MAX) }, singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = C.ink, fontSize = 15.sp),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(C.gold), modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            T("${txt.length}/${Social.TEXT_MAX}", 10.5.sp, if (txt.length >= Social.TEXT_MAX) C.gold else C.muted, num = true)
+            Btn(L("Poslat", "Send", "Senden"), BK.GOLD, Modifier.width(88.dp), enabled = txt.isNotBlank(), height = 32.dp) {
+                Social.sendText(txt); txt = ""; Social.open = false
+            }
+        }
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Social.phrases().forEach { ph -> SmallPill(ph, false) { Social.sendText(ph); Social.open = false } }
+        }
+        T(L("Max 60 znaků, jedna zpráva za 3 s. Sprostá slova se nahradí hvězdičkami.", "Max 60 characters, one message every 3 s. Rude words are starred out.", "Max. 60 Zeichen, eine Nachricht alle 3 s. Schimpfwörter werden ersetzt."), 10.sp, C.muted, maxLines = 1)
+    }
+}
+
+@Composable
+private fun HatTab() {
+    watch()
+    val seats = Game.st.seats.filter { !it.out }
+    val target = Social.target?.takeIf { t -> seats.any { it.pid == t } } ?: Social.myPid()
+    var pick by remember { mutableStateOf("top") }
+    val d = Social.hat(pick)!!
+    val self = target == Social.myPid()
+    val who = seats.firstOrNull { it.pid == target }?.let { Game.pl(it) }
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        WhoRow(target, mine = true)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Social.HATS.forEach { x ->
+                val on = x.id == pick
+                Column(
+                    Modifier.width(66.dp).clip(RoundedCornerShape(10.dp)).background(if (on) C.gold.copy(alpha = 0.22f) else C.panel2)
+                        .border(1.dp, if (on) C.gold else Color.Transparent, RoundedCornerShape(10.dp)).tap { pick = x.id }.padding(vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    T(x.icon, 20.sp, lineHeight = 24.sp)
+                    T(x.name(), 9.5.sp, C.ink, FontWeight.Bold, maxLines = 1, lineHeight = 11.sp)
+                    T(Game.fm(x.price), 11.sp, C.gold, num = true, lineHeight = 13.sp)
+                }
+            }
+        }
+        val bank = Social.bank
+        val enough = bank == null || bank >= d.price
+        Btn(
+            "${d.icon} ${d.name()} " + L("pro", "for", "für") + " ${if (self) L("sebe", "me", "mich") else who?.name ?: "?"} · ${Game.fm(d.price)}",
+            BK.GOLD, Modifier.fillMaxWidth(), enabled = who != null && enough, height = 32.dp,
+        ) { Social.buyHat(target, pick) { Social.open = false } }
+        // my hats: what to wear
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            val worn = Game.P["hero"]?.hat ?: ""
+            T(L("Nosím:", "Wearing:", "Trage:"), 10.5.sp, C.muted, FontWeight.Bold)
+            if (Social.myHats.isEmpty()) T(L("zatím žádný klobouk", "no hat yet", "noch kein Hut"), 10.5.sp, C.muted)
+            Social.myHats.forEach { h ->
+                Box(Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(if (h == worn) C.gold.copy(alpha = 0.3f) else C.panel2)
+                    .tap { Social.wearHat(h) }, contentAlignment = Alignment.Center) { T(Social.hatIcon(h), 14.sp, lineHeight = 17.sp) }
+            }
+            if (worn.isNotEmpty()) SmallPill(L("Sundat", "Take off", "Absetzen"), false) { Social.wearHat("") }
+        }
+    }
+}
+
 @Composable
 private fun DrinkTab() {
     watch()
@@ -201,17 +301,7 @@ private fun DrinkTab() {
     val d = Social.drink(pick)!!
     val who = seats.firstOrNull { it.pid == target }?.let { Game.pl(it) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        // who gets it
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            T(L("Komu:", "To:", "Für:"), 11.5.sp, C.muted, FontWeight.Bold)
-            seats.take(10).forEach { s ->
-                val p = Game.pl(s)
-                val on = s.pid == target
-                Box(Modifier.size(32.dp).tap { Social.target = s.pid }, contentAlignment = Alignment.Center) {
-                    Avatar(p, if (on) 32.dp else 27.dp, ring = if (on) C.gold else Color.White.copy(alpha = 0.25f), border = 2.dp, dim = !on)
-                }
-            }
-        }
+        WhoRow(target)
         // which drink
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Social.DRINKS.forEach { x ->

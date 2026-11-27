@@ -50,6 +50,7 @@ object Fame {
         o["bank"]?.jsonPrimitive?.intOrNull?.let { Social.bank = it }
         o["honor"]?.jsonPrimitive?.intOrNull?.let { honor = it }
         o["cups"]?.jsonPrimitive?.intOrNull?.let { cups = it }
+        o["hat"]?.jsonPrimitive?.contentOrNull?.let { h -> Game.P["hero"]?.hat = h; Game.P[Online.me]?.hat = h; Game.bump() }
         val bonus = o["bonus"]?.jsonPrimitive?.intOrNull ?: 0
         if (bonus > 0) Game.toast(L("Denní bonus 🎁 +$bonus žetonů do peněženky", "Daily bonus 🎁 +$bonus chips to your wallet", "Tagesbonus 🎁 +$bonus Chips in die Geldbörse"))
     }
