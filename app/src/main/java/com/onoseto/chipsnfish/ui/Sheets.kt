@@ -820,28 +820,7 @@ private fun SettingsSheet(d: SettingsArg) {
                 }
             } else DefaultTableSettings()
         }
-        "look" -> {
-            LookPanels()
-            LookTableSize()
-            Label(L("Žetony · hodnoty podle vaší sady", "Chips · values of your set", "Chips · Werte eures Sets"))
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                g.chips.forEach { c ->
-                    var v by remember(c.k) { mutableStateOf(c.v.toString()) }
-                    Column(
-                        Modifier.width(128.dp).alpha(if (c.off) 0.5f else 1f).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 5.dp, bottomEnd = 18.dp, bottomStart = 5.dp))
-                            .background(Color.White.copy(alpha = 0.07f)).border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(topStart = 18.dp, topEnd = 5.dp, bottomEnd = 18.dp, bottomStart = 5.dp)).padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            ChipIcon(c, 24.dp)
-                            T(tr(c.l), 12.5.sp, Color.White, FontWeight.Bold, maxLines = 1, fit = true, modifier = Modifier.weight(1f))
-                        }
-                        Field(v, { t -> v = t.filter { it.isDigit() }.take(6); v.toIntOrNull()?.let { if (it >= 1) { c.v = it; g.saveChips(); g.bump() } } }, Modifier.fillMaxWidth(), number = true, big = true, minH = 34.dp)
-                        SmallPill(if (c.off) L("Nepoužívat ✓", "Not used ✓", "Nicht genutzt ✓") else L("Používat", "In use", "In Benutzung"), !c.off) { c.off = !c.off; g.saveChips(); g.bump(); Ui.redraw() }
-                    }
-                }
-            }
-        }
+        "look" -> LookSettings()
         "data" -> {
             val me = g.P.getValue("hero")
             var name by remember { mutableStateOf(me.name) }

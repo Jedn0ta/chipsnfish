@@ -181,6 +181,14 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
     }
 }
 
+fun backCols(back: String): Triple<Color, Color, Color> = when (back) {
+    "blue" -> Triple(Color(0xFF2456AE), Color(0xFF142F66), Color(0xFFE8C56A))
+    "green" -> Triple(Color(0xFF1F7D4C), Color(0xFF0C4128), Color(0xFFE8C56A))
+    "black" -> Triple(Color(0xFF34363A), Color(0xFF101112), Color(0xFFD9DCE0))
+    "gold" -> Triple(Color(0xFFCFA54C), Color(0xFF7E5A18), Color(0xFFFFF4DA))
+    else -> Triple(Color(0xFFA8202B), Color(0xFF680D15), Color(0xFFE8C56A))
+}
+
 @Composable
 fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifier) {
     watch()
@@ -191,13 +199,7 @@ fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifie
                 FishLogo(Modifier.size(cw * 0.7f))
             }
         } else {
-            val (a, b, t) = when (back) {
-                "blue" -> Triple(Color(0xFF2456AE), Color(0xFF142F66), Color(0xFFE8C56A))
-                "green" -> Triple(Color(0xFF1F7D4C), Color(0xFF0C4128), Color(0xFFE8C56A))
-                "black" -> Triple(Color(0xFF34363A), Color(0xFF101112), Color(0xFFD9DCE0))
-                "gold" -> Triple(Color(0xFFCFA54C), Color(0xFF7E5A18), Color(0xFFFFF4DA))
-                else -> Triple(Color(0xFFA8202B), Color(0xFF680D15), Color(0xFFE8C56A))
-            }
+            val (a, b, t) = backCols(back)
             Canvas(Modifier.fillMaxSize()) { with(CardArt) { back(a, b, t) } }
         }
     }

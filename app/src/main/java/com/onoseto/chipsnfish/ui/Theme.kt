@@ -52,27 +52,31 @@ object C {
     )
     val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Vínová", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
     val BACKS = linkedMapOf("red" to "Rudý", "blue" to "Modrý", "green" to "Zelený", "black" to "Černý", "gold" to "Zlatý", "fish" to "Rybí")
-    val FACES = linkedMapOf("picture" to "Klasické obrázky", "classic" to "Velké indexy", "jumbo" to "Extra velké", "four" to "Čtyřbarevný")
+    val FACES = linkedMapOf("picture" to "Klasické", "classic" to "Velké indexy", "jumbo" to "Extra velké", "four" to "Čtyřbarevné")
 
-    /** Felt key is either a preset name or "h:<hue 0..360>:<intensity 0..1>" from the palette slider. */
-    fun feltHue(key: String): Pair<Float, Float> {
+    /** Suggested table colours: hue, intensity (0 = charcoal). */
+    val FELT_PRESETS = listOf(150f to 1f, 213f to 1f, 350f to 1f, 268f to 1f, 41f to 1f, 213f to 0f)
+
+    /** Felt key is a preset name or "h:<hue>:<intensity>:<tone>" (tone 0 dark … 1 light, 0.5 = standard). */
+    fun feltHue(key: String): Triple<Float, Float, Float> {
         if (key.startsWith("h:")) {
             val p = key.split(":")
-            return (p.getOrNull(1)?.toFloatOrNull() ?: 213f).coerceIn(0f, 360f) to (p.getOrNull(2)?.toFloatOrNull() ?: 1f).coerceIn(0f, 1f)
+            return Triple((p.getOrNull(1)?.toFloatOrNull() ?: 213f).coerceIn(0f, 360f), (p.getOrNull(2)?.toFloatOrNull() ?: 1f).coerceIn(0f, 1f), (p.getOrNull(3)?.toFloatOrNull() ?: 0.5f).coerceIn(0f, 1f))
         }
-        return when (key) { "green" -> 150f to 1f; "red" -> 350f to 1f; "purple" -> 268f to 1f; "gold" -> 41f to 1f; "black" -> 213f to 0f; else -> 213f to 1f }
+        val (h, i) = when (key) { "green" -> 150f to 1f; "red" -> 350f to 1f; "purple" -> 268f to 1f; "gold" -> 41f to 1f; "black" -> 213f to 0f; else -> 213f to 1f }
+        return Triple(h, i, 0.5f)
     }
 
-    fun feltKey(h: Float, i: Float) = "h:${h.roundToInt()}:${(i * 100).roundToInt() / 100f}"
+    fun feltKey(h: Float, i: Float, t: Float = 0.5f) = "h:${h.roundToInt()}:${(i * 100).roundToInt() / 100f}:${(t * 100).roundToInt() / 100f}"
 
-    /** Light (lamp), mid, dark, edge — generated from hue + intensity so any colour works. */
+    /** Light (lamp), mid, dark, edge — generated from hue, intensity and tone so any colour works. */
     fun felt(key: String): List<Long> {
-        FELTS[key]?.let { return it }
-        val (h, i) = feltHue(key)
-        val vs = 0.4f + 0.6f * i
-        fun c(s: Float, v: Float) = android.graphics.Color.HSVToColor(floatArrayOf(h, s * i, v * vs)).toLong() and 0xFFFFFFFFL
+        val (h, i, t) = feltHue(key)
+        val vs = (0.4f + 0.6f * i) * (0.55f + 0.9f * t)
+        fun c(s: Float, v: Float) = android.graphics.Color.HSVToColor(floatArrayOf(h, s * i, (v * vs).coerceAtMost(1f))).toLong() and 0xFFFFFFFFL
         return listOf(c(0.70f, 0.83f), c(0.81f, 0.60f), c(0.87f, 0.34f), c(0.89f, 0.21f))
     }
+
 }
 
 object F {
