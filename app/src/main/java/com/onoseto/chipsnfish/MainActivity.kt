@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         Game.onChipSound = { Sound.chip() }
         com.onoseto.chipsnfish.online.Supa.init(this)
         com.onoseto.chipsnfish.online.KeepAlive.schedule(this)
+        com.onoseto.chipsnfish.online.Invites.schedule(this)
         handleLink(intent)
         if (android.os.Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -51,6 +52,8 @@ class MainActivity : ComponentActivity() {
         val t = u.getQueryParameter("t") ?: if (u.scheme == "chipsnfish" && u.host == "t") u.lastPathSegment else null
         val g = u.getQueryParameter("g") ?: if (u.scheme == "chipsnfish" && u.host == "g") u.lastPathSegment else null
         val f = u.getQueryParameter("f") ?: if (u.scheme == "chipsnfish" && u.host == "f") u.lastPathSegment else null
+        // opened from an invite notification: count it as accepted
+        u.getQueryParameter("inv")?.toLongOrNull()?.let { com.onoseto.chipsnfish.online.Invites.answer(this, it, true) }
         when {
             !f.isNullOrBlank() -> Ui.deep = "f" to f.trim()
             !t.isNullOrBlank() -> Ui.deep = "t" to t.trim()

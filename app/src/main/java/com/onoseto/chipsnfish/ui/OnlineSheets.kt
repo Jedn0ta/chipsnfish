@@ -377,6 +377,7 @@ fun FriendSheet(f: OFriend) {
             Ui.close(); O.challenge(f) { goTable() }
         }
     }
+    DuelLater(f)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Btn(L("Statistiky", "Statistics", "Statistiken"), BK.GHOST, Modifier.weight(1f), height = 38.dp) {
             if (Game.P[f.uid] == null) Game.P[f.uid] = Player(f.uid, f.name, img = f.img, stored = true)
@@ -400,9 +401,52 @@ fun InboxBanner(modifier: Modifier = Modifier) {
             .border(1.dp, C.win.copy(alpha = 0.7f), RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        T("✉", 18.sp, C.win)
-        T(L("${inv.from} tě zve ke stolu ${inv.code}", "${inv.from} invites you to table ${inv.code}", "${inv.from} lädt dich an Tisch ${inv.code} ein") + if (inv.name.isNotBlank()) " · ${inv.name}" else "", 14.sp, C.ink, FontWeight.Bold, modifier = Modifier.weight(1f, fill = false), maxLines = 1)
-        Btn(L("Přisednout", "Join", "Beitreten"), BK.CALL, height = 34.dp) { Online.dismissInvite(inv); Online.join(inv.code) { goTable() } }
-        T("✕", 14.sp, C.muted, modifier = Modifier.tap { Online.dismissInvite(inv) }.padding(4.dp))
+        val later = inv.at != null && inv.at > System.currentTimeMillis() + 60_000
+        T(if (inv.duel) "⚔" else "✉", 18.sp, C.win)
+        T((if (inv.duel) L("${inv.from} tě vyzývá na duel", "${inv.from} challenges you", "${inv.from} fordert dich heraus") else L("${inv.from} tě zve ke stolu ${inv.code}", "${inv.from} invites you to table ${inv.code}", "${inv.from} lädt dich an Tisch ${inv.code} ein")) +
+            (if (later) L(" v ${com.onoseto.chipsnfish.online.hhmm(inv.at!!)}", " at ${com.onoseto.chipsnfish.online.hhmm(inv.at!!)}", " um ${com.onoseto.chipsnfish.online.hhmm(inv.at!!)}") else "") +
+            (if (inv.ans == "yes") " ✓" else ""), 14.sp, C.ink, FontWeight.Bold, modifier = Modifier.weight(1f, fill = false), maxLines = 1)
+        if (later && inv.ans == null) {
+            Btn(L("Přijmout", "Accept", "Annehmen"), BK.CALL, height = 34.dp) { Online.answerInvite(inv, true) }
+            Btn(L("Odmítnout", "Decline", "Ablehnen"), BK.DARK, height = 34.dp) { Online.answerInvite(inv, false) }
+        } else {
+            Btn(L("Přisednout", "Join", "Beitreten"), BK.CALL, height = 34.dp) { if (inv.ans == null) Online.answerInvite(inv, true); Online.dismissInvite(inv); Online.join(inv.code) { goTable() } }
+            T("✕", 14.sp, C.muted, modifier = Modifier.tap { if (inv.ans == null) Online.answerInvite(inv, false) else Online.dismissInvite(inv) }.padding(4.dp))
+        }
     }
+}
+
+/** Duel at a set time: at least 15 minutes ahead (the friend's phone checks for invites every ~15 minutes). */
+@Composable
+private fun DuelLater(f: com.onoseto.chipsnfish.online.OFriend) {
+    val O = Online
+    val minAt = remember { roundUp5(System.currentTimeMillis() + 15 * 60_000L) }
+    var at by remember { mutableStateOf(minAt) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        T(L("Duel později:", "Duel later:", "Duell später:"), 12.5.sp, GlassMuted, FontWeight.Bold)
+        listOf(15, 30, 60, 120).forEach { m ->
+            val v = roundUp5(System.currentTimeMillis() + m * 60_000L)
+            SmallChoice(if (m < 60) "+$m min" else "+${m / 60} h", at == v) { at = v }
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SmallChoice("  −  ", false) { at = maxOf(minAt, at - 15 * 60_000L) }
+        T(com.onoseto.chipsnfish.online.hhmm(at), 20.sp, Color.White, num = true)
+        SmallChoice("  +  ", false) { at += 15 * 60_000L }
+        Spacer(Modifier.weight(1f))
+        Btn("⚔ " + L("Vyzvat na ", "Challenge for ", "Herausfordern um ") + com.onoseto.chipsnfish.online.hhmm(at), BK.RAISE, height = 36.dp, enabled = !O.busy) {
+            val t = maxOf(at, System.currentTimeMillis() + 15 * 60_000L)
+            Ui.close(); O.challenge(f, t) { }
+        }
+    }
+}
+
+private fun roundUp5(ms: Long): Long { val step = 5 * 60_000L; return (ms + step - 1) / step * step }
+
+@Composable
+private fun SmallChoice(text: String, on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) LobbyBlue.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.07f))
+            .border(1.dp, if (on) LobbyBlue else Color.White.copy(alpha = 0.16f), RoundedCornerShape(99.dp)).tap(onClick).padding(horizontal = 9.dp, vertical = 5.dp),
+    ) { T(text, 12.sp, Color.White, FontWeight.Bold, maxLines = 1) }
 }

@@ -1401,6 +1401,57 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 -- ---------------------------------------------------------------------
+-- invites and duel challenges, also for a set time (at least 15 minutes
+-- ahead); friends answer yes / no (also straight from the notification)
+-- ---------------------------------------------------------------------
+alter table cf_invites add column if not exists at timestamptz;
+alter table cf_invites add column if not exists kind text not null default 'invite';
+alter table cf_invites add column if not exists ans text;
+
+create or replace function cf_invite_at(p_uid uuid, p_code text, p_at timestamptz, p_kind text default 'duel') returns bigint
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); v bigint;
+begin
+  if not exists (select 1 from cf_tables where code = p_code) then raise exception 'table not found'; end if;
+  if p_at is not null and p_at < now() + interval '14 minutes' then raise exception 'at least 15 minutes ahead'; end if;
+  if p_at is not null and p_at > now() + interval '7 days' then raise exception 'too far ahead'; end if;
+  delete from cf_invites where to_uid = p_uid and from_uid = u and code = p_code;
+  insert into cf_invites(to_uid, from_uid, code, at, kind) values (p_uid, u, p_code, p_at, case when p_kind = 'duel' then 'duel' else 'invite' end)
+    returning id into v;
+  return v;
+end $$;
+
+-- invites for me: unanswered or accepted, until 30 minutes after they were sent / after their time
+create or replace function cf_inbox() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  perform cf_touch();
+  delete from cf_invites where coalesce(at, t) < now() - interval '30 minutes';
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', i.id, 'code', i.code, 'from', coalesce(p.name, '?'), 'name', coalesce(t.name, ''),
+                  'at', i.at, 'kind', i.kind, 'ans', i.ans) order by coalesce(i.at, i.t)), '[]')
+    from cf_invites i left join cf_profiles p on p.uid = i.from_uid left join cf_tables t on t.code = i.code
+    where i.to_uid = u and coalesce(i.ans, '') <> 'no' and coalesce(t.status, 'over') <> 'over');
+end $$;
+
+create or replace function cf_invite_answer(p_id bigint, p_yes boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update cf_invites set ans = case when p_yes then 'yes' else 'no' end where id = p_id and to_uid = cf_me();
+end $$;
+
+-- what I sent: answers and upcoming games
+create or replace function cf_outbox() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', i.id, 'code', i.code, 'to', coalesce(p.name, '?'), 'at', i.at, 'kind', i.kind, 'ans', i.ans)
+                  order by coalesce(i.at, i.t)), '[]')
+    from cf_invites i left join cf_profiles p on p.uid = i.to_uid
+    where i.from_uid = u and coalesce(i.at, i.t) > now() - interval '30 minutes');
+end $$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -1414,7 +1465,7 @@ begin
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
                      'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me',
-                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek','cf_ask_card','cf_ask_answer','cf_advent_open','cf_advent_days') then
+                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek','cf_ask_card','cf_ask_answer','cf_advent_open','cf_advent_days','cf_invite_at','cf_invite_answer','cf_outbox') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

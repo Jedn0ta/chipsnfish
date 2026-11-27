@@ -40,6 +40,7 @@
                 <data android:scheme="chipsnfish" />
             </intent-filter>
         </activity>
+        <receiver android:name=".online.InviteReceiver" android:exported="false" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

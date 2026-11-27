@@ -37,7 +37,7 @@ import kotlin.math.max
 class OPlayer(val uid: String, val name: String, val img: String?, val on: Boolean, val pending: Boolean, val left: Boolean, val hat: String? = null)
 class OTable(val code: String, val name: String, val status: String, val players: Int, val host: Boolean = false)
 class OFriend(val uid: String, val name: String, val img: String, val online: Boolean, val table: String?)
-class OInvite(val id: Long, val code: String, val from: String, val name: String)
+class OInvite(val id: Long, val code: String, val from: String, val name: String, val at: Long? = null, val duel: Boolean = false, val ans: String? = null)
 class OGroup(val id: String, val name: String, val owner: String, val members: List<OPlayer>, val tables: List<OTable>)
 
 /** The online table session: polls the server about once a second and turns its state into the local view. */
@@ -574,17 +574,29 @@ object Online {
     }
 
     /** Challenge a friend: a fresh heads-up table and an invite for them. */
-    fun challenge(f: OFriend, onOk: () -> Unit) {
+    /** Duel: now (at = null) or at a set time, at least 15 minutes ahead. */
+    fun challenge(f: OFriend, at: Long? = null, onOk: () -> Unit) {
         val me = myName()
         create("⚔ $me vs ${f.name}".take(40), 100, 0, 5, advisor, null) { c ->
             Game.scope.launch {
                 try {
-                    Supa.rpc("cf_invite", args("p_uid" to f.uid, "p_code" to c))
-                    Game.toast(L("Výzva pro ${f.name} odeslána ⚔", "Challenge sent to ${f.name} ⚔", "Herausforderung an ${f.name} gesendet ⚔"))
+                    if (at == null) {
+                        Supa.rpc("cf_invite_at", args("p_uid" to f.uid, "p_code" to c, "p_at" to null, "p_kind" to "duel"))
+                        Game.toast(L("Výzva pro ${f.name} odeslána ⚔", "Challenge sent to ${f.name} ⚔", "Herausforderung an ${f.name} gesendet ⚔"))
+                    } else {
+                        Supa.rpc("cf_invite_at", args("p_uid" to f.uid, "p_code" to c, "p_at" to isoAt(at), "p_kind" to "duel"))
+                        Game.toast(L("Duel s ${f.name} naplánován na ${hhmm(at)} ⚔", "Duel with ${f.name} set for ${hhmm(at)} ⚔", "Duell mit ${f.name} um ${hhmm(at)} ⚔"))
+                    }
                 } catch (e: Exception) { Game.toast(err(e)) }
             }
-            onOk()
+            if (at == null) onOk()
         }
+    }
+
+    fun answerInvite(i: OInvite, yes: Boolean) {
+        if (!yes) dismissed.add(i.id)
+        inbox = if (yes) inbox.map { if (it.id == i.id) OInvite(it.id, it.code, it.from, it.name, it.at, it.duel, "yes") else it } else inbox.filter { it.id != i.id }
+        Game.scope.launch { runCatching { Supa.rpc("cf_invite_answer", buildJsonObject { put("p_id", i.id); put("p_yes", yes) }) } }
     }
 
     fun dismissInvite(i: OInvite) {
@@ -601,7 +613,8 @@ object Online {
                 try {
                     inbox = (Supa.rpc("cf_inbox") as JsonArray).map { e ->
                         val o = e.jsonObject
-                        OInvite(o["id"]!!.jsonPrimitive.long, o["code"]!!.jsonPrimitive.content, o["from"]?.jsonPrimitive?.contentOrNull ?: "?", o["name"]?.jsonPrimitive?.contentOrNull ?: "")
+                        OInvite(o["id"]!!.jsonPrimitive.long, o["code"]!!.jsonPrimitive.content, o["from"]?.jsonPrimitive?.contentOrNull ?: "?", o["name"]?.jsonPrimitive?.contentOrNull ?: "",
+                            parseAt(o["at"]?.jsonPrimitive?.contentOrNull), o["kind"]?.jsonPrimitive?.contentOrNull == "duel", o["ans"]?.jsonPrimitive?.contentOrNull)
                     }.filter { it.id !in dismissed && it.code != code }
                 } catch (_: Exception) { }
                 delay(15000)
