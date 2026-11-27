@@ -105,6 +105,8 @@ data class GState(
     var doneAt: Long = 0,
     /** Online: hole cards of players who allow folded players to look (seat index → cards). */
     var peek: MutableMap<Int, List<Int>>? = null,
+    /** One hole card a player chose to show after being asked (seat index → card). */
+    var one: MutableMap<Int, Int>? = null,
 )
 
 @Serializable

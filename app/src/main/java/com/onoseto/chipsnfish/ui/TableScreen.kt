@@ -237,7 +237,6 @@ fun TableView() {
             repeat(4) { for (k in 1 until st.n) pos[k] = geo.clampS(k, pos[k]) }
             Game.bump()
         }
-        val felt = remember(Game.look.felt) { C.felt(Game.look.felt) }
         val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
         val myTurn = playing && st.turn == 0 && st.done == null && Game.gm()
         LaunchedEffect(myTurn, st.handNo, st.betStreet) {
@@ -245,19 +244,7 @@ fun TableView() {
         }
         val sc = geo.sc
         // rail & velvet felt
-        val noise = remember { velvetNoise() }
-        val dens = LocalDensity.current.density
-        Canvas(Modifier.fillMaxSize().pointerInput(geo) {
-            // double tap on the felt = check (only when it's my turn and checking is free)
-            detectTapGestures(onDoubleTap = { o ->
-                val x = o.x / dens; val y = o.y / dens
-                if (x < geo.x0 || x > geo.x1 || y < geo.y0 || y > geo.y1) return@detectTapGestures
-                val g = Game; val s0 = g.st
-                if (!g.gm() || !g.playing() || s0.turn != 0 || s0.done != null) return@detectTapGestures
-                if (s0.curBet - s0.seats[0].bet <= 0) g.heroAction("call")
-                else g.toast(L("Check teď nejde, je potřeba dorovnat", "Can't check now, there's a bet to call", "Check geht nicht, es gibt einen Einsatz"))
-            })
-        }) { drawVelvetTable(geo, felt, noise) }
+        FeltCanvas(geo)
         // watermark on the felt
         Box(Modifier.offset((geo.cx - 150).dp, (geo.cy + geo.cw * 0.7f + 30).dp).width(300.dp), contentAlignment = Alignment.Center) {
             if (Game.online() && com.onoseto.chipsnfish.online.Online.cup && playing)
@@ -324,6 +311,22 @@ fun TableView() {
                         }
                     },
                 )
+            }
+        }
+        // a friend asks me to show one card: pick it, or decline
+        val ask = com.onoseto.chipsnfish.online.Online.asksIn.firstOrNull()
+        if (Game.online() && ask != null && !st.hero.contains(null)) {
+            Column(
+                Modifier.offset((geo.cx - 150).dp, (geo.cy - 100).dp).width(300.dp).zIndex(24f).shadow(12.dp, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xF0101A28)).border(1.dp, LobbyBlue.copy(alpha = 0.6f), RoundedCornerShape(16.dp)).padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                T(ask.second + L(" chce vidět jednu tvoji kartu", " wants to see one of your cards", " möchte eine deiner Karten sehen"), 14.sp, Color.White, FontWeight.Bold, align = TextAlign.Center)
+                T(L("Klepni na kartu, kterou ukážeš všem u stolu", "Tap the card you'll show to the table", "Tippe auf die Karte, die du zeigst"), 11.sp, C.muted, align = TextAlign.Center)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    for (i in 0..1) CardView(st.hero[i]!!, 64.dp, modifier = Modifier.tap { com.onoseto.chipsnfish.online.Online.answerAsk(ask.first, i) })
+                }
+                Btn(L("Neukážu", "Decline", "Ablehnen"), BK.DARK, Modifier.fillMaxWidth(), height = 38.dp) { com.onoseto.chipsnfish.online.Online.answerAsk(ask.first, -1) }
             }
         }
         // fold zone: appears in the middle of the table while my cards are being dragged
@@ -493,6 +496,26 @@ private fun GameResult() {
     }
 }
 
+/** The table itself; reads the felt colour on its own, so a colour change in the settings shows at once. */
+@Composable
+private fun FeltCanvas(geo: Geo) {
+    watch()
+    val felt = remember(Game.look.felt) { C.felt(Game.look.felt) }
+    val noise = remember { velvetNoise() }
+    val dens = LocalDensity.current.density
+    Canvas(Modifier.fillMaxSize().pointerInput(geo) {
+        // double tap on the felt = check (only when it's my turn and checking is free)
+        detectTapGestures(onDoubleTap = { o ->
+            val x = o.x / dens; val y = o.y / dens
+            if (x < geo.x0 || x > geo.x1 || y < geo.y0 || y > geo.y1) return@detectTapGestures
+            val g = Game; val s0 = g.st
+            if (!g.gm() || !g.playing() || s0.turn != 0 || s0.done != null) return@detectTapGestures
+            if (s0.curBet - s0.seats[0].bet <= 0) g.heroAction("call")
+            else g.toast(L("Check teď nejde, je potřeba dorovnat", "Can't check now, there's a bet to call", "Check geht nicht, es gibt einen Einsatz"))
+        })
+    }) { drawVelvetTable(geo, felt, noise) }
+}
+
 /** Round D / SB / BB button placed between the player and the table centre (beside the bet), sliding when it moves. */
 @Composable
 private fun PosButton(tag: String, k: Int, pos: (Int) -> Double, geo: Geo, dragging: Boolean) {
@@ -578,6 +601,7 @@ private fun SeatView(
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                     Column(horizontalAlignment = Alignment.End) {
                         StackChip(if (s.allin && playing) "ALL-IN" else g.shortN(s.stack), s.allin && playing, crit, sc)
+                        if (s.stack > 0) Box(Modifier.padding(top = (2 * sc).dp, end = (4 * sc).dp)) { ChipPile(s.stack, 3, (12 * sc).dp) }
                         SeatDrinks(s.pid, sc)
                     }
                 }
@@ -590,7 +614,7 @@ private fun SeatView(
                     Avatar(p, (50 * sc).dp, ring = if (isTurn || (k == 0 && g.online())) C.gold else null, border = (3 * sc).dp, dim = folded)
                     if (g.online() && com.onoseto.chipsnfish.online.Online.players.any { it.uid == s.pid && (!it.on || it.left) }) Box(Modifier.align(Alignment.BottomStart).size((12 * sc).dp).clip(CircleShape).background(C.lose).border(1.5.dp, Color.Black, CircleShape))
                     if (isLead) Crown(Modifier.align(Alignment.TopCenter).offset(y = (-14 * sc).dp).size((24 * sc).dp, (16 * sc).dp))
-                    if (g.gm() && k > 0 && playing && !s.folded && !s.out && st.reveal?.get(k) == null && g.peekCards(k) == null) {
+                    if (g.gm() && k > 0 && playing && !s.folded && !s.out && st.reveal?.get(k) == null && g.peekCards(k) == null && st.one?.get(k) == null) {
                         Row(Modifier.align(Alignment.TopEnd).offset((12 * sc).dp, (-4 * sc).dp)) {
                             CardBack((16 * sc).dp, modifier = Modifier.rotate(-8f))
                             CardBack((16 * sc).dp, modifier = Modifier.offset((-8 * sc).dp).rotate(10f))
@@ -610,6 +634,9 @@ private fun SeatView(
                             Row(Modifier.alpha(0.85f), horizontalArrangement = Arrangement.spacedBy(2.dp)) { pk.forEach { CardView(it, (25 * sc).dp) } }
                             T("👁", (10 * sc).sp, modifier = Modifier.align(Alignment.TopEnd).offset((4 * sc).dp, (-6 * sc).dp))
                         }
+                    } else if (g.gm() && st.one?.get(k) != null && !s.folded) {
+                        // one card shown on request
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { CardView(st.one!!.getValue(k), (25 * sc).dp); CardBack((25 * sc).dp) }
                     }
                 }
             }

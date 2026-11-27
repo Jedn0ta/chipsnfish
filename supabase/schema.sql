@@ -1268,6 +1268,71 @@ begin
   return r;
 end $$;
 
+-- ---------------------------------------------------------------------
+-- "show me a card": ask an opponent to show one hole card; he picks
+-- which one (everyone at the table sees it) or declines
+-- ---------------------------------------------------------------------
+create table if not exists cf_asks (
+  code text not null references cf_tables(code) on delete cascade,
+  hand int not null,
+  from_uid uuid not null,
+  to_uid uuid not null,
+  status text not null default 'ask',   -- ask | shown | no
+  card int,
+  at timestamptz not null default now(),
+  primary key (code, hand, from_uid, to_uid)
+);
+alter table cf_asks enable row level security;
+
+create or replace function cf_ask_card(p_code text, p_to uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; sec cf_secret; j int; v_hand int;
+begin
+  select * into t from cf_tables where code = upper(p_code);
+  if not found then raise exception 'table not found'; end if;
+  if u = p_to or cf_seat_of(t.state, u) < 0 then raise exception 'not allowed'; end if;
+  j := cf_seat_of(t.state, p_to);
+  v_hand := cf_gi(t.state, 'handNo');
+  select * into sec from cf_secret where code = t.code;
+  if j < 0 or not found or sec.hand <> v_hand or not (sec.hole ? (j::text)) then raise exception 'no cards'; end if;
+  insert into cf_asks(code, hand, from_uid, to_uid) values (t.code, v_hand, u, p_to) on conflict do nothing;
+end $$;
+
+-- p_idx 0 or 1 = show that card, anything else = decline
+create or replace function cf_ask_answer(p_code text, p_from uuid, p_idx int) returns void
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; sec cf_secret; i int; v_hand int; c int;
+begin
+  select * into t from cf_tables where code = upper(p_code);
+  if not found then return; end if;
+  v_hand := cf_gi(t.state, 'handNo');
+  i := cf_seat_of(t.state, u);
+  select * into sec from cf_secret where code = t.code;
+  if p_idx in (0, 1) and i >= 0 and found and sec.hand = v_hand and sec.hole ? (i::text) then
+    c := (sec.hole->(i::text)->>p_idx)::int;
+    update cf_asks set status = 'shown', card = c where code = t.code and hand = v_hand and from_uid = p_from and to_uid = u and status = 'ask';
+    -- one shown card is enough for everybody who asked this hand
+    update cf_asks set status = 'shown', card = c where code = t.code and hand = v_hand and to_uid = u and status = 'ask';
+  else
+    update cf_asks set status = 'no' where code = t.code and hand = v_hand and from_uid = p_from and to_uid = u and status = 'ask';
+  end if;
+end $$;
+
+create or replace function cf_asks_view(t cf_tables, u uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_hand int := cf_gi(t.state, 'handNo');
+begin
+  return jsonb_build_object(
+    'asks', (select coalesce(jsonb_agg(jsonb_build_object('from', a.from_uid, 'name', coalesce(p.name, '?'))), '[]'::jsonb)
+             from cf_asks a left join cf_players p on p.code = a.code and p.uid = a.from_uid
+             where a.code = t.code and a.hand = v_hand and a.to_uid = u and a.status = 'ask'),
+    'ones', (select coalesce(jsonb_agg(distinct jsonb_build_object('uid', a.to_uid, 'card', a.card)), '[]'::jsonb)
+             from cf_asks a where a.code = t.code and a.hand = v_hand and a.status = 'shown'),
+    'asknos', (select coalesce(jsonb_agg(a.to_uid), '[]'::jsonb)
+             from cf_asks a where a.code = t.code and a.hand = v_hand and a.from_uid = u and a.status = 'no')
+  );
+end $$;
+
 create or replace function cf_view(p_code text, p_ver int default 0) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare u uuid := cf_me(); t cf_tables; sec cf_secret; i int; v_hole jsonb := null; v_hand int;
@@ -1293,7 +1358,7 @@ begin
                 from cf_players cp where cp.code = t.code),
     'shows', (select coalesce(jsonb_agg(jsonb_build_object('uid', s.uid, 'cards', s.cards)), '[]') from cf_shows s where s.code = t.code and s.hand = v_hand),
     'peek', cf_peek(t, u)
-  ) || cf_social(t.code);
+  ) || cf_social(t.code) || cf_asks_view(t, u);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -1310,7 +1375,7 @@ begin
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
                      'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me',
-                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek') then
+                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek','cf_ask_card','cf_ask_answer') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

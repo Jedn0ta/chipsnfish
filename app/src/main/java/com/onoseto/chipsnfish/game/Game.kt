@@ -89,6 +89,25 @@ object Game {
     fun advisorOn() = if (online()) com.onoseto.chipsnfish.online.Online.advisor else true
     fun playing() = st.phase == "play"
 
+    /** Ask seat k to show one hole card; a friend online decides, a bot decides by itself. */
+    fun askCard(k: Int) {
+        if (k <= 0 || !gm()) return
+        val s = st.seats.getOrNull(k) ?: return
+        if (online()) { com.onoseto.chipsnfish.online.Online.askCard(s.pid); return }
+        val cs = st.hole[k] ?: return
+        val hand = st.handNo
+        val name = pl(s).name
+        scope.launch {
+            kotlinx.coroutines.delay(900L + (0..1200).random())
+            if (st.handNo != hand) return@launch
+            if (Math.random() < 0.35) toast(name + L(" kartu ukázat nechce", " won't show a card", " will keine Karte zeigen"))
+            else {
+                st.one = (st.one ?: mutableMapOf()).also { it[k] = cs[(0..1).random()] }
+                toast(name + L(" ukázal kartu", " showed a card", " zeigt eine Karte")); bump()
+            }
+        }
+    }
+
     /** Cards of seat k that I may see because I folded (or busted) and that player allows it; bots always do. */
     fun peekCards(k: Int): List<Int>? {
         if (k == 0 || !gm() || !playing() || st.done != null) return null
@@ -259,7 +278,7 @@ object Game {
     }
 
     fun clearHand() {
-        st.done = null; st.reveal = null; st.hole = mutableMapOf()
+        st.done = null; st.reveal = null; st.hole = mutableMapOf(); st.one = null
         st.seats.forEach { it.folded = it.out; it.allin = false; it.bet = 0; it.total = 0; it.acted = false; it.actions = mutableListOf() }
         st.hero = mutableListOf(null, null)
         st.board = mutableListOf(null, null, null, null, null)

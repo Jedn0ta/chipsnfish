@@ -63,6 +63,10 @@ object Online {
     private var raw: GState? = null
     private var hole: List<Int>? = null
     private var peeks: Map<String, List<Int>> = emptyMap()
+    private var ones: Map<String, Int> = emptyMap()
+    private val noSeen = HashSet<String>()
+    /** Players asking me to show one card this hand: uid to name. */
+    var asksIn by mutableStateOf<List<Pair<String, String>>>(emptyList())
     private var holeHand = 0
     private var shows: Map<String, List<Int>> = emptyMap()
     private var timeOffset = 0L
@@ -232,6 +236,13 @@ object Online {
             val cs = (o["cards"] as? JsonArray)?.map { it.jsonPrimitive.int } ?: return@mapNotNull null
             o["uid"]!!.jsonPrimitive.content to cs
         }?.toMap() ?: emptyMap()
+        ones = (r["ones"] as? JsonArray)?.mapNotNull { e -> val o = e.jsonObject; val c = o["card"]?.jsonPrimitive?.intOrNull ?: return@mapNotNull null; o["uid"]!!.jsonPrimitive.content to c }?.toMap() ?: emptyMap()
+        asksIn = (r["asks"] as? JsonArray)?.map { e -> val o = e.jsonObject; o["from"]!!.jsonPrimitive.content to (o["name"]?.jsonPrimitive?.contentOrNull ?: "?") } ?: emptyList()
+        (r["asknos"] as? JsonArray)?.forEach { e ->
+            val uid = e.jsonPrimitive.content
+            val key = "${raw?.handNo ?: 0}:$uid"
+            if (noSeen.add(key)) Game.toast((players.firstOrNull { it.uid == uid }?.name ?: "?") + L(" kartu ukázat nechce", " won't show a card", " will keine Karte zeigen"))
+        }
         val stEl = r["state"]
         if (stEl != null && stEl !is JsonNull) raw = Game.json.decodeFromJsonElement(GState.serializer(), stEl)
         ver = r["ver"]!!.jsonPrimitive.int
@@ -260,6 +271,9 @@ object Online {
         val pk = HashMap<Int, List<Int>>()
         for ((uid, cs) in peeks) { val k = s.seats.indexOfFirst { it.pid == uid }; if (k >= 0 && uid != me) pk[m(k)] = cs }
         v.peek = if (pk.isEmpty()) null else pk.toMutableMap()
+        val one = HashMap<Int, Int>()
+        for ((uid, c) in ones) { val k = s.seats.indexOfFirst { it.pid == uid }; if (k >= 0) one[m(k)] = c }
+        v.one = if (one.isEmpty()) null else one.toMutableMap()
         v.pos = null
         // player profiles
         for (op in players) {
@@ -351,6 +365,13 @@ object Online {
     }
 
     fun start() = call("cf_start", "p_code" to code)
+    fun askCard(uid: String) = call("cf_ask_card", "p_code" to code, "p_to" to uid) {
+        Game.toast(L("Požádal jsi o ukázání karty", "You asked to see a card", "Du hast um eine Karte gebeten"))
+    }
+    fun answerAsk(from: String, idx: Int) {
+        asksIn = asksIn.filter { it.first != from }
+        call("cf_ask_answer", "p_code" to code, "p_from" to from, "p_idx" to idx)
+    }
     fun proposeCup(n: String) {
         if (players.count { !it.left } < 3) { Game.toast(L("Turnaj o pohár potřebuje aspoň 3 hráče u stolu.", "A cup tournament needs at least 3 players.", "Ein Pokalturnier braucht mindestens 3 Spieler.")); return }
         call("cf_cup_propose", "p_code" to code, "p_name" to n)

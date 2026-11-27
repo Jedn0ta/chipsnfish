@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.offset
@@ -84,9 +85,9 @@ private fun Head(title: String, value: String = "") {
 
 /** One square choice: selected = white outline. */
 @Composable
-private fun Tile(on: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
+private fun Tile(on: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier.size(TILE), content: @Composable () -> Unit) {
     Box(
-        Modifier.size(TILE).clip(Sq)
+        modifier.clip(Sq)
             .border(if (on) 2.dp else 1.dp, if (on) Color.White else Color.White.copy(alpha = 0.16f), Sq)
             .tap(onClick),
         contentAlignment = Alignment.TopStart,
@@ -176,11 +177,11 @@ private fun LookCarousel(keys: List<String>, selected: String, itemW: Dp, h: Dp,
 private fun FeltPicker() {
     val cur = remember(Game.look.felt) { C.feltHue(Game.look.felt) }
     Label(tr("Barva stolu"))
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         C.FELT_PRESETS.forEach { (h, i) ->
             val v = remember(h, i) { C.felt(C.feltKey(h, i)) }
             val on = abs(h - cur.first) < 3f && abs(i - cur.second) < 0.03f
-            Tile(on, { Game.look.felt = C.feltKey(h, i); saveLook() }) {
+            Tile(on, { Game.look.felt = C.feltKey(h, i); saveLook() }, Modifier.weight(1f).aspectRatio(1f)) {
                 Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(v[0]), Color(v[1]), Color(v[2])))))
             }
         }

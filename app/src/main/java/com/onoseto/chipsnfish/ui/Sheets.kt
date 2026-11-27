@@ -460,6 +460,8 @@ private fun SeatSheet(k: Int) {
                 if (O.isFriend(p.id)) T("★ " + L("V přátelích", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
                 else Btn(L("★ Přidat do přátel", "★ Add friend", "★ Zu Freunden"), BK.GOLD, height = 34.dp) { O.addFriend(p.id, p.name) }
             }
+            if (g.gm() && k != 0 && g.playing() && !s.out && !s.folded && st.done == null && st.one?.get(k) == null && (g.online() || st.hole[k] != null))
+                Btn("🂠 " + L("Ukaž kartu", "Show a card", "Zeig eine Karte"), BK.DARK, height = 34.dp) { Ui.close(); g.askCard(k) }
             if (com.onoseto.chipsnfish.online.Social.available() && com.onoseto.chipsnfish.online.SupaCfg.configured)
                 Btn("🍹 " + L("Drink", "Drink", "Drink"), BK.DARK, height = 34.dp) { Ui.close(); com.onoseto.chipsnfish.online.Social.openPanel("drink", s.pid) }
             if (com.onoseto.chipsnfish.online.Social.available() && com.onoseto.chipsnfish.online.SupaCfg.configured)
