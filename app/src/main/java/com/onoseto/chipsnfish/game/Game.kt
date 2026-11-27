@@ -80,6 +80,8 @@ object Game {
 
     /** Game-like table (vs computer or online): real dealt cards, no manual entry. */
     fun gm() = mode == "game" || mode == "online"
+    /** Pre-selected "check / fold" for this hand number (-1 = off): fires automatically when it's the hero's turn. */
+    var preCF = -1
     fun bot() = mode == "game"
     fun online() = mode == "online"
     fun advisorOn() = if (online()) com.onoseto.chipsnfish.online.Online.advisor else true

@@ -5,6 +5,10 @@ package com.onoseto.chipsnfish.ui
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import kotlin.math.sqrt
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -301,6 +305,13 @@ fun TableView() {
                 )
             }
         }
+        // dealer / small blind / big blind buttons lying on the felt in front of the player
+        if (st.n >= 2) {
+            val dpos = { k: Int -> drag?.takeIf { it.k == k }?.s ?: st.pos!![k] }
+            PosButton("D", st.dealer, dpos, geo, drag != null)
+            if (sb >= 0 && sb != st.dealer) PosButton("SB", sb, dpos, geo, drag != null)
+            if (bb >= 0) PosButton("BB", bb, dpos, geo, drag != null)
+        }
         // drag marker
         drag?.let { d ->
             val s = d.s
@@ -441,6 +452,36 @@ private fun GameResult() {
     }
 }
 
+/** Round D / SB / BB button placed between the player and the table centre (beside the bet), sliding when it moves. */
+@Composable
+private fun PosButton(tag: String, k: Int, pos: (Int) -> Double, geo: Geo, dragging: Boolean) {
+    val st = Game.st
+    if (k !in 0 until st.n || st.pos == null) return
+    val sc = geo.sc / 0.8f
+    val p = geo.pt(pos(k))
+    val dx = geo.cx - p.x; val dy = geo.cy - p.y
+    val dd = hypot(dx, dy).coerceAtLeast(1f)
+    val ux = dx / dd; val uy = dy / dd
+    // seats are wide (stack left, cards right) and low: keep out of them with an elliptical clearance
+    val ax = 96f * sc; val ay = 50f * sc
+    val dist = min(1f / sqrt((ux / ax) * (ux / ax) + (uy / ay) * (uy / ay)), dd * 0.55f)
+    val side = 26f * sc
+    val tx = p.x + ux * dist - uy * side
+    val ty = p.y + uy * dist + ux * side
+    val spec = if (dragging) snap<Float>() else tween<Float>(500, easing = FastOutSlowInEasing)
+    val x by animateFloatAsState(tx, spec, label = "px$tag")
+    val y by animateFloatAsState(ty, spec, label = "py$tag")
+    val d = 21f * sc
+    val (bg, ink) = when (tag) { "D" -> Color(0xFFF4F1E8) to Color(0xFF15181C); "BB" -> C.gold to C.goldInk; else -> Color(0xFF3E7CC9) to Color.White }
+    Box(
+        Modifier.offset((x - d / 2).dp, (y - d / 2).dp).size(d.dp).zIndex(2.5f)
+            .shadow(3.dp, CircleShape).clip(CircleShape)
+            .background(Brush.radialGradient(listOf(bg, bg.copy(alpha = 1f).let { Color(it.red * 0.8f, it.green * 0.8f, it.blue * 0.8f) })))
+            .border(1.5.dp, Color.White.copy(alpha = 0.55f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) { T(tag, (if (tag == "D") 11 * sc else 8.5f * sc).sp, ink, FontWeight.Black, maxLines = 1) }
+}
+
 @Composable
 private fun SeatView(
     k: Int, pt: Offset, geo: Geo, sb: Int, bb: Int, lead: Int, leadCnt: Int, moving: Boolean, drop: Boolean,
@@ -455,12 +496,6 @@ private fun SeatView(
     val playing = g.playing()
     val isTurn = playing && st.turn == k && !(g.gm() && st.done != null)
     val folded = s.folded && playing
-    val tag = when {
-        k == st.dealer -> "D"
-        st.n > 2 && k == sb -> "SB"
-        k == bb -> "BB"
-        else -> null
-    }
     val last = if (playing) s.actions.filter { it.st == st.betStreet && it.a != "sb" && it.a != "bb" }.lastOrNull() else null
     val isLead = playing && st.n > 1 && s.stack + s.bet == lead && leadCnt == 1
     val crit = playing && !s.allin && s.stack > 0 && s.stack <= 10 * st.bb
@@ -508,14 +543,6 @@ private fun SeatView(
                     if (drop) Box(Modifier.fillMaxSize().graphicsLayer(scaleX = 1.2f, scaleY = 1.2f).clip(CircleShape).background(C.gold.copy(alpha = 0.7f)))
                     Avatar(p, (50 * sc).dp, ring = if (isTurn || (k == 0 && g.online())) C.gold else null, border = (3 * sc).dp, dim = folded)
                     if (g.online() && com.onoseto.chipsnfish.online.Online.players.any { it.uid == s.pid && (!it.on || it.left) }) Box(Modifier.align(Alignment.BottomStart).size((12 * sc).dp).clip(CircleShape).background(C.lose).border(1.5.dp, Color.Black, CircleShape))
-                    if (tag != null) {
-                        Box(
-                            Modifier.align(Alignment.TopEnd).offset((7 * sc).dp, (-5 * sc).dp).clip(RoundedCornerShape(8.dp))
-                                .background(if (tag == "BB") C.gold else if (tag == "D") Color.White else Color(0xFFDFE6EA))
-                                .then(if (tag == "D") Modifier.border(1.dp, Color(0xFF999999), RoundedCornerShape(8.dp)) else Modifier)
-                                .padding(horizontal = (4 * sc).dp)
-                        ) { T(tag, (10 * sc).sp, Color(0xFF111111), FontWeight.Black, lineHeight = (16 * sc).sp) }
-                    }
                     if (isLead) Crown(Modifier.align(Alignment.TopCenter).offset(y = (-14 * sc).dp).size((24 * sc).dp, (16 * sc).dp))
                     if (g.gm() && k > 0 && playing && !s.folded && !s.out && st.reveal?.get(k) == null) {
                         Row(Modifier.align(Alignment.BottomEnd).offset((8 * sc).dp, (4 * sc).dp)) {
@@ -692,6 +719,17 @@ private fun ActBox() {
     val g = Game
     val st = g.st
     @Suppress("UNUSED_VARIABLE") val rev = g.rev
+    // armed check/fold: check when it's free, otherwise fold — as soon as it's my turn
+    LaunchedEffect(st.turn, st.handNo, st.betStreet, g.preCF) {
+        if (g.gm() && st.turn == 0 && st.done == null && g.preCF == st.handNo) {
+            delay(450)
+            if (st.turn == 0 && st.done == null && g.preCF == st.handNo) {
+                g.preCF = -1
+                val tc = max(0, st.curBet - st.seats[0].bet)
+                g.heroAction(if (tc == 0) "call" else "fold")
+            }
+        }
+    }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.End) {
         if (st.phase == "ready") {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.panel).border(1.dp, C.line, RoundedCornerShape(10.dp)).padding(6.dp)) {
@@ -744,7 +782,16 @@ private fun ActBox() {
                 TurnWho(st.turn)
                 ColBtn(if (st.curBet > 0) "RAISE" else "BET", BK.RAISE, enabled = false) {}
                 ColBtn(if (st.curBet > st.seats[0].bet) "CALL" else "CHECK", BK.CALL, enabled = false) {}
-                ColBtn("FOLD", BK.FOLD, enabled = false) {}
+                val me = st.seats[0]
+                if (st.done == null && st.turn >= 0 && !me.folded && !me.out && !me.allin && me.stack > 0) {
+                    val armed = g.preCF == st.handNo
+                    GBtn(BK.FOLD, Modifier.fillMaxWidth().height(46.dp), on = armed, onClick = { g.preCF = if (armed) -1 else st.handNo; g.bump() }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            T((if (armed) "✓ " else "") + "CHECK", 12.sp, Color.White, num = true, lineHeight = 14.sp, maxLines = 1, fit = true)
+                            T("/ FOLD", 12.sp, Color.White, num = true, lineHeight = 14.sp, maxLines = 1, fit = true)
+                        }
+                    }
+                } else ColBtn("FOLD", BK.FOLD, enabled = false) {}
                 return@Column
             }
         }
@@ -1128,10 +1175,7 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVelvetTable(geo: Geo, f
     val rw = (geo.x1 - geo.x0 + rp * 2) * dp; val rh = (geo.y1 - geo.y0 + rp * 2) * dp
     val rr = (geo.r + rp) * dp
     // soft shadow on the floor (stacked translucent layers)
-    for (i in 0 until 7) {
-        val g = i * 2.5f * dp
-        drawRoundRect(Color.Black.copy(alpha = 0.09f), Offset(l - g, t + 10 * dp + g * 0.6f), Size(rw + g * 2, rh + g * 1.2f), CornerRadius(rr + g))
-    }
+    for (i in 1..4) drawRoundRect(Color.Black.copy(alpha = 0.12f), Offset(l, t + i * 2.5f * dp), Size(rw, rh), CornerRadius(rr))
     // padded leather rail
     drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF6B3F26), C.leather, Color(0xFF2A160D), C.leather2), t, t + rh), Offset(l, t), Size(rw, rh), CornerRadius(rr))
     drawRoundRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.04f), Color.Transparent), t, t + rh * 0.45f), Offset(l + 2 * dp, t + 1.5f * dp), Size(rw - 4 * dp, rh * 0.5f), CornerRadius(rr))

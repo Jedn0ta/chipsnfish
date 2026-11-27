@@ -200,7 +200,7 @@ private fun TopBar() {
     Row(Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         FishLogo(
             Modifier.size(28.dp).combinedClickable(remember { MutableInteractionSource() }, null,
-                onLongClick = { Ui.open("about") },
+                onLongClick = { if (playing && Ui.view == "table") Ui.open("hands") else Ui.open("about") },
                 onClick = {
                     Sound.chip()
                     val now = System.currentTimeMillis()
@@ -227,7 +227,7 @@ private fun TopBar() {
             Box(Modifier.height(32.dp).clip(RoundedCornerShape(9.dp)).border(1.dp, C.line, RoundedCornerShape(9.dp)).tap { Ui.solo = false; Ui.goView("table"); Ui.showMenu() }.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
                 T(tr("‹ Menu"), 13.sp, C.gold, FontWeight.ExtraBold)
             }
-        } else {
+        } else if (!(playing && Ui.view == "table")) {
             listOf("table", "players", "records").forEach { v ->
                 val on = Ui.view == v
                 Box(
@@ -254,15 +254,6 @@ private fun TopBar() {
             }
             T("#${st.handNo}", 15.sp, C.muted, num = true)
             BlindGroup()
-        }
-        // hand rankings – one tap away, only while a game is on
-        if (Ui.view == "table" && playing) Row(
-            Modifier.height(32.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp))
-                .tap { Ui.open("hands") }.padding(horizontal = 9.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            T("♠", 16.sp, C.ink, FontWeight.Bold)
-            T(L("Kombinace", "Hands", "Hände"), 12.sp, C.ink, FontWeight.Bold)
         }
         Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp)).tap { Ui.openSettings() }, contentAlignment = Alignment.Center) {
             Icon24("gear", C.ink, 19.dp)
