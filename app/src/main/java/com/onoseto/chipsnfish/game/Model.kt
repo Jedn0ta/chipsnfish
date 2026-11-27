@@ -103,6 +103,8 @@ data class GState(
     var cfgDone: Boolean = false,
     var turnAt: Long = 0,
     var doneAt: Long = 0,
+    /** Online: hole cards of players who allow folded players to look (seat index → cards). */
+    var peek: MutableMap<Int, List<Int>>? = null,
 )
 
 @Serializable
@@ -153,7 +155,7 @@ data class HandRec(
 data class ChipDef(val k: String, val l: String, val c: Long, var v: Int, var off: Boolean = false)
 
 @Serializable
-data class Look(var felt: String = "blue", var back: String = "red", var face: String = "picture", var hide: Boolean = false)
+data class Look(var felt: String = "blue", var back: String = "cred", var face: String = "picture", var hide: Boolean = false)
 
 @Serializable
 data class GameCfg(
@@ -165,6 +167,8 @@ data class GameCfg(
     var speed: Double = 1.0,
     var coach: Boolean = false,
     var advisor: Boolean = true,
+    /** Players who folded may see my hole cards (sent to the server as cf_profiles.peek). */
+    var peek: Boolean = false,
 )
 
 /** End-of-hand dialog state for the live advisor mode. */

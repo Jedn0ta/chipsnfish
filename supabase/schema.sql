@@ -1238,6 +1238,65 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- peek: a player who folded may see the hole cards of the players
+-- who allow it in their profile (cf_profiles.peek)
+-- ---------------------------------------------------------------------
+alter table cf_profiles add column if not exists peek boolean not null default false;
+
+create or replace function cf_set_peek(p boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update cf_profiles set peek = coalesce(p, false) where uid = cf_me();
+end $$;
+
+create or replace function cf_peek(t cf_tables, u uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare i int; sec cf_secret; v_hand int; r jsonb;
+begin
+  i := cf_seat_of(t.state, u);
+  if i < 0 or coalesce((t.state->'seats'->i->>'folded')::boolean, false) = false then return '[]'::jsonb; end if;
+  if jsonb_typeof(t.state->'done') = 'object' then return '[]'::jsonb; end if;
+  v_hand := cf_gi(t.state, 'handNo');
+  select * into sec from cf_secret where code = t.code;
+  if not found or sec.hand <> v_hand then return '[]'::jsonb; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('uid', e.s->>'pid', 'cards', sec.hole->((e.o - 1)::text))), '[]'::jsonb) into r
+    from jsonb_array_elements(t.state->'seats') with ordinality e(s, o)
+    join cf_profiles pr on pr.uid::text = e.s->>'pid'
+    where (e.o - 1) <> i and pr.peek
+      and coalesce((e.s->>'folded')::boolean, false) = false
+      and sec.hole ? ((e.o - 1)::text);
+  return r;
+end $$;
+
+create or replace function cf_view(p_code text, p_ver int default 0) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); t cf_tables; sec cf_secret; i int; v_hole jsonb := null; v_hand int;
+begin
+  select * into t from cf_tables where code = upper(p_code);
+  if not found then return jsonb_build_object('ok', false, 'err', 'notfound'); end if;
+  update cf_players set seen = now() where code = t.code and uid = u;
+  update cf_profiles set seen = now() where uid = u;
+  v_hand := cf_gi(t.state, 'handNo');
+  i := cf_seat_of(t.state, u);
+  if i >= 0 then
+    select * into sec from cf_secret where code = t.code;
+    if sec.hand = v_hand then v_hole := sec.hole->(i::text); end if;
+  end if;
+  return jsonb_build_object(
+    'ok', true, 'code', t.code, 'ver', t.ver, 'now', cf_now(), 'host', t.host, 'name', t.name, 'gid', t.gid,
+    'cfg', t.cfg, 'status', t.status, 'me', u,
+    'state', case when t.ver <> p_ver then t.state else null end,
+    'hole', jsonb_build_object('hand', v_hand, 'cards', v_hole),
+    'players', (select coalesce(jsonb_agg(jsonb_build_object('uid', cp.uid, 'name', cp.name, 'img', case when p_ver = 0 or t.ver <> p_ver then cp.img else null end,
+                  'on', cp.seen > now() - interval '15 seconds', 'pending', cp.pending, 'left', cp.left_at is not null,
+                  'hat', coalesce((select pr.hat from cf_profiles pr where pr.uid = cp.uid), '')) order by cp.joined), '[]')
+                from cf_players cp where cp.code = t.code),
+    'shows', (select coalesce(jsonb_agg(jsonb_build_object('uid', s.uid, 'cards', s.cards)), '[]') from cf_shows s where s.code = t.code and s.hand = v_hand),
+    'peek', cf_peek(t, u)
+  ) || cf_social(t.code);
+end $$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -1251,7 +1310,7 @@ begin
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
                      'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me',
-                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code') then
+                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

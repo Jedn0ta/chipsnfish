@@ -834,6 +834,10 @@ private fun SettingsSheet(d: SettingsArg) {
             PhotoButtons(me)
             if (com.onoseto.chipsnfish.online.SupaCfg.configured) {
                 Label(L("Online profil", "Online profile", "Online-Profil"))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    T(L("Kdo složí, smí vidět moje karty", "Players who folded may see my cards", "Wer gefoldet hat, darf meine Karten sehen"), 12.5.sp, Color.White, FontWeight.Bold, modifier = Modifier.weight(1f))
+                    SmallPill(if (g.gameCfg.peek) L("Ano ✓", "Yes ✓", "Ja ✓") else L("Ne", "No", "Nein"), g.gameCfg.peek) { com.onoseto.chipsnfish.online.Online.setPeek(!g.gameCfg.peek); Ui.redraw() }
+                }
                 Btn(L("Smazat můj online profil", "Delete my online profile", "Mein Online-Profil löschen"), BK.GHOST, Modifier.fillMaxWidth(), height = 36.dp) {
                     Ui.confirm(L("Smazat online profil?", "Delete online profile?", "Online-Profil löschen?"),
                         L("Ze serveru se smaže tvoje jméno, fotka, peněženka, body cti, poháry, přátelé a skupiny a odejdeš od stolu. Nejde to vrátit. Data v telefonu (hráči, záznam hand) zůstanou.",

@@ -51,7 +51,7 @@ object C {
         "black" to listOf(0xFF44494F, 0xFF26292D, 0xFF121416, 0xFF050607),
     )
     val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Vínová", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
-    val BACKS = linkedMapOf("red" to "Rudý", "blue" to "Modrý", "green" to "Zelený", "black" to "Černý", "gold" to "Zlatý", "fish" to "Rybí")
+    val BACKS = linkedMapOf("cred" to "Klasický červený", "cblue" to "Klasický modrý", "red" to "Rudý", "blue" to "Modrý", "green" to "Zelený", "black" to "Černý", "gold" to "Zlatý", "fish" to "Rybí")
     val FACES = linkedMapOf("picture" to "Klasické", "classic" to "Velké indexy", "jumbo" to "Extra velké", "four" to "Čtyřbarevné")
 
     /** Suggested table colours: hue, intensity (0 = charcoal). */

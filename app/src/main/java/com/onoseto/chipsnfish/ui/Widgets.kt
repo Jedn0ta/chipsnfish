@@ -187,7 +187,10 @@ fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifie
     watch()
     val shape = RoundedCornerShape(cw * 0.13f)
     Box(modifier.size(cw, cw * 1.4f).clip(shape).background(Color.White).padding(maxOf(1.dp, cw * 0.045f)).clip(RoundedCornerShape(cw * 0.1f))) {
-        if (back == "fish") {
+        if (back == "cred" || back == "cblue") {
+            val main = if (back == "cblue") Color(0xFF1C4596) else Color(0xFFB0222B)
+            Canvas(Modifier.fillMaxSize()) { with(CardArt) { classicBack(main) } }
+        } else if (back == "fish") {
             Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF173A52), Color(0xFF0B1A26)))), contentAlignment = Alignment.Center) {
                 FishLogo(Modifier.size(cw * 0.7f))
             }

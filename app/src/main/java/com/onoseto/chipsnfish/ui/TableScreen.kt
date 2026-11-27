@@ -590,7 +590,7 @@ private fun SeatView(
                     Avatar(p, (50 * sc).dp, ring = if (isTurn || (k == 0 && g.online())) C.gold else null, border = (3 * sc).dp, dim = folded)
                     if (g.online() && com.onoseto.chipsnfish.online.Online.players.any { it.uid == s.pid && (!it.on || it.left) }) Box(Modifier.align(Alignment.BottomStart).size((12 * sc).dp).clip(CircleShape).background(C.lose).border(1.5.dp, Color.Black, CircleShape))
                     if (isLead) Crown(Modifier.align(Alignment.TopCenter).offset(y = (-14 * sc).dp).size((24 * sc).dp, (16 * sc).dp))
-                    if (g.gm() && k > 0 && playing && !s.folded && !s.out && st.reveal?.get(k) == null) {
+                    if (g.gm() && k > 0 && playing && !s.folded && !s.out && st.reveal?.get(k) == null && g.peekCards(k) == null) {
                         Row(Modifier.align(Alignment.TopEnd).offset((12 * sc).dp, (-4 * sc).dp)) {
                             CardBack((16 * sc).dp, modifier = Modifier.rotate(-8f))
                             CardBack((16 * sc).dp, modifier = Modifier.offset((-8 * sc).dp).rotate(10f))
@@ -601,8 +601,15 @@ private fun SeatView(
                 Spacer(Modifier.width((5 * sc).dp))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     val rv = st.reveal?.get(k)
+                    val pk = g.peekCards(k)
                     if (g.gm() && rv != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { rv.forEach { CardView(it, (25 * sc).dp) } }
+                    } else if (pk != null) {
+                        // I folded and this player lets folded players look
+                        Box {
+                            Row(Modifier.alpha(0.85f), horizontalArrangement = Arrangement.spacedBy(2.dp)) { pk.forEach { CardView(it, (25 * sc).dp) } }
+                            T("👁", (10 * sc).sp, modifier = Modifier.align(Alignment.TopEnd).offset((4 * sc).dp, (-6 * sc).dp))
+                        }
                     }
                 }
             }

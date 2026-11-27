@@ -89,6 +89,16 @@ object Game {
     fun advisorOn() = if (online()) com.onoseto.chipsnfish.online.Online.advisor else true
     fun playing() = st.phase == "play"
 
+    /** Cards of seat k that I may see because I folded (or busted) and that player allows it; bots always do. */
+    fun peekCards(k: Int): List<Int>? {
+        if (k == 0 || !gm() || !playing() || st.done != null) return null
+        val me = st.seats.getOrNull(0) ?: return null
+        if (!me.folded && !me.out) return null
+        val s = st.seats.getOrNull(k) ?: return null
+        if (s.folded || s.out) return null
+        return if (online()) st.peek?.get(k) else st.hole[k]
+    }
+
     // ================= persistence =================
     private fun getS(k: String): String? = prefs.getString(k, null)
     private fun setS(k: String, v: String?) {

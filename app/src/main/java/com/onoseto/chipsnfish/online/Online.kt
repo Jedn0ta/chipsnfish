@@ -62,6 +62,7 @@ object Online {
     private var ver = 0
     private var raw: GState? = null
     private var hole: List<Int>? = null
+    private var peeks: Map<String, List<Int>> = emptyMap()
     private var holeHand = 0
     private var shows: Map<String, List<Int>> = emptyMap()
     private var timeOffset = 0L
@@ -140,6 +141,14 @@ object Online {
     suspend fun syncProfile() {
         val h = Game.P.getValue("hero")
         Supa.rpc("cf_profile", args("p_name" to h.name, "p_img" to h.img))
+        runCatching { Supa.rpc("cf_set_peek", buildJsonObject { put("p", Game.gameCfg.peek) }) }
+    }
+
+    /** Let (or stop letting) players who folded see my cards. */
+    fun setPeek(on: Boolean) {
+        Game.gameCfg.peek = on; Game.saveCfg()
+        if (!SupaCfg.configured) return
+        Game.scope.launch { runCatching { Supa.rpc("cf_set_peek", buildJsonObject { put("p", on) }) } }
     }
 
     // ---------------- session ----------------
@@ -218,6 +227,11 @@ object Online {
         hole = (h?.get("cards") as? JsonArray)?.map { it.jsonPrimitive.int }
         Social.ingest(r["chat"], r["drinks"])
         shows = r["shows"]!!.jsonArray.associate { e -> val o = e.jsonObject; o["uid"]!!.jsonPrimitive.content to o["cards"]!!.jsonArray.map { it.jsonPrimitive.int } }
+        peeks = (r["peek"] as? JsonArray)?.mapNotNull { e ->
+            val o = e.jsonObject
+            val cs = (o["cards"] as? JsonArray)?.map { it.jsonPrimitive.int } ?: return@mapNotNull null
+            o["uid"]!!.jsonPrimitive.content to cs
+        }?.toMap() ?: emptyMap()
         val stEl = r["state"]
         if (stEl != null && stEl !is JsonNull) raw = Game.json.decodeFromJsonElement(GState.serializer(), stEl)
         ver = r["ver"]!!.jsonPrimitive.int
@@ -243,6 +257,9 @@ object Online {
         val rv = HashMap<Int, List<Int>>()
         for ((uid, cs) in shows) { val k = s.seats.indexOfFirst { it.pid == uid }; if (k >= 0 && uid != me) rv[m(k)] = cs }
         v.reveal = if (rv.isEmpty()) null else rv.toMutableMap()
+        val pk = HashMap<Int, List<Int>>()
+        for ((uid, cs) in peeks) { val k = s.seats.indexOfFirst { it.pid == uid }; if (k >= 0 && uid != me) pk[m(k)] = cs }
+        v.peek = if (pk.isEmpty()) null else pk.toMutableMap()
         v.pos = null
         // player profiles
         for (op in players) {
