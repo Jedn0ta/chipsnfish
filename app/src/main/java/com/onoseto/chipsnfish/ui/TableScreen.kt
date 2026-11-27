@@ -1286,7 +1286,8 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVelvetTable(geo: Geo, f
     for (i in 1..4) drawRoundRect(Color.Black.copy(alpha = 0.12f), Offset(l, t + i * 2.5f * dp), Size(rw, rh), CornerRadius(rr))
     // padded leather rail
     drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF6B3F26), C.leather, Color(0xFF2A160D), C.leather2), t, t + rh), Offset(l, t), Size(rw, rh), CornerRadius(rr))
-    drawRoundRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.04f), Color.Transparent), t, t + rh * 0.45f), Offset(l + 2 * dp, t + 1.5f * dp), Size(rw - 4 * dp, rh * 0.5f), CornerRadius(rr))
+    // sheen on the rail: same shape as the rail (a half-height rect with this radius got its corners shrunk and stuck out as grey corners)
+    drawRoundRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.04f), Color.Transparent), t, t + rh * 0.45f), Offset(l + 2 * dp, t + 1.5f * dp), Size(rw - 4 * dp, rh - 3 * dp), CornerRadius(rr - 2 * dp))
     drawRoundRect(Color.Black.copy(alpha = 0.5f), Offset(l, t), Size(rw, rh), CornerRadius(rr), style = Stroke(1.2f * dp))
     // double stitching
     val st1 = rp * 0.28f * dp
