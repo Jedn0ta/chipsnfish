@@ -110,13 +110,15 @@ class Geo(val w: Float, val h: Float, n: Int, zoom: Double, playing: Boolean) {
     val cx: Float; val cy: Float
     val cw: Float
     val zone: FloatArray?
+    /** Bottom-right corner kept free for the round action buttons. */
+    val zone2: FloatArray?
 
     init {
         val sc0 = (zoom * 0.8).toFloat()
         val per0 = 2 * (w + h)
         var ss = min(1f, (per0 * 0.62f) / (max(1, n) * 150 * sc0))
         ss = max(0.7f, ss)
-        val rcol = 194f
+        val rcol = 112f
         val cardW = 150 * sc0 * ss
         val cardH = 66 * sc0 * ss
         x0 = cardW / 2 + 4; x1 = w - rcol - cardW / 2 - 2
@@ -127,7 +129,9 @@ class Geo(val w: Float, val h: Float, n: Int, zoom: Double, playing: Boolean) {
         val availW = (x1 - x0 - cardW - 16) / 5.25f
         cw = min(64f, max(40f, min(availH, availW))).roundToInt().toFloat()
         sc = sc0 * ss
-        zone = if (playing) floatArrayOf(w - 232, -20f, w + 20, 96f) else null
+        // top-right corner: my hole cards; bottom-right corner: action buttons — seats keep out of both
+        zone = if (playing) floatArrayOf(w - 182, -20f, w + 20, 140f) else null
+        zone2 = if (playing) floatArrayOf(w - 184, h - 166, w + 20, h + 20) else null
     }
 
     fun pt(s0: Double): Offset {
@@ -175,6 +179,8 @@ class Geo(val w: Float, val h: Float, n: Int, zoom: Double, playing: Boolean) {
         val sw = 158 * sc; val sh = 70 * sc
         val z = zone
         if (z != null && k > 0 && p.x + sw * 0.42f > z[0] && p.y - sh * 0.5f < z[3]) return true
+        val z2 = zone2
+        if (z2 != null && k > 0 && p.x + sw * 0.42f > z2[0] && p.y + sh * 0.5f > z2[1]) return true
         val pos = st.pos!!
         for (j in 0 until st.n) {
             if (j == k) continue
@@ -871,26 +877,26 @@ private fun ActBox() {
                             .background(if (on) C.gold.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.45f))
                             .border(1.dp, if (on) C.gold else Color.White.copy(alpha = 0.16f), RoundedCornerShape(99.dp)).tap { g.raiseTo = x; g.bump() },
                         contentAlignment = Alignment.Center,
-                    ) { T(l, 9.5.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true) }
+                    ) { T(l, 9.5.sp, if (on) C.gold else Color.White, FontWeight.ExtraBold, maxLines = 1) }
                 }
                 RoundBtn(26.dp, RB_DARK, Modifier.offset(84.dp, 68.dp), on = g.raiseOpen, onClick = { g.heroAction("raiseopen") }) { T("⋯", 13.sp, Color.White, FontWeight.Black, lineHeight = 13.sp) }
             }
             RoundBtn(64.dp, RB_RAISE, Modifier.offset(101.dp, 2.dp), enabled = canRaise, onClick = { g.raiseOpen = false; g.heroAction("raise") }) {
                 val to = g.raiseTo.coerceIn(mn, mx)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    T(if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE", 10.5.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1, fit = true)
-                    T(g.fm(to), 13.sp, C.goldInk, num = true, lineHeight = 14.sp, maxLines = 1, fit = true)
+                    T(if (to >= mx) "ALL-IN" else if (st.curBet == 0) "BET" else "RAISE", 10.5.sp, C.goldInk, num = true, lineHeight = 12.sp, maxLines = 1)
+                    T(g.fm(to), 13.sp, C.goldInk, num = true, lineHeight = 14.sp, maxLines = 1)
                 }
             }
             RoundBtn(60.dp, if (toCall == 0 && !foldArm) RB_DARK else RB_FOLD, Modifier.offset(22.dp, 96.dp), onClick = {
                 if (toCall == 0 && !foldArm) foldArm = true else g.heroAction("fold")
-            }) { T(if (foldArm) "FOLD?" else "FOLD", 12.sp, Color.White, num = true, maxLines = 1, fit = true) }
+            }) { T(if (foldArm) "FOLD?" else "FOLD", 12.sp, Color.White, num = true, maxLines = 1) }
             RoundBtn(78.dp, RB_CALL, Modifier.offset(94.dp, 80.dp), ring = ring, onClick = { g.heroAction("call") }) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     when {
-                        toCall == 0 -> T("CHECK", 14.sp, Color.White, num = true, maxLines = 1, fit = true)
-                        toCall >= s.stack -> { T("ALL-IN", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1, fit = true); T(g.fm(s.stack), 14.sp, Color.White, num = true, lineHeight = 15.sp, maxLines = 1, fit = true) }
-                        else -> { T("CALL", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1, fit = true); T(g.fm(toCall), 15.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1, fit = true) }
+                        toCall == 0 -> T("CHECK", 14.sp, Color.White, num = true, maxLines = 1)
+                        toCall >= s.stack -> { T("ALL-IN", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1); T(g.fm(s.stack), 14.sp, Color.White, num = true, lineHeight = 15.sp, maxLines = 1) }
+                        else -> { T("CALL", 12.sp, Color.White, num = true, lineHeight = 13.sp, maxLines = 1); T(g.fm(toCall), 15.sp, Color.White, num = true, lineHeight = 16.sp, maxLines = 1) }
                     }
                 }
             }
@@ -918,7 +924,7 @@ private fun RoundBtn(size: Dp, col: Pair<Color, Color>, modifier: Modifier, enab
 @Composable
 private fun ColBtn(text: String, kind: BK, h: Dp = 50.dp, enabled: Boolean = true, onClick: () -> Unit) {
     watch()
-    GBtn(kind, Modifier.fillMaxWidth().height(h), enabled = enabled, onClick = onClick) {
+    GBtn(kind, Modifier.width(124.dp).height(h), enabled = enabled, onClick = onClick) {
         T(text.uppercase(), 13.5.sp, btnInk(kind), num = true, align = TextAlign.Center, maxLines = 2, lineHeight = 15.sp, fit = true)
     }
 }
@@ -947,7 +953,7 @@ private fun MyCards() {
     watch()
     val g = Game
     val st = g.st
-    val cw = 82.dp
+    val cw = 80.dp
     val both = !st.hero.contains(null)
     val nx = g.firstEmpty()
     val folded = st.seats[0].folded
@@ -1018,7 +1024,7 @@ private fun MyCards() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(Modifier.weight(1f)) {
                     if (both && ((!g.gm() && !Ui.peek) || hidden)) T(tr("podrž = ukázat"), 11.sp, C.muted, FontWeight.Bold, maxLines = 1, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                    else T(info.replace(" · ", "  "), 11.5.sp, C.gold, FontWeight.Bold, maxLines = 1, fit = true, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    else T(info.replace(" · ", "  "), 12.sp, C.gold, FontWeight.Bold, maxLines = 1, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
                 // eye: hide / show my cards
                 if (g.gm()) Box(
