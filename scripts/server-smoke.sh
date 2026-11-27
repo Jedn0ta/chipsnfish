@@ -75,6 +75,7 @@ F=$(rpc "$A" cf_fame '{"p_period":"week","p_scope":"all"}')
 [ "$(echo "$F" | jq '.top | length')" -ge 1 ] || { echo "hall of fame failed: $F"; exit 1; }
 echo "✓ practice earnings and hall of fame (honor points from the test hand: $(echo "$F" | jq -c '[.top[] | select(.name | startswith("Test")) | .pts]'))"
 rpc "$A" cf_ping '{}' >/dev/null; echo "✓ keep-alive ping"
+sleep 4
 rpc "$A" cf_say_text "{\"p_code\":\"$CODE\",\"p_text\":\"GG\"}" >/dev/null
 [ "$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}" | jq -r '.chat[-1].m')" = "t:GG" ] || { echo "text chat failed"; exit 1; }
 echo "✓ text chat"
