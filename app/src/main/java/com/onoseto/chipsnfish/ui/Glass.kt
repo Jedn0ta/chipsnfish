@@ -1,5 +1,11 @@
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -107,6 +113,70 @@ fun LobbyBokeh() {
             val y = d[1] * size.height + kotlin.math.sin(ph * 6.283f) * 8f
             val a = 0.04f + 0.09f * kotlin.math.sin(ph * 3.1416f)
             drawCircle(Color(0xFF9ED2FF).copy(alpha = a), d[2] * density, Offset(x, y))
+        }
+    }
+}
+
+/** Little things happening on the lobby table: a drink put on the rail, a chip tossed, a card dealt. */
+@Composable
+fun LobbyLife() {
+    class Ev(val id: Long, val kind: Int, val x: Float, val y: Float, val icon: String)
+    val evs = remember { androidx.compose.runtime.mutableStateListOf<Ev>() }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        var n = 0L
+        kotlinx.coroutines.delay(1800)
+        while (true) {
+            val k = listOf(0, 0, 1, 1, 2).random()
+            val e = when (k) {
+                // drink on the far rail (visible between the top bar and the panels)
+                0 -> Ev(n++, 0, 300f + Math.random().toFloat() * 200f, 64f, listOf("🥃", "🍸", "🍺", "🍷", "☕", "🥂").random())
+                // chip tossed onto the felt
+                1 -> Ev(n++, 1, if (Math.random() < 0.5) 268f + Math.random().toFloat() * 30f else 500f + Math.random().toFloat() * 50f, 300f + Math.random().toFloat() * 30f, "")
+                // card dealt from the dealer's side
+                else -> Ev(n++, 2, if (Math.random() < 0.5) 275f else 515f, 290f + Math.random().toFloat() * 30f, "")
+            }
+            evs.add(e)
+            if (evs.size > 5) evs.removeAt(0)
+            kotlinx.coroutines.delay(4500L + (Math.random() * 4500).toLong())
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        evs.toList().forEach { e ->
+            androidx.compose.runtime.key(e.id) {
+                val t = remember { androidx.compose.animation.core.Animatable(0f) }
+                val fade = remember { androidx.compose.animation.core.Animatable(1f) }
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    t.animateTo(1f, androidx.compose.animation.core.tween(if (e.kind == 0) 1400 else 900, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    kotlinx.coroutines.delay(if (e.kind == 0) 9000 else 6000)
+                    fade.animateTo(0f, androidx.compose.animation.core.tween(1200))
+                    evs.remove(e)
+                }
+                val v = t.value
+                when (e.kind) {
+                    0 -> {   // slides in from the side along the rail
+                        val from = if (e.x < 400f) -40f else 840f
+                        val x = from + (e.x - from) * v
+                        Box(Modifier.offset((x - 14).dp, (e.y - 16).dp).size(28.dp).graphicsLayer(alpha = fade.value), contentAlignment = Alignment.Center) {
+                            Box(Modifier.offset(y = 9.dp).size(20.dp, 6.dp).background(Brush.radialGradient(listOf(Color(0x99000000), Color.Transparent)), CircleShape))
+                            T(e.icon, 19.sp, lineHeight = 22.sp)
+                        }
+                    }
+                    1 -> {   // chip flies in from below with a little arc and spin
+                        val x = e.x + (1 - v) * 40f
+                        val y = 380f + (e.y - 380f) * v - kotlin.math.sin(v * 3.1416f) * 60f
+                        Box(Modifier.offset((x - 9).dp, (y - 9).dp).graphicsLayer(alpha = fade.value, rotationX = (1 - v) * 540f, scaleX = 0.8f + 0.2f * v, scaleY = 0.8f + 0.2f * v)) {
+                            ChipDisc(listOf(C.gold, Color(0xFF2F7BFF), Color(0xFFC62828), Color(0xFF1B1B1B))[(e.id % 4).toInt()], 18.dp)
+                        }
+                    }
+                    else -> { // card slides from the top centre
+                        val x = 400f + (e.x - 400f) * v
+                        val y = 40f + (e.y - 40f) * v
+                        Box(Modifier.offset((x - 11).dp, (y - 15).dp).graphicsLayer(alpha = fade.value, rotationZ = (1 - v) * 220f + (if (e.x < 400f) -12f else 12f) * v)) {
+                            CardBack(22.dp)
+                        }
+                    }
+                }
+            }
         }
     }
 }

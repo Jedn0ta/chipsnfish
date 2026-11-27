@@ -250,6 +250,15 @@ private fun TopBar() {
             T("#${st.handNo}", 15.sp, C.muted, num = true)
             BlindGroup()
         }
+        // hand rankings – always one tap away during the game
+        Row(
+            Modifier.height(32.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp))
+                .tap { Ui.open("hands") }.padding(horizontal = 9.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            T("♠", 16.sp, C.ink, FontWeight.Bold)
+            T(L("Kombinace", "Hands", "Hände"), 12.sp, C.ink, FontWeight.Bold)
+        }
         Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).border(1.dp, C.line, RoundedCornerShape(10.dp)).tap { Ui.openSettings() }, contentAlignment = Alignment.Center) {
             Icon24("gear", C.ink, 19.dp)
         }
@@ -318,6 +327,7 @@ private fun MenuScreen(onExit: () -> Unit) {
     val gOn = gs != null && gs.over == null
     Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }) {
         LobbyBackground()
+        LobbyLife()
         // top bar
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FishLogo(Modifier.size(32.dp))
