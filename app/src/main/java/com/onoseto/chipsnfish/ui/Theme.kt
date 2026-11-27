@@ -1,5 +1,6 @@
 package com.onoseto.chipsnfish.ui
 
+import kotlin.math.roundToInt
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -50,8 +51,28 @@ object C {
         "black" to listOf(0xFF44494F, 0xFF26292D, 0xFF121416, 0xFF050607),
     )
     val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Vínová", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
-    val BACKS = linkedMapOf("red" to "Rudý", "blue" to "Modrý", "black" to "Černý", "fish" to "Rybí")
-    val FACES = linkedMapOf("classic" to "Klasický", "jumbo" to "Velké znaky", "four" to "Čtyřbarevný", "picture" to "Obrázkový")
+    val BACKS = linkedMapOf("red" to "Rudý", "blue" to "Modrý", "green" to "Zelený", "black" to "Černý", "gold" to "Zlatý", "fish" to "Rybí")
+    val FACES = linkedMapOf("picture" to "Klasické obrázky", "classic" to "Velké indexy", "jumbo" to "Extra velké", "four" to "Čtyřbarevný")
+
+    /** Felt key is either a preset name or "h:<hue 0..360>:<intensity 0..1>" from the palette slider. */
+    fun feltHue(key: String): Pair<Float, Float> {
+        if (key.startsWith("h:")) {
+            val p = key.split(":")
+            return (p.getOrNull(1)?.toFloatOrNull() ?: 213f).coerceIn(0f, 360f) to (p.getOrNull(2)?.toFloatOrNull() ?: 1f).coerceIn(0f, 1f)
+        }
+        return when (key) { "green" -> 150f to 1f; "red" -> 350f to 1f; "purple" -> 268f to 1f; "gold" -> 41f to 1f; "black" -> 213f to 0f; else -> 213f to 1f }
+    }
+
+    fun feltKey(h: Float, i: Float) = "h:${h.roundToInt()}:${(i * 100).roundToInt() / 100f}"
+
+    /** Light (lamp), mid, dark, edge — generated from hue + intensity so any colour works. */
+    fun felt(key: String): List<Long> {
+        FELTS[key]?.let { return it }
+        val (h, i) = feltHue(key)
+        val vs = 0.4f + 0.6f * i
+        fun c(s: Float, v: Float) = android.graphics.Color.HSVToColor(floatArrayOf(h, s * i, v * vs)).toLong() and 0xFFFFFFFFL
+        return listOf(c(0.70f, 0.83f), c(0.81f, 0.60f), c(0.87f, 0.34f), c(0.89f, 0.21f))
+    }
 }
 
 object F {

@@ -821,40 +821,8 @@ private fun SettingsSheet(d: SettingsArg) {
             } else DefaultTableSettings()
         }
         "look" -> {
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Label(tr("Barva stolu"))
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        C.FELTS.forEach { (k, v) ->
-                            LookBtn(g.look.felt == k, tr(C.FELT_NAMES.getValue(k)), { g.look.felt = k; g.saveLook(); g.bump(); Ui.redraw() }, Modifier.weight(1f)) {
-                                Box(Modifier.size(26.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(v[0]), Color(v[2])))))
-                            }
-                        }
-                    }
-                    Label(tr("Rub karet"))
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        C.BACKS.forEach { (k, l) -> LookBtn(g.look.back == k, tr(l), { g.look.back = k; g.saveLook(); g.bump(); Ui.redraw() }, Modifier.weight(1f)) { CardBack(22.dp, k) } }
-                    }
-                    Label(tr("Velikost stolu"))
-                    var z by remember { mutableStateOf((2.1 - g.zoom).toFloat()) }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        T(tr("menší"), 12.sp, C.muted)
-                        Slider(z, { z = it; g.zoom = ((2.1 - it) * 100).roundToInt() / 100.0; g.saveZoom(); g.bump() }, Modifier.weight(1f).height(32.dp), valueRange = 0.6f..1.5f,
-                            colors = SliderDefaults.colors(thumbColor = C.gold, activeTrackColor = C.gold, inactiveTrackColor = C.line))
-                        T(tr("větší"), 12.sp, C.muted)
-                        T("${(z * 100).roundToInt()} %", 17.sp, num = true)
-                    }
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Label(tr("Líc karet"))
-                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        C.FACES.forEach { (k, l) -> LookBtn(g.look.face == k, tr(l), { g.look.face = k; g.saveLook(); g.bump(); Ui.redraw() }, Modifier.weight(1f)) { Row { CardView(49, 20.dp, k); CardView(37, 20.dp, k) } } }
-                    }
-                    Label(tr("Rozmístění u stolu"))
-                    Note(L("Hráče i sebe posuneš tažením podél okraje stolu, umístění se uloží samo.", "Drag players (and yourself) along the table edge; positions save automatically.", "Spieler am Tischrand entlang ziehen; Positionen werden gespeichert."))
-                    Btn(tr("Obnovit výchozí rozmístění"), BK.GHOST, Modifier.fillMaxWidth(), height = 38.dp) { st.pos = g.defaultPos(st.n); g.saveLayout(); Ui.close(); g.update(); g.toast(tr("Rozmístění obnoveno")) }
-                }
-            }
+            LookPanels()
+            LookTableSize()
             Label(L("Žetony · hodnoty podle vaší sady", "Chips · values of your set", "Chips · Werte eures Sets"))
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 g.chips.forEach { c ->
@@ -1052,15 +1020,6 @@ private fun askRestore(txt: String) {
         Game.restoreData(data)
         Ui.hideMenu(); Ui.showMenu()
     }
-}
-
-@Composable
-private fun LookBtn(on: Boolean, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, preview: @Composable () -> Unit) {
-    watch()
-    Column(
-        modifier.clip(RoundedCornerShape(9.dp)).background(C.panel2).border(2.dp, if (on) C.gold else C.line, RoundedCornerShape(9.dp)).tap(onClick).padding(vertical = 5.dp, horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) { preview(); T(label, 10.sp, if (on) C.gold else C.ink, FontWeight.Bold, maxLines = 1) }
 }
 
 @Composable

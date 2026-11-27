@@ -7,6 +7,7 @@ import androidx.compose.ui.draw.drawWithContent
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -157,20 +158,26 @@ fun CardView(c: Int, cw: Dp, face: String = Game.look.face, glow: Boolean = fals
             .clip(shape)
             .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF6F3EC), Color(0xFFEDE8DD))))
     ) {
+        if (face == "picture") {
+            // classic layout: small corner indices + pips / court figure in the middle
+            Canvas(Modifier.fillMaxSize()) { with(CardArt) { face(r, s, col) } }
+            val idx = @Composable { m: Modifier ->
+                Column(m.padding(start = cw * 0.035f, top = cw * 0.025f).width(cw * 0.21f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(Cards.rl(r), color = col, fontFamily = F.num, fontWeight = FontWeight.ExtraBold, fontSize = (w * (if (r == 8) 0.21f else 0.27f)).sp, lineHeight = (w * 0.26f).sp, letterSpacing = (-1).sp, maxLines = 1, softWrap = false)
+                    Canvas(Modifier.size(cw * 0.15f)) { with(CardArt) { suit(s, center, size.height, col) } }
+                }
+            }
+            idx(Modifier.align(Alignment.TopStart))
+            idx(Modifier.align(Alignment.BottomEnd).rotate(180f))
+            return@Box
+        }
         val jumbo = face == "jumbo"
-        val pic = face == "picture" && r >= 9
         Column(Modifier.padding(start = cw * 0.07f, top = cw * 0.02f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(Cards.rl(r), color = col, fontFamily = F.num, fontWeight = FontWeight.ExtraBold, fontSize = (w * (if (jumbo) 0.66f else 0.5f)).sp, lineHeight = (w * (if (jumbo) 0.62f else 0.46f)).sp, letterSpacing = (-0.5).sp)
             Text(Cards.SYM[s], color = col, fontSize = (w * (if (jumbo) 0.42f else 0.32f)).sp, lineHeight = (w * (if (jumbo) 0.42f else 0.32f)).sp)
         }
-        if (pic) {
-            Box(Modifier.align(Alignment.Center).offset(x = cw * 0.12f, y = cw * 0.12f), contentAlignment = Alignment.Center) {
-                Text(when (r) { 9 -> "♞"; 10 -> "♛"; 11 -> "♚"; else -> Cards.SYM[s] }, color = col, fontSize = (w * 0.62f).sp)
-            }
-        } else {
-            Text(Cards.SYM[s], color = col.copy(alpha = if (jumbo) 0.85f else 1f), fontSize = (w * (if (jumbo) 0.4f else 0.62f)).sp,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = cw * 0.06f, bottom = cw * 0.02f), lineHeight = (w * 0.62f).sp)
-        }
+        Text(Cards.SYM[s], color = col.copy(alpha = if (jumbo) 0.85f else 1f), fontSize = (w * (if (jumbo) 0.4f else 0.62f)).sp,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = cw * 0.06f, bottom = cw * 0.02f), lineHeight = (w * 0.62f).sp)
     }
 }
 
@@ -184,27 +191,14 @@ fun CardBack(cw: Dp, back: String = Game.look.back, modifier: Modifier = Modifie
                 FishLogo(Modifier.size(cw * 0.7f))
             }
         } else {
-            val (a, b) = when (back) {
-                "blue" -> Color(0xFF1F4FA0) to Color(0xFF163A78)
-                "black" -> Color(0xFF2B2B2B) to Color(0xFF121212)
-                else -> Color(0xFF9C1C26) to Color(0xFF7C1119)
+            val (a, b, t) = when (back) {
+                "blue" -> Triple(Color(0xFF2456AE), Color(0xFF142F66), Color(0xFFE8C56A))
+                "green" -> Triple(Color(0xFF1F7D4C), Color(0xFF0C4128), Color(0xFFE8C56A))
+                "black" -> Triple(Color(0xFF34363A), Color(0xFF101112), Color(0xFFD9DCE0))
+                "gold" -> Triple(Color(0xFFCFA54C), Color(0xFF7E5A18), Color(0xFFFFF4DA))
+                else -> Triple(Color(0xFFA8202B), Color(0xFF680D15), Color(0xFFE8C56A))
             }
-            Canvas(Modifier.fillMaxSize()) {
-                drawRect(Brush.radialGradient(listOf(a, b), center, size.maxDimension * 0.7f))
-                val step = 5.dp.toPx()
-                var x = -size.height
-                while (x < size.width + size.height) {
-                    drawLine(Color.White.copy(alpha = 0.09f), Offset(x, size.height), Offset(x + size.height, 0f), strokeWidth = 1.dp.toPx())
-                    drawLine(Color.White.copy(alpha = 0.09f), Offset(x, 0f), Offset(x + size.height, size.height), strokeWidth = 1.dp.toPx())
-                    x += step
-                }
-                val ins = size.minDimension * 0.09f
-                drawRect(Color(0xFFE8C56A).copy(alpha = 0.85f), Offset(ins, ins), androidx.compose.ui.geometry.Size(size.width - ins * 2, size.height - ins * 2), style = Stroke(maxOf(1f, size.minDimension * 0.035f)))
-                val c = center; val d = size.minDimension * 0.22f
-                val dia = androidx.compose.ui.graphics.Path().apply { moveTo(c.x, c.y - d * 1.3f); lineTo(c.x + d, c.y); lineTo(c.x, c.y + d * 1.3f); lineTo(c.x - d, c.y); close() }
-                drawPath(dia, Color(0xFFE8C56A).copy(alpha = 0.9f))
-                drawPath(dia, Color.Black.copy(alpha = 0.25f), style = Stroke(1f))
-            }
+            Canvas(Modifier.fillMaxSize()) { with(CardArt) { back(a, b, t) } }
         }
     }
 }

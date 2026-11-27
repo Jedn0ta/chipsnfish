@@ -223,7 +223,7 @@ fun TableView() {
             repeat(4) { for (k in 1 until st.n) pos[k] = geo.clampS(k, pos[k]) }
             Game.bump()
         }
-        val felt = C.FELTS[Game.look.felt] ?: C.FELTS.getValue("blue")
+        val felt = remember(Game.look.felt) { C.felt(Game.look.felt) }
         val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
         val myTurn = playing && st.turn == 0 && st.done == null && Game.gm()
         LaunchedEffect(myTurn, st.handNo, st.betStreet) {
