@@ -63,18 +63,15 @@ fun PlayersView() {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
             Row(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                T(tr("Hráči").uppercase(), 30.sp, num = true)
-                T(L("${list.size} v seznamu", "${list.size} on the list", "${list.size} in der Liste"), 12.5.sp, C.muted)
+                T(L("STATISTIKY", "STATISTICS", "STATISTIKEN"), 30.sp, num = true)
+                T(L("${list.size} hráčů · přibývají sami, jak s nimi hraješ", "${list.size} players · added automatically as you play", "${list.size} Spieler · kommen beim Spielen automatisch dazu"), 12.5.sp, C.muted)
                 Spacer(Modifier.weight(1f))
-                Btn(tr("+ Přidat hráče"), height = 40.dp) {
-                    val np = g.newPlayer(tr("Nový hráč")); g.storePlayer(np); g.bump(); Ui.open("player", PlayerArg(np.id))
-                }
             }
         }
         if (list.isEmpty()) item {
             Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, C.line, RoundedCornerShape(14.dp)).padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                T(tr("Seznam je prázdný"), 16.sp, weight = FontWeight.Bold)
-                T(tr("Přidej hráče, se kterými hraješ. Pak je v přípravě hry posadíš ke stolu z lavičky."), 13.sp, C.muted, align = TextAlign.Center)
+                T(L("Zatím tu nikdo není", "Nobody here yet", "Noch niemand hier"), 16.sp, weight = FontWeight.Bold)
+                T(L("Každý, s kým si zahraješ, i všichni tví přátelé se tu objeví sami i se statistikami.", "Everyone you play with and all your friends show up here by themselves, with their stats.", "Alle, mit denen du spielst, und alle deine Freunde erscheinen hier automatisch mit Statistiken."), 13.sp, C.muted, align = TextAlign.Center)
             }
         }
         var shownOthers = false

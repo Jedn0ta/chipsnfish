@@ -437,6 +437,14 @@ object Online {
                     OFriend(o["uid"]!!.jsonPrimitive.content, o["name"]?.jsonPrimitive?.contentOrNull ?: "?", o["img"]?.jsonPrimitive?.contentOrNull ?: "",
                         o["online"]?.jsonPrimitive?.booleanOrNull ?: false, o["table"]?.jsonPrimitive?.contentOrNull)
                 }
+                // friends always show up in the statistics
+                var added = false
+                friends?.forEach { f ->
+                    val p = Game.P[f.uid]
+                    if (p == null) { Game.P[f.uid] = Player(f.uid, f.name, img = f.img, stored = true); added = true }
+                    else { if (!p.stored) { p.stored = true; added = true }; if (f.name.isNotBlank() && f.name != "?") p.name = f.name; if (f.img.isNotEmpty()) p.img = f.img }
+                }
+                if (added) Game.saveLocal()
             } catch (e: Exception) { if (friends == null) friends = emptyList() }
         }
     }
