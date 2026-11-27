@@ -334,7 +334,7 @@ fun Avatar(p: Player, size: Dp, ring: Color? = null, shape: Shape = CircleShape,
 
 // ---------------- logo ----------------
 
-private val fishPath by lazy { PathParser().parsePathString("M10.5 20c2.6-4.2 6.4-5.6 10.2-4.6 2.2.6 3.9 2 5 3.4l3.3-2.6v7.6l-3.3-2.6c-1.1 1.4-2.8 2.8-5 3.4-3.8 1-7.6-.4-10.2-4.6z").toPath() }
+internal val fishPath by lazy { PathParser().parsePathString("M10.5 20c2.6-4.2 6.4-5.6 10.2-4.6 2.2.6 3.9 2 5 3.4l3.3-2.6v7.6l-3.3-2.6c-1.1 1.4-2.8 2.8-5 3.4-3.8 1-7.6-.4-10.2-4.6z").toPath() }
 
 @Composable
 fun FishLogo(modifier: Modifier = Modifier) {

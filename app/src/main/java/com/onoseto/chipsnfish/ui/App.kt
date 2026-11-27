@@ -2,6 +2,10 @@
 
 package com.onoseto.chipsnfish.ui
 
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.rotate
+import kotlinx.coroutines.launch
 import androidx.compose.ui.res.imageResource
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.layout.positionInRoot
@@ -363,7 +367,7 @@ private fun MenuScreen(onExit: () -> Unit) {
             FriendsOnlineRow()
         }
         // centre: the big play button
-        Column(Modifier.align(Alignment.Center).padding(top = 30.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.align(Alignment.Center).padding(top = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (O.code != null) PlayOrb(L("POKRAČOVAT", "CONTINUE", "WEITER"), L("stůl ${O.code}", "table ${O.code}", "Tisch ${O.code}")) { goTable() }
             else PlayOrb(L("HRÁT", "PLAY", "SPIELEN"), L("s přáteli", "with friends", "mit Freunden")) { Ui.open("online", OnlineArg()) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -396,43 +400,96 @@ private fun MenuScreen(onExit: () -> Unit) {
     }
 }
 
-/** Big glowing round play button with a pulsing ring. */
+/** The main button: a glowing blue glass poker chip with the fish. Now and then it flips; a tap sends it spinning. */
 @Composable
 private fun PlayOrb(title: String, sub: String, onClick: () -> Unit) {
     watch()
-    val pulse = rememberInfiniteTransition(label = "orb").animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = LinearEasing)), label = "p")
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val inf = rememberInfiniteTransition(label = "chip")
+    val glowT = inf.animateFloat(0f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "glow")
+    val flip = remember { androidx.compose.animation.core.Animatable(0f) }      // occasional flip
+    val shine = remember { androidx.compose.animation.core.Animatable(-1f) }    // light sweep
+    val burst = remember { androidx.compose.animation.core.Animatable(0f) }     // tap
+    var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5200L + (Math.random() * 3000).toLong())
+            if (busy) continue
+            shine.snapTo(-1f)
+            launch { shine.animateTo(1.4f, tween(1100, easing = LinearEasing)) }
+            if (Math.random() < 0.55) { flip.snapTo(0f); flip.animateTo(360f, tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+        }
+    }
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.93f else 1f, label = "orbpress")
-    Box(Modifier.size(170.dp), contentAlignment = Alignment.Center) {
-        // pulse rings
-        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-            val r0 = size.minDimension * 0.36f
-            for (k in 0..1) {
-                val ph = (pulse.value + k * 0.5f) % 1f
-                drawCircle(LobbyBlue.copy(alpha = 0.45f * (1f - ph)), r0 * (1f + 0.38f * ph), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
-            }
-            drawCircle(Brush.radialGradient(listOf(Color(0x664FA8FF), Color.Transparent), radius = size.minDimension * 0.5f), size.minDimension * 0.5f)
-        }
-        Box(
-            Modifier.size(124.dp).graphicsLayer(scaleX = sc, scaleY = sc)
-                .shadow(24.dp, androidx.compose.foundation.shape.CircleShape, ambientColor = Color(0xFF2F7BFF), spotColor = Color(0xFF2F7BFF))
-                .clip(androidx.compose.foundation.shape.CircleShape)
-                .background(Brush.radialGradient(listOf(Color(0xFF8AD2FF), Color(0xFF2F7BFF), Color(0xFF0F2C8C)), center = androidx.compose.ui.geometry.Offset.Unspecified))
-                .drawBehind {
-                    drawOval(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Transparent), 0f, size.height * 0.5f),
-                        topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.18f, size.height * 0.06f),
-                        size = androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.42f))
+    val press by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.92f else 1f, label = "press")
+    val b = burst.value
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(158.dp), contentAlignment = Alignment.Center) {
+            // glow and shock-wave rings
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val r = size.minDimension * 0.34f
+                val g = 0.35f + 0.25f * kotlin.math.sin(glowT.value * 6.283f)
+                drawCircle(Brush.radialGradient(listOf(Color(0xFF4FA8FF).copy(alpha = g), Color.Transparent), radius = size.minDimension * 0.5f), size.minDimension * 0.5f)
+                if (b > 0f) for (k in 0..2) {
+                    val ph = ((b - k * 0.15f) / 0.7f).coerceIn(0f, 1f)
+                    if (ph > 0f) drawCircle(LobbyBlue.copy(alpha = 0.8f * (1f - ph)), r * (1f + 0.9f * ph), style = androidx.compose.ui.graphics.drawscope.Stroke((4f - 3f * ph) * density))
                 }
-                .border(2.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.9f), Color(0x552F7BFF))), androidx.compose.foundation.shape.CircleShape)
-                .clickable(src, null, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                T(title, 24.sp, Color.White, num = true, letter = 1.5.sp, maxLines = 1, fit = true, modifier = Modifier.padding(horizontal = 10.dp))
-                T(sub, 12.sp, Color.White.copy(alpha = 0.85f), FontWeight.Bold, maxLines = 1, fit = true)
+            }
+            val scale = press * (1f + 0.22f * kotlin.math.sin(b * 3.1416f))
+            androidx.compose.foundation.Canvas(
+                Modifier.size(112.dp)
+                    .graphicsLayer(scaleX = scale, scaleY = scale, rotationY = flip.value, rotationZ = b * 540f, cameraDistance = 14f * LocalDensity.current.density)
+                    .clickable(src, null) {
+                        if (busy) return@clickable
+                        busy = true
+                        scope.launch {
+                            burst.snapTo(0f)
+                            burst.animateTo(1f, tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                            onClick()
+                            burst.snapTo(0f); busy = false
+                        }
+                    },
+            ) {
+                val c = center
+                val R = size.minDimension / 2
+                // shadow
+                drawCircle(Color(0x66000000), R * 0.98f, c + androidx.compose.ui.geometry.Offset(0f, R * 0.06f))
+                // rim
+                drawCircle(Brush.radialGradient(listOf(Color(0xFF9AD8FF), Color(0xFF2F7BFF), Color(0xFF0F2C8C)), c - androidx.compose.ui.geometry.Offset(R * 0.3f, R * 0.4f), R * 1.6f), R)
+                // edge inserts
+                for (k in 0 until 8) {
+                    val a = k * 45f
+                    rotate(a, c) {
+                        drawRoundRect(Color.White.copy(alpha = 0.92f), androidx.compose.ui.geometry.Offset(c.x - R * 0.1f, c.y - R * 0.99f),
+                            androidx.compose.ui.geometry.Size(R * 0.2f, R * 0.2f), androidx.compose.ui.geometry.CornerRadius(R * 0.04f))
+                    }
+                }
+                // glass inlay
+                drawCircle(Brush.radialGradient(listOf(Color(0xCC1A3E8C), Color(0xEE0A1A48)), c, R * 0.72f), R * 0.72f)
+                drawCircle(Color.White.copy(alpha = 0.75f), R * 0.66f, style = androidx.compose.ui.graphics.drawscope.Stroke(R * 0.03f,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(R * 0.09f, R * 0.07f))))
+                // the fish
+                val s = R * 1.25f / 40f
+                translate(c.x - 20f * s - R * 0.03f, c.y - 20f * s) {
+                    scale(s, s, androidx.compose.ui.geometry.Offset.Zero) {
+                        drawPath(fishPath, Brush.verticalGradient(listOf(Color(0xFFDDF3FF), Color(0xFF7FC4FF)), 14f, 26f))
+                        drawCircle(Color(0xFF0A1A48), 1.3f, androidx.compose.ui.geometry.Offset(14.6f, 19.2f))
+                    }
+                }
+                // glass highlight + moving shine
+                drawOval(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Transparent), c.y - R, c.y),
+                    topLeft = androidx.compose.ui.geometry.Offset(c.x - R * 0.7f, c.y - R * 0.95f), size = androidx.compose.ui.geometry.Size(R * 1.4f, R * 0.8f))
+                val sx = shine.value * R * 2f
+                clipPath(androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(c, R)) }) {
+                    drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.45f), Color.Transparent),
+                        start = androidx.compose.ui.geometry.Offset(c.x + sx - R * 0.5f, c.y - R), end = androidx.compose.ui.geometry.Offset(c.x + sx + R * 0.1f, c.y + R)))
+                }
+                drawCircle(Color.White.copy(alpha = 0.6f), R - 1.5f, style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f))
             }
         }
+        T(title, 22.sp, Color.White, num = true, letter = 3.sp, maxLines = 1, lineHeight = 24.sp)
+        T(sub, 11.5.sp, LobbyBlue, FontWeight.ExtraBold, letter = 1.5.sp, maxLines = 1)
     }
 }
 
