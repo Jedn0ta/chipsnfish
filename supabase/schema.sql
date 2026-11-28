@@ -862,7 +862,9 @@ revoke all on cf_chat, cf_drinks from anon, authenticated;
 
 create or replace function cf_drink_price(k text) returns int language sql immutable as $$
   select case k when 'coffee' then 20 when 'beer' then 50 when 'wine' then 80
-                when 'cocktail' then 120 when 'whisky' then 150 when 'champagne' then 400 end
+                when 'cocktail' then 120 when 'whisky' then 150 when 'champagne' then 400
+                when 'fries' then 30 when 'hotdog' then 40 when 'pizza' then 60 when 'burger' then 80
+                when 'sushi' then 120 when 'cake' then 100 end
 $$;
 
 -- an emoji message: up to 5 indexes into the app's emoji set, e.g. '3,17,5'

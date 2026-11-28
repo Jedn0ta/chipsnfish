@@ -42,7 +42,16 @@ object Social {
         Drink("whisky", "🥃", "Whisky", "Whisky", "Whisky", 150),
         Drink("champagne", "🍾", "Šampaňské", "Champagne", "Champagner", 400),
     )
-    fun drink(id: String) = DRINKS.firstOrNull { it.id == id }
+    /** Food works like drinks (bought for someone at the table, flies over and stays beside him). */
+    val FOOD = listOf(
+        Drink("fries", "🍟", "Hranolky", "Fries", "Pommes", 30),
+        Drink("hotdog", "🌭", "Hotdog", "Hot dog", "Hotdog", 40),
+        Drink("pizza", "🍕", "Pizza", "Pizza", "Pizza", 60),
+        Drink("burger", "🍔", "Burger", "Burger", "Burger", 80),
+        Drink("cake", "🍰", "Dort", "Cake", "Torte", 100),
+        Drink("sushi", "🍣", "Sushi", "Sushi", "Sushi", 120),
+    )
+    fun drink(id: String) = DRINKS.firstOrNull { it.id == id } ?: FOOD.firstOrNull { it.id == id }
 
     /** Hats are worn on the avatar and stay (online: on the server profile). */
     val HATS = listOf(
@@ -97,7 +106,7 @@ object Social {
 
     fun openPanel(t: String = "emoji", who: String? = null) {
         tab = t; target = who ?: target; open = true
-        if (t == "drink" || t == "hat" || bank == null) loadBank()
+        if (t == "drink" || t == "food" || t == "hat" || bank == null) loadBank()
         if (t == "hat") loadHats()
     }
 

@@ -5,6 +5,8 @@ package com.onoseto.chipsnfish.ui
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -397,7 +399,7 @@ fun TableView() {
             }
         }
         // quick actions for a tapped player
-        if (Ui.seatMenu in 1 until st.n) SeatMenu(Ui.seatMenu, geo, w)
+        if (Ui.seatMenu in 0 until st.n) SeatMenu(Ui.seatMenu, geo, w)
         // mood popup
         if (Ui.moodSeat in 0 until st.n) MoodPop(geo, w, h)
         // fish bubble, swimming chip, chip rain
@@ -545,10 +547,20 @@ private fun SeatMenu(k: Int, geo: Geo, w: Float) {
     val pt = geo.pt(st.pos!![k])
     val social = com.onoseto.chipsnfish.online.Social
     val shop = social.available() && com.onoseto.chipsnfish.online.SupaCfg.configured
+    val me = k == 0
     val items = buildList<Triple<String, String, () -> Unit>> {
+        if (me) {
+            // treat myself: drink, food, hat
+            if (shop) add(Triple("🍹", L("Drink", "Drink", "Drink"), { social.openPanel("drink", s.pid) }))
+            if (shop) add(Triple("🍔", L("Jídlo", "Food", "Essen"), { social.openPanel("food", s.pid) }))
+            if (shop) add(Triple("🎩", L("Klobouk", "Hat", "Hut"), { social.openPanel("hat", s.pid) }))
+            add(Triple("ⓘ", L("Profil", "Profile", "Profil"), { Ui.open("seat", k) }))
+            return@buildList
+        }
         if (g.playing() && !s.out && !s.folded && st.done == null && st.one?.get(k) == null && (g.online() || st.hole[k] != null))
             add(Triple("🂠", L("Ukaž kartu", "Show a card", "Karte zeigen"), { g.askCard(k) }))
         if (shop) add(Triple("🍹", L("Drink", "Drink", "Drink"), { social.openPanel("drink", s.pid) }))
+        if (shop) add(Triple("🍔", L("Jídlo", "Food", "Essen"), { social.openPanel("food", s.pid) }))
         if (shop) add(Triple("🎁", L("Darovat", "Give", "Schenken"), { social.openPanel("hat", s.pid) }))
         if (social.available()) add(Triple("💬", L("Napsat", "Message", "Schreiben"), { social.openPanel("chat", s.pid) }))
         if (social.available()) add(Triple("😀", L("Emoji", "Emoji", "Emoji"), { social.openPanel("emoji", s.pid) }))
@@ -676,8 +688,8 @@ private fun SeatView(
             }
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() }, indication = null,
-                onClick = { Ui.moodSeat = -1; if (k != 0 && g.gm()) Ui.seatMenu = k else Ui.open("seat", k) },
-                onLongClick = { Ui.moodSeat = k },
+                onClick = { Ui.moodSeat = -1; if (g.gm()) Ui.seatMenu = k else Ui.open("seat", k) },
+                onLongClick = { },
             ),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -1049,10 +1061,21 @@ private fun ActBox() {
                 val pt = g.potTotal()
                 fun pre(f: Double) = (((st.curBet + f * (pt + toCall)) / g.step()).roundToInt() * g.step()).coerceIn(mn, mx)
                 Column(
-                    Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp, y = (-58).dp).width(82.dp).clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xE60E1622)).border(1.dp, C.gold.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(3.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    Modifier.align(Alignment.BottomEnd).offset(x = (-90).dp, y = (-58).dp).width(110.dp).clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xEE0E1622)).border(1.dp, C.gold.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        T(g.fm(g.raiseTo.coerceIn(mn, mx)), 16.sp, C.gold, num = true, modifier = Modifier.weight(1f), align = TextAlign.Center)
+                        // cancel the raise
+                        Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)).tap { betOpen = false; g.raiseTo = mn; g.raiseOpen = false; g.bump() }, contentAlignment = Alignment.Center) {
+                            T("✕", 12.sp, Color.White, FontWeight.Bold)
+                        }
+                    }
+                    MiniSlider(((g.raiseTo.coerceIn(mn, mx) - mn).toFloat() / max(1, mx - mn))) { f ->
+                        val stp = st.bb.coerceAtLeast(1)
+                        g.raiseTo = if (f >= 0.999f) mx else (mn + ((f * (mx - mn)) / stp).roundToInt() * stp).coerceIn(mn, mx); g.bump()
+                    }
                     listOf(listOf("MIN" to mn, "½" to pre(0.5)), listOf("POT" to pre(1.0), "MAX" to mx)).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             row.forEach { (l, x) ->
@@ -1065,13 +1088,30 @@ private fun ActBox() {
                             }
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        GBtn(BK.DARK, Modifier.weight(1f).height(26.dp), enabled = g.raiseTo > mn, onClick = { g.raiseTo = (g.raiseTo - st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("−", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
-                        GBtn(BK.DARK, Modifier.weight(1f).height(26.dp), enabled = g.raiseTo < mx, onClick = { g.raiseTo = (g.raiseTo + st.bb.coerceAtLeast(1)).coerceIn(mn, mx); g.bump() }) { T("+", 15.sp, Color.White, FontWeight.Black, lineHeight = 15.sp) }
-                    }
                 }
             }
         }
+    }
+}
+
+/** Minimal bet slider: thin gold track, white thumb. */
+@Composable
+private fun MiniSlider(value: Float, onChange: (Float) -> Unit) {
+    val change by rememberUpdatedState(onChange)
+    Canvas(
+        Modifier.fillMaxWidth().height(26.dp)
+            .pointerInput(Unit) { detectTapGestures { change(((it.x - size.height / 2f) / (size.width - size.height)).coerceIn(0f, 1f)) } }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { ch, _ -> ch.consume(); change(((ch.position.x - size.height / 2f) / (size.width - size.height)).coerceIn(0f, 1f)) }
+            }
+    ) {
+        val r = size.height / 2f
+        val th = 4.dp.toPx()
+        val x = r + value.coerceIn(0f, 1f) * (size.width - 2 * r)
+        drawRoundRect(Color.White.copy(alpha = 0.18f), Offset(r, center.y - th / 2), Size(size.width - 2 * r, th), CornerRadius(th / 2))
+        drawRoundRect(C.gold, Offset(r, center.y - th / 2), Size(x - r, th), CornerRadius(th / 2))
+        drawCircle(Color.White, r * 0.62f, Offset(x, center.y))
+        drawCircle(C.gold, r * 0.62f, Offset(x, center.y), style = Stroke(2.dp.toPx()))
     }
 }
 

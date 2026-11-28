@@ -148,22 +148,23 @@ fun SocialPop() {
     if (!Social.open) return
     val shape = RoundedCornerShape(14.dp)
     Column(
-        Modifier.width(436.dp).shadow(12.dp, shape).clip(shape).background(C.panel).border(1.dp, C.line, shape).padding(8.dp),
+        Modifier.width(470.dp).shadow(12.dp, shape).clip(shape).background(C.panel).border(1.dp, C.line, shape).padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             SmallPill("😀 Emoji", Social.tab == "emoji") { Social.tab = "emoji" }
             SmallPill("💬 Chat", Social.tab == "chat") { Social.tab = "chat" }
             SmallPill("🍹 Drink", Social.tab == "drink") { Social.openPanel("drink") }
+            SmallPill("🍔 " + L("Jídlo", "Food", "Essen"), Social.tab == "food") { Social.openPanel("food") }
             SmallPill("🎩 " + L("Klobouk", "Hat", "Hut"), Social.tab == "hat") { Social.openPanel("hat") }
             Spacer(Modifier.weight(1f))
-            if (Social.tab == "drink" || Social.tab == "hat") T("💰 " + (Social.bank?.let { Game.fm(it) } ?: "…"), 14.sp, C.gold, num = true)
+            if (Social.tab == "drink" || Social.tab == "food" || Social.tab == "hat") T("💰 " + (Social.bank?.let { Game.fm(it) } ?: "…"), 14.sp, C.gold, num = true)
             Box(Modifier.size(28.dp).clip(CircleShape).background(C.panel2).tap { Social.open = false }, contentAlignment = Alignment.Center) {
                 T("✕", 14.sp, C.muted, FontWeight.Bold)
             }
         }
         Box(Modifier.fillMaxWidth().height(164.dp)) {
-            when (Social.tab) { "emoji" -> EmojiTab(); "chat" -> ChatTab(); "hat" -> HatTab(); else -> DrinkTab() }
+            when (Social.tab) { "emoji" -> EmojiTab(); "chat" -> ChatTab(); "hat" -> HatTab(); "food" -> DrinkTab(Social.FOOD); else -> DrinkTab(Social.DRINKS) }
         }
     }
 }
@@ -300,18 +301,18 @@ private fun HatTab() {
 }
 
 @Composable
-private fun DrinkTab() {
+private fun DrinkTab(list: List<Social.Drink>) {
     watch()
     val seats = Game.st.seats.filter { !it.out }
     val target = Social.target?.takeIf { t -> seats.any { it.pid == t } } ?: seats.getOrNull(1)?.pid ?: seats.firstOrNull()?.pid
-    var pick by remember { mutableStateOf("beer") }
+    var pick by remember(list) { mutableStateOf(list[1].id) }
     val d = Social.drink(pick)!!
     val who = seats.firstOrNull { it.pid == target }?.let { Game.pl(it) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         WhoRow(target)
         // which drink
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Social.DRINKS.forEach { x ->
+            list.forEach { x ->
                 val on = x.id == pick
                 Column(
                     Modifier.width(60.dp).clip(RoundedCornerShape(10.dp)).background(if (on) C.gold.copy(alpha = 0.22f) else C.panel2)

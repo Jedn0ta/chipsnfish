@@ -243,13 +243,9 @@ private fun TopBar() {
         }
         Spacer(Modifier.weight(1f))
         if (Ui.view == "table" && playing && !Ui.solo) {
-            Row(Modifier.clip(RoundedCornerShape(9.dp)).background(Color.Black.copy(alpha = 0.42f)).border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(9.dp)).padding(2.dp)) {
-                listOf("PREFLOP", "FLOP", "TURN", "RIVER").forEachIndexed { i, n ->
-                    val on = i == st.betStreet
-                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(if (on) C.gold else Color.Transparent).padding(horizontal = 7.dp, vertical = 2.dp)) {
-                        T(n, 13.sp, if (on) C.goldInk else if (i < st.betStreet) Color.White.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.4f), num = true, letter = 0.8.sp)
-                    }
-                }
+            // just the current street
+            Box(Modifier.clip(RoundedCornerShape(9.dp)).background(C.gold).padding(horizontal = 12.dp, vertical = 3.dp)) {
+                T(listOf("PREFLOP", "FLOP", "TURN", "RIVER").getOrElse(st.betStreet) { "RIVER" }, 14.sp, C.goldInk, num = true, letter = 1.sp)
             }
             T("#${st.handNo}", 15.sp, C.muted, num = true)
             BlindGroup()
