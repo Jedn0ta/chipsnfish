@@ -818,7 +818,7 @@ private fun SettingsSheet(d: SettingsArg) {
                     Btn(tr("♠ Výherní kombinace"), BK.GHOST, Modifier.weight(1f), height = 40.dp) { Ui.open("hands", null, Ui.sheet) }
                     Btn(tr("Nová hra"), BK.GHOST, Modifier.weight(1f), height = 40.dp) { Ui.openGameSetup() }
                     Btn(tr("Ukončit hru"), BK.DANGER, Modifier.weight(1f), height = 40.dp) {
-                        Ui.confirm(tr("Ukončit hru?"), tr("Hra proti počítači skončí a aplikace se zavře."), tr("Ukončit hru")) { g.endGameVsComputer(); Ui.exitRequest++ }
+                        Ui.confirm(tr("Ukončit hru?"), L("Hra proti počítači skončí a vrátíš se do menu.", "The game against the computer ends and you go back to the menu.", "Das Spiel gegen den Computer endet, zurück ins Menü."), tr("Ukončit hru")) { g.endGameVsComputer(); g.saveLocal(); Ui.close(); Ui.showMenu() }
                     }
                 }
             } else DefaultTableSettings()
