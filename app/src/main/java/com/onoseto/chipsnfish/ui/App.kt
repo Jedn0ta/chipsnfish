@@ -323,7 +323,7 @@ private fun MenuScreen(onExit: () -> Unit) {
         LobbyBackground()
         // top bar
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FishHat(32.dp, Modifier.combinedClickable(remember { MutableInteractionSource() }, null, onLongClick = { Ui.open("advent") }, onClick = {}))
+            FishHat(32.dp)
             Column {
                 T("HOLD'EM", 11.sp, LobbyBlue, num = true, letter = 4.sp, lineHeight = 12.sp)
                 T("CHIPS&FISH", 22.sp, Color.White, num = true, letter = 1.5.sp, lineHeight = 24.sp)
@@ -613,14 +613,8 @@ private fun ProfileBlock() {
             NameField()
         }
     }
-    val F = com.onoseto.chipsnfish.online.Fame
-    val S = com.onoseto.chipsnfish.online.Social
+    // wallet, honor and cups are in the top right corner already
     ResultsChart()
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        StatChip(L("žetony", "chips", "Chips"), S.bank?.let { Game.fm(it) } ?: "–", Modifier.weight(1f))
-        StatChip(L("čest", "honor", "Ehre"), Game.fm(F.honor ?: 0), Modifier.weight(1f))
-        StatChip(L("poháry", "cups", "Pokale"), "${F.cups ?: 0}", Modifier.weight(1f))
-    }
 }
 
 @Composable

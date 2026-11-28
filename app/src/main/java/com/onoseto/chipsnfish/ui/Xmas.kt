@@ -97,10 +97,12 @@ object Xmas {
     val ORDER = listOf(7, 19, 3, 22, 12, 1, 16, 9, 24, 5, 14, 20, 2, 11, 17, 8, 23, 4, 13, 21, 6, 18, 10, 15)
 
     fun today(): LocalDate = LocalDate.now(ZoneId.of("Europe/Prague"))
+    /** Testing before Advent: the calendar shows already and every window can be opened (until 1 December). */
+    fun testing() = today().let { it.monthValue == 11 && it.year == 2026 }
     /** December = Christmas look (Santa hat on the fish chip). */
     fun season() = today().monthValue == 12
     /** Highest window that may be opened today (0 outside 1–24 December). */
-    fun openUpTo(): Int = today().let { if (it.monthValue == 12) minOf(it.dayOfMonth, 24) else 0 }
+    fun openUpTo(): Int = if (testing()) 24 else today().let { if (it.monthValue == 12) minOf(it.dayOfMonth, 24) else 0 }
     fun calendarOn() = openUpTo() > 0
 
     /** Opened windows (also mirrored from the server when signed in). */
@@ -175,8 +177,12 @@ fun AdventSheet() {
         SantaHat(Modifier.size(30.dp))
         T(L("Adventní kalendář", "Advent calendar", "Adventskalender"), 22.sp, Color.White, FontWeight.ExtraBold,
             modifier = Modifier.combinedClickable(remember { MutableInteractionSource() }, null, onLongClick = { preview = !preview }, onClick = {}))
-        T(if (upTo == 0) L("otevře se 1. prosince", "opens on 1 December", "öffnet am 1. Dezember") else L("každý den jedno okénko, pro všechny to samé", "one window a day, the same for everyone", "jeden Tag ein Fenster, für alle gleich"),
+        T(if (Xmas.testing()) L("TEST: do 1. prosince jdou otevřít všechna okénka", "TEST: all windows open until 1 December", "TEST: bis 1. Dezember alle Fenster offen")
+          else if (upTo == 0) L("otevře se 1. prosince", "opens on 1 December", "öffnet am 1. Dezember") else L("každý den jedno okénko, pro všechny to samé", "one window a day, the same for everyone", "jeden Tag ein Fenster, für alle gleich"),
             12.sp, GlassMuted, FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
+    }
+    if (Xmas.testing() && Xmas.opened.size < 24) Btn(L("Otevřít všechna okénka (test)", "Open all windows (test)", "Alle Fenster öffnen (Test)"), BK.GHOST, height = 34.dp) {
+        (1..24).filter { it !in Xmas.opened }.forEach { d -> Xmas.open(d) { got = it } }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         FlowRow(Modifier.width(460.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), maxItemsInEachRow = 8) {

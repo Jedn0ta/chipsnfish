@@ -1390,7 +1390,10 @@ language plpgsql security definer set search_path = public as $$
 declare u uuid := cf_me(); d date := cf_today(); k text;
 begin
   if u is null then raise exception 'not signed in'; end if;
-  if extract(month from d) <> 12 or p_day < 1 or p_day > 24 or p_day > extract(day from d) then raise exception 'not yet'; end if;
+  -- November 2026 is for testing: every window opens
+  if p_day < 1 or p_day > 24 then raise exception 'bad day'; end if;
+  if not (extract(month from d) = 11 and extract(year from d) = 2026)
+     and (extract(month from d) <> 12 or p_day > extract(day from d)) then raise exception 'not yet'; end if;
   k := cf_advent_item(p_day);
   insert into cf_advent(uid, day) values (u, p_day) on conflict do nothing;
   if not exists (select 1 from cf_hats where uid = u and kind = k) then insert into cf_hats(uid, kind) values (u, k); end if;
