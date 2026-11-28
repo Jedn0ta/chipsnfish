@@ -9,6 +9,7 @@ import com.onoseto.chipsnfish.L
 import com.onoseto.chipsnfish.game.Game
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -65,8 +66,11 @@ object Social {
     fun hat(id: String) = HATS.firstOrNull { it.id == id }
     fun hatIcon(id: String) = hat(id)?.icon ?: com.onoseto.chipsnfish.ui.Xmas.item(id)?.icon ?: ""
 
-    /** Quick phrases for the short chat. */
-    fun phrases() = listOf(
+    /** Quick phrases for the short chat: my own (set in Settings), or these to start with. */
+    private val strList = kotlinx.serialization.builtins.ListSerializer(String.serializer())
+    fun phrases(): List<String> = Game.getS("hr-phrases")?.let { s -> runCatching { Game.json.decodeFromString(strList, s) }.getOrNull() } ?: defaultPhrases()
+    fun setPhrases(l: List<String>) { Game.setS("hr-phrases", Game.json.encodeToString(strList, l)); Game.bump() }
+    fun defaultPhrases() = listOf(
         L("Pěkná hra 👍", "Nice game 👍", "Schönes Spiel 👍"), "GG", L("Hodně štěstí 🍀", "Good luck 🍀", "Viel Glück 🍀"),
         L("Bluf! 😏", "Bluff! 😏", "Bluff! 😏"), L("To jsem nečekal 😱", "Didn't see that coming 😱", "Das kam unerwartet 😱"),
         L("Ještě jednu?", "One more?", "Noch eine?"), L("Díky 🙏", "Thanks 🙏", "Danke 🙏"), L("Sorry 😅", "Sorry 😅", "Sorry 😅"),

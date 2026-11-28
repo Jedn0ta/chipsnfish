@@ -223,14 +223,9 @@ private fun WhoRow(target: String?, mine: Boolean = false) {
 private fun ChatTab() {
     watch()
     var txt by remember { mutableStateOf("") }
-    // a message aimed at one player starts with @name
-    val to = Social.target?.let { t -> Game.st.seats.firstOrNull { it.pid == t }?.let { Game.pl(it).name } }
-    fun out(m: String) = if (to != null) "@$to $m" else m
+    // the chat is public: everyone at the table reads everything
+    fun out(m: String) = m
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (to != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            T(L("Pro: ", "To: ", "An: ") + to, 12.sp, C.gold, FontWeight.Bold)
-            SmallPill(L("všem", "everyone", "alle"), false) { Social.target = null }
-        }
         Row(
             Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp)).background(C.panel2).padding(start = 10.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),

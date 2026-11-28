@@ -618,7 +618,6 @@ private fun SeatMenu(k: Int, geo: Geo, w: Float) {
         if (shop) add(Triple("🍹", L("Drink", "Drink", "Drink"), { social.openPanel("drink", s.pid) }))
         if (shop) add(Triple("🍔", L("Jídlo", "Food", "Essen"), { social.openPanel("food", s.pid) }))
         if (shop) add(Triple("🎁", L("Darovat", "Give", "Schenken"), { social.openPanel("hat", s.pid) }))
-        if (social.available()) add(Triple("💬", L("Napsat", "Message", "Schreiben"), { social.openPanel("chat", s.pid) }))
         if (social.available()) add(Triple("😀", L("Emoji", "Emoji", "Emoji"), { social.openPanel("emoji", s.pid) }))
         add(Triple("ⓘ", L("Profil", "Profile", "Profil"), { Ui.open("seat", k) }))
     }

@@ -877,6 +877,7 @@ private fun MySettings() {
                     }
                 }
             }
+            QuickPhrases()
             OptRow(L("Moje karty u stolu", "My cards at the table", "Meine Karten am Tisch"),
                 L("Skryté = lícem dolů, podržením je ukážeš", "Hidden = face down, hold to look", "Verdeckt = gedrückt halten zum Ansehen")) {
                 SmallPill(L("Vidět", "Shown", "Offen"), !g.look.hide) { g.look.hide = false; g.saveLook(); g.bump() }
@@ -892,6 +893,42 @@ private fun MySettings() {
                         L("Smazat", "Delete", "Löschen")) { O.deleteMe { } }
                 },
             )
+        }
+    }
+}
+
+/** My own short messages for the table chat (instead of the built-in ones). */
+@Composable
+private fun QuickPhrases() {
+    watch()
+    val S = com.onoseto.chipsnfish.online.Social
+    val list = S.phrases()
+    var nw by remember { mutableStateOf("") }
+    val leaf = RoundedCornerShape(topStart = 16.dp, topEnd = 5.dp, bottomEnd = 16.dp, bottomStart = 5.dp)
+    Column(
+        Modifier.fillMaxWidth().clip(leaf).background(Color.White.copy(alpha = 0.06f)).border(1.dp, Color.White.copy(alpha = 0.12f), leaf).padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            T(L("Moje rychlé zprávy", "My quick messages", "Meine Schnellnachrichten"), 13.sp, Color.White, FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+            T("${list.size}/12", 11.sp, GlassMuted, num = true)
+        }
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            list.forEachIndexed { i, ph ->
+                Row(
+                    Modifier.clip(RoundedCornerShape(99.dp)).background(Color.White.copy(alpha = 0.08f)).padding(start = 9.dp, end = 3.dp, top = 3.dp, bottom = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    T(ph, 12.sp, Color.White, maxLines = 1)
+                    T("✕", 11.sp, GlassMuted, modifier = Modifier.tap { S.setPhrases(list.filterIndexed { j, _ -> j != i }) }.padding(horizontal = 5.dp))
+                }
+            }
+        }
+        if (list.size < 12) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Field(nw, { nw = it.replace("\n", " ").take(40) }, Modifier.weight(1f), placeholder = L("Nová zpráva…", "New message…", "Neue Nachricht…"), minH = 36.dp)
+            Btn(L("Přidat", "Add", "Hinzufügen"), BK.GOLD, height = 36.dp, enabled = nw.isNotBlank()) {
+                val t = S.clean(nw); if (t.isNotEmpty()) S.setPhrases(list + t); nw = ""
+            }
         }
     }
 }
