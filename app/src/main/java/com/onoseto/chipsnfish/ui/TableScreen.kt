@@ -797,10 +797,11 @@ private fun SeatView(
                 Modifier.offset(y = (-13 * sc).dp).zIndex(3f).clip(RoundedCornerShape(99.dp)).background(Color(0xEB0A1015))
                     .border(1.dp, if (isTurn) C.gold else C.seatLine, RoundedCornerShape(99.dp))
                     .padding(horizontal = (8 * sc).dp, vertical = (1 * sc).dp)
-                    .widthIn(max = (156 * sc).dp),
+                    .widthIn(max = (180 * sc).dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((4 * sc).dp),
             ) {
-                T(if (k == 0 && p.id == "hero") p.name else p.name, (12.5f * sc).sp, if (isTurn) C.gold else C.ink, FontWeight.Bold, maxLines = 1, modifier = Modifier.widthIn(max = (90 * sc).dp))
+                // the action badge (e.g. "All-in 92") always shows in full; a long name gets shortened instead
+                T(p.name, (12.5f * sc).sp, if (isTurn) C.gold else C.ink, FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 val stt: Pair<String, Color>? = when {
                     s.out -> "OUT" to C.fold
                     won -> ("+" + g.fm(st.done!!.amt[k])) to C.win
