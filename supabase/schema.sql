@@ -1484,6 +1484,149 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- one profile per person: players sign in with their Google account, so the
+-- profile survives reinstalls; only listed testers (cf_allowed) are shown
+-- ---------------------------------------------------------------------
+alter table cf_profiles add column if not exists email text;
+create unique index if not exists cf_profiles_email on cf_profiles(lower(email)) where email is not null;
+
+-- the testers' Google e-mails; while this table is empty, every Google-signed player is shown
+create table if not exists cf_allowed (email text primary key);
+alter table cf_allowed enable row level security;
+revoke all on cf_allowed from anon, authenticated;
+
+-- e-mail of the signed-in user (from the login token)
+create or replace function cf_email() returns text language sql stable as $$
+  select nullif(lower(coalesce(current_setting('request.jwt.claims', true)::jsonb ->> 'email', '')), '')
+$$;
+
+-- is this player a real, listed person (not a test or anonymous account)?
+create or replace function cf_visible(p uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from cf_profiles x where x.uid = p and x.email is not null
+                 and (not exists (select 1 from cf_allowed) or exists (select 1 from cf_allowed a where lower(a.email) = lower(x.email))))
+$$;
+
+-- remember my e-mail on my profile whenever I'm signed in with Google
+create or replace function cf_touch_email() returns void language plpgsql security definer set search_path = public as $$
+declare e text := cf_email(); u uuid := cf_me();
+begin
+  if e is null or u is null then return; end if;
+  update cf_profiles set email = e where uid = u and (email is distinct from e)
+    and not exists (select 1 from cf_profiles o where lower(o.email) = e and o.uid <> u);
+end $$;
+
+-- move everything that belongs to a profile (wallet, honor, cups, hats, advent, stats) to another account
+create or replace function cf_move_profile(p_old uuid, p_new uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if p_old = p_new then return; end if;
+  if exists (select 1 from cf_profiles where uid = p_new) then
+    -- the new account already has a profile: add the old wallet to it, keep its name
+    update cf_profiles n set bank = n.bank + coalesce(o.bank, 0), earned = greatest(n.earned, o.earned),
+           img = case when n.img = '' then o.img else n.img end
+      from cf_profiles o where n.uid = p_new and o.uid = p_old;
+    delete from cf_profiles where uid = p_old;
+  else
+    update cf_profiles set uid = p_new where uid = p_old;
+  end if;
+  update cf_honor set uid = p_new where uid = p_old;
+  update cf_trophies set uid = p_new where uid = p_old;
+  update cf_hats set uid = p_new where uid = p_old;
+  update cf_hats set from_uid = p_new where from_uid = p_old;
+  delete from cf_advent a where a.uid = p_old and exists (select 1 from cf_advent b where b.uid = p_new and b.day = a.day);
+  update cf_advent set uid = p_new where uid = p_old;
+end $$;
+revoke all on function cf_move_profile(uuid, uuid) from public, anon, authenticated;
+
+-- a phone that still has its old (anonymous) profile hands it over to the Google account:
+-- with the old login it asks for a one-time code, with the new login it claims it
+create table if not exists cf_links (code text primary key, uid uuid not null, t timestamptz not null default now());
+alter table cf_links enable row level security;
+revoke all on cf_links from anon, authenticated;
+
+create or replace function cf_link_code() returns text language plpgsql security definer set search_path = public as $$
+declare c text := md5(random()::text || clock_timestamp()::text || coalesce(cf_me()::text, ''));
+begin
+  delete from cf_links where t < now() - interval '1 hour';
+  insert into cf_links(code, uid) values (c, cf_me());
+  return c;
+end $$;
+
+create or replace function cf_link_claim(p_code text) returns boolean language plpgsql security definer set search_path = public as $$
+declare o uuid; u uuid := cf_me();
+begin
+  if cf_email() is null then raise exception 'sign in with Google first'; end if;
+  select uid into o from cf_links where code = p_code and t > now() - interval '1 hour';
+  if o is null then return false; end if;
+  delete from cf_links where code = p_code;
+  -- only an anonymous profile can be handed over
+  if exists (select 1 from cf_profiles where uid = o and email is not null) then return false; end if;
+  perform cf_move_profile(o, u);
+  perform cf_touch_email();
+  return true;
+end $$;
+
+-- my profile as the server knows it (used right after signing in on a new phone)
+create or replace function cf_me_profile() returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  perform cf_touch_email();
+  return (select jsonb_build_object('name', name, 'img', img, 'email', email) from cf_profiles where uid = cf_me());
+end $$;
+
+-- friends: listed people only, one per e-mail, never me
+create or replace function cf_friends() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); me text;
+begin
+  perform cf_touch();
+  perform cf_touch_email();
+  select lower(email) into me from cf_profiles where uid = u;
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'uid', p.uid, 'name', p.name, 'img', p.img, 'online', p.seen > now() - interval '3 minutes',
+      'table', (select t.code from cf_tables t join cf_players q on q.code = t.code
+                where q.uid = p.uid and q.left_at is null and q.seen > now() - interval '2 minutes' and t.status <> 'over'
+                order by q.seen desc limit 1)
+    ) order by (p.seen > now() - interval '3 minutes') desc, p.seen desc), '[]')
+    from (select distinct on (lower(x.email)) x.*
+            from cf_profiles x
+           where x.uid <> u and cf_visible(x.uid) and coalesce(btrim(x.name), '') <> ''
+             and lower(x.email) is distinct from me
+           order by lower(x.email), x.seen desc) p);
+end $$;
+
+create or replace function cf_fame(p_period text, p_scope text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me(); since timestamptz; prev timestamptz; mine int; r int; sc uuid[]; fr boolean := p_scope = 'friends';
+begin
+  since := case p_period when 'week' then date_trunc('week', now()) when 'month' then date_trunc('month', now()) else '-infinity'::timestamptz end;
+  prev := case p_period when 'week' then since - interval '1 week' when 'month' then since - interval '1 month' else null end;
+  sc := array(select fid from cf_friends where cf_friends.uid = u) || u;
+  select coalesce(sum(h.pts), 0) into mine from cf_honor h where h.uid = u and h.t >= since;
+  select count(*) + 1 into r from (select h.uid from cf_honor h where h.t >= since and cf_visible(h.uid)
+      and (not fr or h.uid = any(sc))
+      group by h.uid having sum(h.pts) > mine) q;
+  return jsonb_build_object(
+    'top', (select coalesce(jsonb_agg(q.o order by q.p desc, q.n), '[]') from (
+        select sum(h.pts) p, coalesce(max(pr.name), '?') n,
+          jsonb_build_object('uid', h.uid, 'name', coalesce(max(pr.name), '?'), 'img', coalesce(max(pr.img), ''), 'pts', sum(h.pts),
+            'hands', count(*) filter (where h.kind = 'hand'), 'wins', count(*) filter (where h.kind = 'win')) o
+        from cf_honor h left join cf_profiles pr on pr.uid = h.uid
+        where h.t >= since and cf_visible(h.uid) and (not fr or h.uid = any(sc))
+        group by h.uid order by sum(h.pts) desc limit 30) q),
+    'me', jsonb_build_object('pts', mine, 'rank', case when mine > 0 then r else null end),
+    'champ', case when prev is null then null else (
+        select jsonb_build_object('name', coalesce(max(pr.name), '?'), 'pts', sum(h.pts))
+        from cf_honor h left join cf_profiles pr on pr.uid = h.uid
+        where h.t >= prev and h.t < since and cf_visible(h.uid) and (not fr or h.uid = any(sc))
+        group by h.uid order by sum(h.pts) desc limit 1) end,
+    'cups', (select coalesce(jsonb_agg(jsonb_build_object('name', x.name, 'players', x.players, 'tier', x.tier,
+               't', (extract(epoch from x.t) * 1000)::bigint) order by x.t desc), '[]')
+             from (select * from cf_trophies where cf_trophies.uid = u order by t desc limit 24) x),
+    'total', (select coalesce(sum(h.pts), 0) from cf_honor h where h.uid = u)
+  );
+end $$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
@@ -1497,7 +1640,7 @@ begin
                      'cf_group_rename','cf_groups','cf_my_tables','cf_ping',
                      'cf_friend_add','cf_friend_remove','cf_friends','cf_invite','cf_inbox','cf_inbox_dismiss',
                      'cf_wallet','cf_say','cf_drink','cf_earn','cf_fame','cf_cup_propose','cf_cup_vote','cf_delete_me',
-                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek','cf_ask_card','cf_ask_answer','cf_advent_open','cf_advent_days','cf_invite_at','cf_invite_answer','cf_outbox') then
+                     'cf_hat_buy','cf_hat_wear','cf_my_hats','cf_say_text','cf_friend_code','cf_friend_add_code','cf_set_peek','cf_ask_card','cf_ask_answer','cf_advent_open','cf_advent_days','cf_invite_at','cf_invite_answer','cf_outbox','cf_link_code','cf_link_claim','cf_me_profile') then
       execute format('grant execute on function %s to authenticated', f.sig);
     else
       execute format('revoke all on function %s from authenticated', f.sig);

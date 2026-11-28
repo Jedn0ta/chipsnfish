@@ -614,7 +614,8 @@ private fun ProfileBlock() {
         }
     }
     // wallet, honor and cups are in the top right corner already
-    ResultsChart()
+    if (com.onoseto.chipsnfish.online.GoogleAuth.available && !com.onoseto.chipsnfish.online.GoogleAuth.signedIn) GoogleSignInCard(Modifier.fillMaxWidth(), compact = true)
+    else ResultsChart()
 }
 
 @Composable

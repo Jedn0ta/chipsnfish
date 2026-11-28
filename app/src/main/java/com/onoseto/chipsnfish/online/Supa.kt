@@ -22,6 +22,8 @@ object SupaCfg {
     const val URL = "https://leobbaixgbnftirzdudl.supabase.co"
     const val KEY = "sb_publishable_esmekdxKuc2F2NbSobe_kw_yfAZtjm6"
     val configured get() = URL.isNotBlank() && KEY.isNotBlank()
+    /** OAuth "Web application" client ID from Google Cloud (public). Empty = Google sign-in not set up yet. */
+    const val GOOGLE_WEB_CLIENT_ID = ""
 }
 
 class SupaError(val code: Int, message: String) : Exception(message)
@@ -33,6 +35,9 @@ object Supa {
     private val lock = Mutex()
     var uid: String = ""
         private set
+    /** Google e-mail of the signed-in player ("" = anonymous account on this phone). */
+    var email: String = ""
+        private set
     private var access = ""
     private var refresh = ""
     private var expires = 0L
@@ -43,6 +48,7 @@ object Supa {
         access = prefs.getString("access", "") ?: ""
         refresh = prefs.getString("refresh", "") ?: ""
         expires = prefs.getLong("expires", 0)
+        email = prefs.getString("email", "") ?: ""
     }
 
     private fun http(path: String, body: String, auth: String?): Pair<Int, String> {
@@ -66,7 +72,8 @@ object Supa {
         refresh = o["refresh_token"]!!.jsonPrimitive.content
         expires = System.currentTimeMillis() + ((o["expires_in"]?.jsonPrimitive?.longOrNull ?: 3600L) - 120) * 1000
         uid = o["user"]?.jsonObject?.get("id")?.jsonPrimitive?.content ?: uid
-        prefs.edit().putString("uid", uid).putString("access", access).putString("refresh", refresh).putLong("expires", expires).apply()
+        o["user"]?.jsonObject?.get("email")?.jsonPrimitive?.content?.takeIf { it.isNotBlank() && it != "null" }?.let { email = it }
+        prefs.edit().putString("uid", uid).putString("access", access).putString("refresh", refresh).putLong("expires", expires).putString("email", email).apply()
     }
 
     /** Makes sure we have a valid session (anonymous account, kept on this phone). */
@@ -87,6 +94,27 @@ object Supa {
             if (c !in 200..299) throw SupaError(c, errMsg(t))
             store(json.parseToJsonElement(t).jsonObject)
         }
+    }
+
+    /**
+     * Signs in with a Google ID token. If this phone had an anonymous profile, it is handed over
+     * to the Google account (wallet, honor, cups, hats), so nothing is lost.
+     */
+    suspend fun signInGoogle(idToken: String, rawNonce: String) {
+        val old = if (email.isEmpty() && access.isNotEmpty()) runCatching { (rpc("cf_link_code") as? kotlinx.serialization.json.JsonPrimitive)?.content }.getOrNull() else null
+        lock.withLock {
+            withContext(Dispatchers.IO) {
+                val body = buildJsonObject {
+                    put("provider", kotlinx.serialization.json.JsonPrimitive("google"))
+                    put("id_token", kotlinx.serialization.json.JsonPrimitive(idToken))
+                    put("nonce", kotlinx.serialization.json.JsonPrimitive(rawNonce))
+                }.toString()
+                val (c, t) = http("/auth/v1/token?grant_type=id_token", body, null)
+                if (c !in 200..299) throw SupaError(c, errMsg(t))
+                store(json.parseToJsonElement(t).jsonObject)
+            }
+        }
+        if (old != null) runCatching { rpc("cf_link_claim", buildJsonObject { put("p_code", kotlinx.serialization.json.JsonPrimitive(old)) }) }
     }
 
     private fun errMsg(t: String): String = runCatching {

@@ -2,6 +2,7 @@
 
 package com.onoseto.chipsnfish.ui
 
+import kotlinx.coroutines.launch
 import com.onoseto.chipsnfish.online.OFriend
 import androidx.compose.ui.text.style.TextAlign
 import com.onoseto.chipsnfish.game.Reads
@@ -311,6 +312,7 @@ private fun FriendsTab() {
     if (O.code != null) Note(L("Sedíš u stolu <b>${O.code}</b>. Klepni u přítele na <b>Pozvat</b> a jemu se v aplikaci ukáže pozvánka.",
         "You're at table <b>${O.code}</b>. Tap <b>Invite</b> next to a friend and they'll see the invite in the app.",
         "Du sitzt an Tisch <b>${O.code}</b>. Tippe bei einem Freund auf <b>Einladen</b>, er sieht die Einladung in der App."))
+    GoogleSignInCard(Modifier.fillMaxWidth())
     if (fs == null) { Note(L("Načítám…", "Loading…", "Lade…")); return }
     if (fs.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(top = 36.dp, bottom = 20.dp, start = 40.dp, end = 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -444,4 +446,24 @@ private fun SmallChoice(text: String, on: Boolean, onClick: () -> Unit) {
         Modifier.clip(RoundedCornerShape(99.dp)).background(if (on) LobbyBlue.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.07f))
             .border(1.dp, if (on) LobbyBlue else Color.White.copy(alpha = 0.16f), RoundedCornerShape(99.dp)).tap(onClick).padding(horizontal = 9.dp, vertical = 5.dp),
     ) { T(text, 12.sp, Color.White, FontWeight.Bold, maxLines = 1) }
+}
+
+/** "Sign in with Google" card: keeps one profile per person, on every phone and after reinstalling. */
+@Composable
+fun GoogleSignInCard(modifier: Modifier = Modifier, compact: Boolean = false) {
+    val G = com.onoseto.chipsnfish.online.GoogleAuth
+    if (!G.available || G.signedIn) return
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 6.dp, bottomEnd = 18.dp, bottomStart = 6.dp)
+    Column(
+        modifier.clip(shape).background(Color.White.copy(alpha = 0.08f)).border(1.dp, LobbyBlue.copy(alpha = 0.6f), shape).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (!compact) T(L("Přihlas se, ať máš svůj profil napořád", "Sign in to keep your profile for good", "Melde dich an, damit dein Profil bleibt"), 13.sp, Color.White, FontWeight.ExtraBold)
+        if (!compact) T(L("Žetony, body cti a přátelé zůstanou i po přeinstalování nebo na jiném telefonu.", "Chips, honor and friends stay after reinstalling or on another phone.", "Chips, Ehre und Freunde bleiben auch nach Neuinstallation."), 11.sp, GlassMuted)
+        Btn(if (G.busy) "…" else "G  " + L("Přihlásit přes Google", "Sign in with Google", "Mit Google anmelden"), BK.GOLD, Modifier.fillMaxWidth(), height = 38.dp, enabled = !G.busy) {
+            scope.launch { G.signIn(ctx) }
+        }
+    }
 }

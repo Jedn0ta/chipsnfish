@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         Game.init(this)
         Game.onChipSound = { Sound.chip() }
         com.onoseto.chipsnfish.online.Supa.init(this)
+        com.onoseto.chipsnfish.online.GoogleAuth.load()
         com.onoseto.chipsnfish.online.KeepAlive.schedule(this)
         com.onoseto.chipsnfish.online.Invites.schedule(this)
         handleLink(intent)

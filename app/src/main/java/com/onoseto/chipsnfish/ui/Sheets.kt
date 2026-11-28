@@ -855,6 +855,11 @@ private fun MySettings() {
                 }
             }
             PhotoButtons(me)
+            val G = com.onoseto.chipsnfish.online.GoogleAuth
+            if (G.signedIn) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                T("✓ Google", 12.sp, C.win, FontWeight.ExtraBold)
+                T(G.email, 12.sp, GlassMuted, maxLines = 1)
+            } else GoogleSignInCard(Modifier.fillMaxWidth())
             if (online) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MiniStat("💰", com.onoseto.chipsnfish.online.Social.bank?.let { g.fm(it) } ?: "…", L("peněženka", "wallet", "Geldbörse"), Modifier.weight(1f))
                 MiniStat("⭐", com.onoseto.chipsnfish.online.Fame.honor?.let { g.fm(it) } ?: "…", L("body cti", "honor", "Ehre"), Modifier.weight(1f))
