@@ -175,6 +175,7 @@ private fun LookCarousel(keys: List<String>, selected: String, itemW: Dp, h: Dp,
 
 @Composable
 private fun FeltPicker() {
+    watch()
     val cur = remember(Game.look.felt) { C.feltHue(Game.look.felt) }
     Label(tr("Barva stolu"))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -190,6 +191,7 @@ private fun FeltPicker() {
 
 @Composable
 private fun TableSize() {
+    watch()
     val g = Game
     var z by remember { mutableFloatStateOf((2.1 - g.zoom).toFloat()) }
     Head(tr("Velikost stolu"), "${(z * 100).roundToInt()} %")

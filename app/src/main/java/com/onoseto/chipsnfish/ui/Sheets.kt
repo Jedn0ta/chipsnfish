@@ -797,7 +797,7 @@ private fun SettingsSheet(d: SettingsArg) {
         listOf(
             Triple("game", L("Hra", "Game", "Spiel"), L("rádce, nová hra", "coach, new game", "Coach, neues Spiel")),
             Triple("look", L("Stůl a karty", "Table & cards", "Tisch & Karten"), L("barva, rub, líc", "colour, back, face", "Farbe, Rücken, Bild")),
-            Triple("data", L("Já a data", "Me & data", "Ich & Daten"), L("profil, záloha", "profile, backup", "Profil, Backup")),
+            Triple("data", L("Můj profil", "My profile", "Mein Profil"), L("jméno, foto, soukromí", "name, photo, privacy", "Name, Foto, Privatsphäre")),
             Triple("update", L("Aktualizace", "Updates", "Updates"), L("nová verze", "new version", "neue Version")),
         ).forEach { (k, l, sub) -> SettingsTabCard(l, sub, d.tab == k) { d.tab = k; Ui.redraw() } }
     }
@@ -824,78 +824,107 @@ private fun SettingsSheet(d: SettingsArg) {
             } else DefaultTableSettings()
         }
         "look" -> LookSettings()
-        "data" -> {
-            val me = g.P.getValue("hero")
-            var name by remember { mutableStateOf(me.name) }
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            Column(Modifier.weight(0.8f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Label(tr("Můj profil"))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Avatar(me, 52.dp)
-                Field(name, { name = it; me.name = it.trim().ifEmpty { "Ty" }; g.saveLocal(); g.bump() }, Modifier.weight(1f), big = true)
-            }
-            PhotoButtons(me)
-            if (com.onoseto.chipsnfish.online.SupaCfg.configured) {
-                Label(L("Online profil", "Online profile", "Online-Profil"))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    T(L("Pozvánky na pozadí", "Invites in background", "Einladungen im Hintergrund"), 12.5.sp, Color.White, FontWeight.Bold, modifier = Modifier.weight(1f))
-                    var ev by remember { mutableStateOf(com.onoseto.chipsnfish.online.Invites.every(ctx)) }
-                    listOf(0 to L("Vyp.", "Off", "Aus"), 15 to "15 min", 60 to "1 h").forEach { (m, l) ->
-                        SmallPill(l, ev == m) { ev = m; com.onoseto.chipsnfish.online.Invites.setEvery(ctx, m) }
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    T(L("Kdo složí, smí vidět moje karty", "Players who folded may see my cards", "Wer gefoldet hat, darf meine Karten sehen"), 12.5.sp, Color.White, FontWeight.Bold, modifier = Modifier.weight(1f))
-                    SmallPill(if (g.gameCfg.peek) L("Ano ✓", "Yes ✓", "Ja ✓") else L("Ne", "No", "Nein"), g.gameCfg.peek) { com.onoseto.chipsnfish.online.Online.setPeek(!g.gameCfg.peek); Ui.redraw() }
-                }
-                Btn(L("Smazat můj online profil", "Delete my online profile", "Mein Online-Profil löschen"), BK.GHOST, Modifier.fillMaxWidth(), height = 36.dp) {
-                    Ui.confirm(L("Smazat online profil?", "Delete online profile?", "Online-Profil löschen?"),
-                        L("Ze serveru se smaže tvoje jméno, fotka, peněženka, body cti, poháry, přátelé a skupiny a odejdeš od stolu. Nejde to vrátit. Data v telefonu (hráči, záznam hand) zůstanou.",
-                          "Your name, photo, wallet, honor points, cups, friends and groups are deleted from the server and you leave the table. This can't be undone. Data on this phone (players, hand history) stays.",
-                          "Name, Foto, Geldbörse, Ehrenpunkte, Pokale, Freunde und Gruppen werden vom Server gelöscht und du verlässt den Tisch. Nicht umkehrbar. Daten auf dem Handy bleiben."),
-                        L("Smazat", "Delete", "Löschen")) { com.onoseto.chipsnfish.online.Online.deleteMe { } }
-                }
-            }
-            }
-            Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Label(tr("Záloha dat"))
-            Note(tr("Hráči, záznam hand, rozehrané hry i nastavení. Data jsou jen v tomhle zařízení, záloha je přenese jinam."))
-            val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                if (uri != null) runCatching { ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull()?.let { askRestore(it) }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn(tr("Vytvořit zálohu"), modifier = Modifier.weight(1f)) { d.bk = g.backupData(); Ui.redraw(); g.toast(tr("Záloha připravená")) }
-                Btn(tr("Obnovit ze souboru"), BK.GHOST, Modifier.weight(1f)) { restoreLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }
-            }
-            val bk = d.bk
-            if (bk != null) {
-                Label(tr("Text zálohy"))
-                Field(bk.take(600) + if (bk.length > 600) "…" else "", {}, Modifier.fillMaxWidth().heightIn(max = 90.dp), single = false, readOnly = true, minH = 70.dp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn(tr("Kopírovat text"), BK.GHOST, Modifier.weight(1f)) {
-                        (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Chips&Fish", bk))
-                        g.toast(tr("Zkopírováno"))
-                    }
-                    Btn(L("Sdílet / uložit soubor", "Share / save file", "Teilen / Datei speichern"), BK.GHOST, Modifier.weight(1f)) {
-                        val f = java.io.File(ctx.cacheDir, "chipsfish-backup.json"); f.writeText(bk)
-                        val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f)
-                        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("application/json").putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_TEXT, bk).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), tr("Záloha dat")))
-                    }
-                }
-                Note(tr("Text si ulož třeba do poznámek nebo pošli e-mailem. Obnovíš ho vložením do pole „Obnovit z textu“."))
-            } else {
-                var paste by remember { mutableStateOf("") }
-                Label(tr("Obnovit z textu"))
-                Field(paste, { paste = it }, Modifier.fillMaxWidth(), placeholder = tr("Sem vlož text zálohy…"), single = false, minH = 60.dp)
-                Btn(tr("Obnovit z textu"), BK.GHOST, Modifier.fillMaxWidth()) { if (paste.isNotBlank()) askRestore(paste.trim()) }
-            }
-                    }
-            }
-        }
+        "data" -> MySettings()
 
         else -> UpdateTab()
     }
     }
+    }
+}
+
+/** My profile: who I am at the table, what friends see, notifications. */
+@Composable
+private fun MySettings() {
+    watch()
+    val g = Game
+    val ctx = LocalContext.current
+    val me = g.P.getValue("hero")
+    val O = com.onoseto.chipsnfish.online.Online
+    val online = com.onoseto.chipsnfish.online.SupaCfg.configured
+    var name by remember { mutableStateOf(me.name) }
+    LaunchedEffect(Unit) { if (online) { O.loadFriendCode(); com.onoseto.chipsnfish.online.Social.loadBank() } }
+    val leaf = RoundedCornerShape(topStart = 20.dp, topEnd = 6.dp, bottomEnd = 20.dp, bottomStart = 6.dp)
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        // who I am
+        Column(
+            Modifier.weight(1f).clip(leaf).background(Color.White.copy(alpha = 0.06f)).border(1.dp, Color.White.copy(alpha = 0.14f), leaf).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Avatar(me, 64.dp, ring = LobbyBlue)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Label(L("Jméno u stolu", "Name at the table", "Name am Tisch"))
+                    Field(name, { name = it.take(20); me.name = it.trim().ifEmpty { "Ty" }; g.saveLocal(); g.bump() }, Modifier.fillMaxWidth(), big = true, minH = 40.dp)
+                }
+            }
+            PhotoButtons(me)
+            if (online) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MiniStat("💰", com.onoseto.chipsnfish.online.Social.bank?.let { g.fm(it) } ?: "…", L("peněženka", "wallet", "Geldbörse"), Modifier.weight(1f))
+                MiniStat("⭐", com.onoseto.chipsnfish.online.Fame.honor?.let { g.fm(it) } ?: "…", L("body cti", "honor", "Ehre"), Modifier.weight(1f))
+                MiniStat("🏆", (com.onoseto.chipsnfish.online.Fame.cups ?: 0).toString(), L("poháry", "cups", "Pokale"), Modifier.weight(1f))
+            }
+            if (online) O.myFriendCode?.let { c ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    T(L("Můj kód pro přátele", "My friend code", "Mein Freundescode"), 12.sp, GlassMuted, FontWeight.Bold, modifier = Modifier.weight(1f))
+                    T(c, 18.sp, LobbyBlue, num = true, letter = 2.sp)
+                }
+            }
+        }
+        // privacy and notifications
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (online) {
+                OptRow(L("Moje karty po foldu", "My cards after a fold", "Meine Karten nach Fold"),
+                    L("Kdo složí, smí vidět moje karty", "Players who folded may see my cards", "Wer gefoldet hat, sieht meine Karten")) {
+                    SmallPill(L("Ano", "Yes", "Ja"), g.gameCfg.peek) { if (!g.gameCfg.peek) O.setPeek(true); Ui.redraw() }
+                    SmallPill(L("Ne", "No", "Nein"), !g.gameCfg.peek) { if (g.gameCfg.peek) O.setPeek(false); Ui.redraw() }
+                }
+                var ev by remember { mutableStateOf(com.onoseto.chipsnfish.online.Invites.every(ctx)) }
+                OptRow(L("Pozvánky a výzvy", "Invites and challenges", "Einladungen"),
+                    L("Jak často se telefon sám podívá, když je aplikace zavřená", "How often the phone checks while the app is closed", "Wie oft geprüft wird, wenn die App zu ist")) {
+                    listOf(0 to L("Vyp.", "Off", "Aus"), 15 to "15 min", 60 to "1 h").forEach { (m, l) ->
+                        SmallPill(l, ev == m) { ev = m; com.onoseto.chipsnfish.online.Invites.setEvery(ctx, m) }
+                    }
+                }
+            }
+            OptRow(L("Moje karty u stolu", "My cards at the table", "Meine Karten am Tisch"),
+                L("Skryté = lícem dolů, podržením je ukážeš", "Hidden = face down, hold to look", "Verdeckt = gedrückt halten zum Ansehen")) {
+                SmallPill(L("Vidět", "Shown", "Offen"), !g.look.hide) { g.look.hide = false; g.saveLook(); g.bump() }
+                SmallPill(L("Skryté", "Hidden", "Verdeckt"), g.look.hide) { g.look.hide = true; g.saveLook(); g.bump() }
+            }
+            if (online) androidx.compose.material3.Text(
+                L("Smazat můj online profil", "Delete my online profile", "Mein Online-Profil löschen"), color = C.lose.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp).tap {
+                    Ui.confirm(L("Smazat online profil?", "Delete online profile?", "Online-Profil löschen?"),
+                        L("Ze serveru se smaže tvoje jméno, fotka, peněženka, body cti, poháry a přátelé a odejdeš od stolu. Nejde to vrátit.",
+                          "Your name, photo, wallet, honor points, cups and friends are deleted from the server and you leave the table. This can't be undone.",
+                          "Name, Foto, Geldbörse, Ehrenpunkte, Pokale und Freunde werden vom Server gelöscht. Nicht umkehrbar."),
+                        L("Smazat", "Delete", "Löschen")) { O.deleteMe { } }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiniStat(icon: String, value: String, label: String, modifier: Modifier) {
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.06f)).padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        T("$icon $value", 14.sp, Color.White, num = true, maxLines = 1)
+        T(label, 10.sp, GlassMuted, FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun OptRow(title: String, sub: String, choices: @Composable () -> Unit) {
+    val leaf = RoundedCornerShape(topStart = 16.dp, topEnd = 5.dp, bottomEnd = 16.dp, bottomStart = 5.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(leaf).background(Color.White.copy(alpha = 0.06f)).border(1.dp, Color.White.copy(alpha = 0.12f), leaf).padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            T(title, 13.sp, Color.White, FontWeight.ExtraBold, maxLines = 1)
+            T(sub, 10.5.sp, GlassMuted, maxLines = 2, lineHeight = 12.sp)
+        }
+        choices()
     }
 }
 

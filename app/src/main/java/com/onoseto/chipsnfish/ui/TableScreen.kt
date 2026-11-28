@@ -1160,7 +1160,7 @@ private fun MyCards() {
         I18n.cat(Cards.CAT[c] + " " + Cards.rl((sc shr 16) and 15)) + e
     } else if (st.hero.any { it != null }) tr("vyber druhou kartu") else tr("vyber své karty")
     // optional: keep my cards face down, press and hold to look
-    val hidden = g.gm() && g.look.hide && both && !Ui.peek
+    val hidden = g.gm() && g.look.hide && both && !Ui.peek && Ui.foldDrag == null
     Box(Modifier.fillMaxWidth().height(cw * 1.4f + 22.dp), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier.fillMaxWidth().alpha(if (folded && g.playing()) 0.45f else 1f),
