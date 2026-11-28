@@ -557,10 +557,15 @@ private fun ResultBanner(geo: Geo) {
     fun nm(k: Int) = if (k == 0) tr("Ty") else g.pl(st.seats[k]).name
     fun hole(k: Int): List<Int>? = if (k == 0) st.hero.filterNotNull().takeIf { it.size == 2 } else st.reveal?.get(k)
     val board = g.boardKnown()
-    val heroWon = 0 in d.w
-    val title = if (d.w.size > 1) tr("Dělba potu") + " · " + d.w.joinToString(", ") { nm(it) }
-        else d.w[0].let { k -> if (k == 0) L("Vyhráváš ", "You win ", "Du gewinnst ") + g.fm(d.amt[k]) else nm(k) + L(" vyhrává ", " wins ", " gewinnt ") + g.fm(d.amt[k]) }
-    val wk = d.w[0]
+    // who got the most is the winner; others in d.w only got a side pot or uncalled chips back.
+    // It's a real split only when the top amounts are (almost) the same.
+    val byAmt = d.w.sortedByDescending { d.amt[it] }
+    val wk = byAmt[0]
+    val split = byAmt.size > 1 && d.amt[byAmt[1]] * 10 >= d.amt[wk] * 9
+    val heroWon = wk == 0 || (split && 0 in byAmt.takeWhile { d.amt[it] * 10 >= d.amt[wk] * 9 })
+    val title = if (split) tr("Dělba potu") + " · " + byAmt.takeWhile { d.amt[it] * 10 >= d.amt[wk] * 9 }.joinToString(", ") { nm(it) }
+        else if (wk == 0) L("Vyhráváš ", "You win ", "Du gewinnst ") + g.fm(d.amt[wk]) else nm(wk) + L(" vyhrává ", " wins ", " gewinnt ") + g.fm(d.amt[wk])
+    val others = if (split) emptyList() else byAmt.drop(1)
     val wHole = hole(wk)
     val five = if (d.sd && wHole != null) bestFive(wHole + board) else null
     // the best hand that lost at the showdown
@@ -575,6 +580,8 @@ private fun ResultBanner(geo: Geo) {
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         T(title, 24.sp, if (heroWon) C.win else C.gold, num = true, align = TextAlign.Center, maxLines = 2, lineHeight = 27.sp)
+        // smaller amounts others got (a side pot, or their own chips nobody called)
+        if (others.isNotEmpty()) T(others.joinToString(" · ") { nm(it) + L(" získává ", " gets ", " bekommt ") + g.fm(d.amt[it]) }, 12.sp, Color.White.copy(alpha = 0.7f), align = TextAlign.Center)
         if (five != null) {
             T(describe(five), 16.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
             // the winning five: his own cards glow, the rest come from the board

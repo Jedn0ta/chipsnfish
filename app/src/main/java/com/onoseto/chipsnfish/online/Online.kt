@@ -311,7 +311,13 @@ object Online {
             }
             if (v.seats.isNotEmpty() && v.seats[0].pid == me && !v.hero.contains(null)) {
                 val myWin = d.amt.getOrElse(0) { 0 }
-                val res = if (myWin <= 0) "lose" else if (d.w.size > 1 && d.w.contains(0)) "split" else "win"
+                // a real split only when shares are about equal; a small side pot / refund next to a big win is a loss
+                val top = d.w.maxOf { d.amt[it] }
+                val res = when {
+                    myWin <= 0 || myWin * 10 < top * 9 -> "lose"
+                    d.w.count { d.amt[it] * 10 >= top * 9 } > 1 -> "split"
+                    else -> "win"
+                }
                 Game.H.add(0, HandRec(
                     id = Game.uid("h"), no = v.handNo, t = System.currentTimeMillis(), n = v.n, blinds = Cards.lvlStr(v.curLevel),
                     street = v.betStreet, hero = v.hero.toList(), board = v.board.toList(), result = res,
