@@ -60,7 +60,8 @@ echo "✓ groups"
 UB=$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}" | jq -r .me)
 [ "$(rpc "$A" cf_friend_add "{\"p_uid\":\"$UB\"}")" = "true" ] || { echo "friend add failed"; exit 1; }
 # everybody is a friend now, test players are left out of the list
-rpc "$A" cf_friends '{}' | jq -e 'type == "array"' >/dev/null || { echo "friends failed"; exit 1; }
+rpc "$A" cf_friends '{}' | jq -e 'type == "array" and length >= 1' >/dev/null || { echo "friends failed (everyone should be listed)"; exit 1; }
+echo "✓ everybody with the app is listed as a friend ($(rpc "$A" cf_friends '{}' | jq length) players)"
 rpc "$A" cf_invite "{\"p_uid\":\"$UB\",\"p_code\":\"$CODE\"}" >/dev/null
 [ "$(rpc "$B" cf_inbox '{}' | jq -r '.[0].from')" = "Test A" ] || { echo "invite failed"; exit 1; }
 rpc "$A" cf_friend_remove "{\"p_uid\":\"$UB\"}" >/dev/null
@@ -70,7 +71,8 @@ rpc "$A" cf_say "{\"p_code\":\"$CODE\",\"p_msg\":\"0,4,21\"}" >/dev/null
 rpc "$A" cf_drink "{\"p_code\":\"$CODE\",\"p_to\":\"$UB\",\"p_kind\":\"beer\"}" >/dev/null
 VS=$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}")
 [ "$(echo "$VS" | jq -r '.chat[-1].m')" = "0,4,21" ] && [ "$(echo "$VS" | jq -r '.drinks[-1].kind')" = "beer" ] || { echo "emoji/drinks failed: $(echo "$VS" | jq -c '{chat,drinks}')"; exit 1; }
-echo "✓ emoji chat, wallet and drinks"
+rpc "$A" cf_drink "{\"p_code\":\"$CODE\",\"p_to\":\"$UB\",\"p_kind\":\"pizza\"}" >/dev/null
+echo "✓ emoji chat, wallet, drinks and food"
 [ "$(rpc "$A" cf_earn '{"p_amount":25}' | jq -r .added)" = "25" ] || { echo "practice earnings failed"; exit 1; }
 F=$(rpc "$A" cf_fame '{"p_period":"week","p_scope":"all"}')
 [ "$(echo "$F" | jq '.top | length')" -ge 1 ] || { echo "hall of fame failed: $F"; exit 1; }
