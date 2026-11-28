@@ -24,6 +24,8 @@ object GoogleAuth {
     /** E-mail shown in the UI (observable). */
     var email by mutableStateOf("")
     var busy by mutableStateOf(false)
+    /** Last problem with signing in, shown on the card. */
+    var lastError by mutableStateOf("")
 
     fun load() { email = Supa.email }
     val signedIn get() = email.isNotEmpty()
@@ -31,16 +33,18 @@ object GoogleAuth {
     suspend fun signIn(ctx: Context): Boolean {
         if (!available || busy) return false
         busy = true
+        lastError = ""
         try {
             val raw = UUID.randomUUID().toString()
             val hashed = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray()).joinToString("") { "%02x".format(it) }
             val opt = GetSignInWithGoogleOption.Builder(SupaCfg.GOOGLE_WEB_CLIENT_ID).setNonce(hashed).build()
             val req = GetCredentialRequest.Builder().addCredentialOption(opt).build()
             val c = CredentialManager.create(ctx).getCredential(ctx, req).credential
-            if (c !is CustomCredential || c.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) return false
+            if (c !is CustomCredential || c.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) { lastError = "unexpected credential: " + c.type; return false }
             val g = GoogleIdTokenCredential.createFrom(c.data)
             Supa.signInGoogle(g.idToken, raw)
             email = Supa.email
+            if (email.isEmpty()) { lastError = L("Server přihlášení přijal, ale nevrátil e-mail.", "Server accepted the sign-in but returned no e-mail.", "Server lieferte keine E-Mail."); return false }
             // my profile from the server (after a reinstall) – or the one on this phone goes up
             val prof = runCatching { Supa.rpc("cf_me_profile") as? kotlinx.serialization.json.JsonObject }.getOrNull()
             val me = Game.P.getValue("hero")
@@ -58,6 +62,7 @@ object GoogleAuth {
             return false
         } catch (e: Exception) {
             ErrorLog.add("google sign-in", e)
+            lastError = (e::class.simpleName ?: "") + ": " + (e.message ?: "").take(160)
             Game.toast(L("Přihlášení přes Google se nepovedlo", "Google sign-in failed", "Google-Anmeldung fehlgeschlagen") + ": " + (e.message ?: "").take(80))
             return false
         } finally { busy = false }

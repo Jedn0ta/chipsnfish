@@ -319,7 +319,9 @@ private fun MenuScreen(onExit: () -> Unit) {
     // a finished online game is closed when you come back to the lobby
     LaunchedEffect(O.code, O.status) { if (O.code != null && O.status == "over") O.leave() }
     LaunchedEffect(Unit) { Xmas.load() }
-    Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { }) {
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    // tapping anywhere outside a text field drops the cursor and hides the keyboard
+    Box(Modifier.fillMaxSize().zIndex(30f).background(Color(0xFF050B1A)).tap { focus.clearFocus() }) {
         LobbyBackground()
         // top bar
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -632,6 +634,9 @@ private fun NameField() {
     watch()
     val me = Game.P.getValue("hero")
     var name by remember { mutableStateOf(if (me.name == "Ty") "" else me.name) }
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    // the name can also change from outside (e.g. restored from the server after signing in)
+    LaunchedEffect(me.name) { if (me.name != name.trim().ifEmpty { "Ty" }) name = if (me.name == "Ty") "" else me.name }
     LaunchedEffect(name) {
         delay(900)
         if (com.onoseto.chipsnfish.online.SupaCfg.configured && name.isNotBlank()) runCatching { com.onoseto.chipsnfish.online.Online.syncProfile() }
@@ -641,6 +646,8 @@ private fun NameField() {
         androidx.compose.foundation.text.BasicTextField(
             name, { v -> name = v.take(24); me.name = v.trim().ifEmpty { "Ty" }; Game.saveLocal(); Game.bump() },
             singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { focus.clearFocus() }),
             textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold),
             cursorBrush = androidx.compose.ui.graphics.SolidColor(LobbyBlue), modifier = Modifier.fillMaxWidth(),
         )

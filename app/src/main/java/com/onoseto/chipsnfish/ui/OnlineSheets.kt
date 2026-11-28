@@ -462,8 +462,9 @@ fun GoogleSignInCard(modifier: Modifier = Modifier, compact: Boolean = false) {
     ) {
         if (!compact) T(L("Přihlas se, ať máš svůj profil napořád", "Sign in to keep your profile for good", "Melde dich an, damit dein Profil bleibt"), 13.sp, Color.White, FontWeight.ExtraBold)
         if (!compact) T(L("Žetony, body cti a přátelé zůstanou i po přeinstalování nebo na jiném telefonu.", "Chips, honor and friends stay after reinstalling or on another phone.", "Chips, Ehre und Freunde bleiben auch nach Neuinstallation."), 11.sp, GlassMuted)
-        Btn(if (G.busy) "…" else "G  " + L("Přihlásit přes Google", "Sign in with Google", "Mit Google anmelden"), BK.GOLD, Modifier.fillMaxWidth(), height = 38.dp, enabled = !G.busy) {
+        Btn(if (G.busy) L("Přihlašuji…", "Signing in…", "Anmeldung…") else "G  " + L("Přihlásit přes Google", "Sign in with Google", "Mit Google anmelden"), BK.GOLD, Modifier.fillMaxWidth(), height = 38.dp, enabled = !G.busy) {
             scope.launch { G.signIn(ctx) }
         }
+        if (G.lastError.isNotEmpty()) T(G.lastError, 10.5.sp, C.lose, maxLines = 4)
     }
 }

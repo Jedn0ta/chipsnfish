@@ -46,8 +46,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** Display font for the big lobby title (Cinzel Decorative, OFL). */
-val Lucky = FontFamily(Font(R.font.cinzel_deco_black, androidx.compose.ui.text.font.FontWeight.Black), Font(R.font.cinzel_deco_bold, androidx.compose.ui.text.font.FontWeight.Bold))
+/** Display font for the big lobby title (Poppins, OFL): modern and clean. */
+val Lucky = FontFamily(Font(R.font.poppins_extrabold, androidx.compose.ui.text.font.FontWeight.Black), Font(R.font.poppins_semibold, androidx.compose.ui.text.font.FontWeight.Bold))
 
 /** Big title with a thick dark outline and a golden fill. */
 @Composable
@@ -55,11 +55,9 @@ fun StrokeTitle(text: String, size: TextUnit, modifier: Modifier = Modifier, bol
     val d = LocalDensity.current.density
     val fw = if (bold) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Black
     Box(modifier, contentAlignment = Alignment.Center) {
-        Text(text, style = TextStyle(fontFamily = Lucky, fontWeight = fw, fontSize = size, textAlign = TextAlign.Center, color = Color(0xFF0A1530), letterSpacing = 1.sp,
-            drawStyle = Stroke(width = 3.5f * d, join = StrokeJoin.Round)))
-        Text(text, style = TextStyle(fontFamily = Lucky, fontWeight = fw, fontSize = size, textAlign = TextAlign.Center, letterSpacing = 1.sp,
-            brush = Brush.verticalGradient(listOf(Color(0xFFFFF4C2), Color(0xFFFFD24A), Color(0xFFE59A12))),
-            shadow = Shadow(Color(0x99000000), Offset(0f, 3f * d), 6f * d)))
+        Text(text, style = TextStyle(fontFamily = Lucky, fontWeight = fw, fontSize = size, textAlign = TextAlign.Center, letterSpacing = if (bold) 3.sp else 1.sp,
+            color = if (bold) Color(0xFFDCEBFF) else Color.White,
+            shadow = Shadow(Color(0xCC000814), Offset(0f, 2f * d), 10f * d)))
     }
 }
 
@@ -104,8 +102,8 @@ fun PlayCards(title: String, sub: String, tilt: Offset, onClick: () -> Unit) {
         }
         // the title, written over the cards
         Column(Modifier.align(Alignment.BottomCenter).graphicsLayer(scaleX = 1f + 0.12f * f, scaleY = 1f + 0.12f * f), horizontalAlignment = Alignment.CenterHorizontally) {
-            StrokeTitle(title, 38.sp)
-            StrokeTitle(sub, 17.sp, Modifier.offset(y = (-4).dp), bold = true)
+            StrokeTitle(title, 36.sp)
+            StrokeTitle(sub, 13.sp, Modifier.offset(y = (-8).dp), bold = true)
         }
     }
 }
