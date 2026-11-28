@@ -118,9 +118,9 @@ rpc "$B" cf_invite_answer "{\"p_id\":$I,\"p_yes\":true}" >/dev/null
 echo "✓ duel at a set time, accepted"
 [ "$(rpc "$A" cf_advent_days '{}' | jq -r 'type')" = "array" ] || { echo "advent failed"; exit 1; }
 # November 2026 = test month: any window opens
-if [ "$(TZ=Europe/Prague date +%Y-%m)" = "2026-11" ]; then
-  [ "$(rpc "$A" cf_advent_open '{"p_day":3}' | jq -r .)" = "crescent" ] || { echo "advent test window failed"; exit 1; }
-  echo "✓ advent calendar (test month: window 3 = vanilla crescent)"
+if [ "$(TZ=Europe/Prague date +%m)" = "11" ]; then
+  if (rpc "$A" cf_advent_open '{"p_day":3}' >/dev/null 2>&1); then echo "advent opened before December"; exit 1; fi
+  echo "✓ advent calendar (closed until 1 December)"
 else echo "✓ advent calendar"; fi
 for t in "$A" "$B" "$C"; do rpc "$t" cf_leave "{\"p_code\":\"$T3\"}" >/dev/null || true; done
 # clean up: delete the test accounts' profiles

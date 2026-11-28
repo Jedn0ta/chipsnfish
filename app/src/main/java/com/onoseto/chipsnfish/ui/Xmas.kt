@@ -99,7 +99,7 @@ object Xmas {
 
     fun today(): LocalDate = LocalDate.now(ZoneId.of("Europe/Prague"))
     /** Testing before Advent: the calendar shows already and every window can be opened (until 1 December). */
-    fun testing() = today().let { it.monthValue == 11 && it.year == 2026 }
+    fun testing() = false
     /** December = Christmas look (Santa hat on the fish chip). */
     fun season() = today().monthValue == 12
     /** Highest window that may be opened today (0 outside 1–24 December). */
