@@ -51,8 +51,19 @@ object C {
         "black" to listOf(0xFF44494F, 0xFF26292D, 0xFF121416, 0xFF050607),
     )
     val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Vínová", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
-    /** One colour per design – what differs is the pattern. */
-    val BACKS = linkedMapOf("b_lattice" to "Mřížka", "b_rosette" to "Rozeta", "b_red" to "Tečky", "cred" to "Medailony", "red" to "Diamant", "fish" to "Rybí")
+    /** Back designs; each has colour variants (swipe up / down over the preview in settings). */
+    val BACK_DESIGNS = linkedMapOf(
+        "lattice" to listOf("b_lattice", "b_lattice_blue"),
+        "medal" to listOf("cred", "cblue"),
+        "rosette" to listOf("b_rosette", "b_rosette_blue"),
+        "dots" to listOf("b_red", "b_blue", "b_green", "b_black", "b_maroon", "b_navy"),
+        "diamond" to listOf("red", "blue", "green", "black", "gold"),
+        "fish" to listOf("fish"),
+    )
+    val BACK_NAMES = mapOf("lattice" to "Mřížka", "medal" to "Klasický", "rosette" to "Rozeta", "dots" to "Tečky", "diamond" to "Diamant", "fish" to "Rybí")
+    /** Every back key, for checking stored choices. */
+    val BACKS: Set<String> = BACK_DESIGNS.values.flatten().toSet()
+    fun backDesign(key: String) = BACK_DESIGNS.entries.firstOrNull { key in it.value }?.key ?: "lattice"
     val FACES = linkedMapOf("casino" to "Kasino", "picture" to "Anglické", "french" to "Francouzské", "classic" to "Velké indexy", "jumbo" to "Extra velké", "four" to "Čtyřbarevné")
 
     /** Suggested table colours: hue, intensity (0 = charcoal). */

@@ -398,6 +398,8 @@ fun TableView() {
                 }
             }
         }
+        // who won the hand, how and why
+        if (Game.gm() && playing && st.done != null) ResultBanner(geo)
         // quick actions for a tapped player
         if (Ui.seatMenu in 0 until st.n) SeatMenu(Ui.seatMenu, geo, w)
         // mood popup
@@ -481,7 +483,6 @@ private fun Center(geo: Geo) {
                         } else CardView(v, cw, modifier = Modifier.tap { openCardSlot(i) })
                     }
                 }
-                if (Game.gm()) GameResult()
             }
         } else if (Game.online()) {
             OnlineLobbyCenter()
@@ -510,29 +511,84 @@ fun openCardSlot(i: Int) {
     Ui.open("card", CardArg(target))
 }
 
-@Composable
-private fun GameResult() {
-    watch()
-    val d = Game.st.done ?: return
-    val st = Game.st
-    fun nm(k: Int) = if (k == 0) tr("Ty") else Game.pl(st.seats[k]).name
-    val heroWon = 0 in d.w
-    val t: String; var sub = ""
-    if (d.w.size > 1) {
-        t = tr("Dělba potu")
-        sub = d.w.joinToString(" · ") { nm(it) + " +" + Game.fm(d.amt[it]) }
-    } else {
-        val k = d.w[0]
-        t = if (k == 0) L("Vyhráváš ", "You win ", "Du gewinnst ") + Game.fm(d.amt[k]) else nm(k) + L(" vyhrává ", " wins ", " gewinnt ") + Game.fm(d.amt[k])
+/** Best five of the given cards (brute force over all 5-card combinations). */
+private fun bestFive(cs: List<Int>): List<Int> {
+    if (cs.size <= 5) return cs
+    var best = -1; var pick = cs.take(5)
+    val n = cs.size
+    for (a in 0 until n) for (b in a + 1 until n) for (c in b + 1 until n) for (d in c + 1 until n) for (e in d + 1 until n) {
+        val f = listOf(cs[a], cs[b], cs[c], cs[d], cs[e])
+        val v = Cards.ev(f)
+        if (v > best) { best = v; pick = f }
     }
-    val c = if (d.sd) I18n.cat(Cards.CAT[d.cat[d.w[0]] ?: 0]) else tr("ostatní složili")
+    return pick
+}
+
+/** "Two pair, kings and sevens" etc. from the best five cards. */
+private fun describe(five: List<Int>): String {
+    val sc = Cards.ev(five)
+    val cat = Cards.cat(sc)
+    val byRank = five.groupBy { Cards.rank(it) }.entries.sortedWith(compareByDescending<Map.Entry<Int, List<Int>>> { it.value.size }.thenByDescending { it.key })
+    fun r(i: Int) = Cards.rl(byRank[i].key)
+    val ranks = five.map { Cards.rank(it) }.sortedDescending()
+    val top = if (ranks == listOf(12, 3, 2, 1, 0)) "5" else Cards.rl(ranks[0])
+    return when (cat) {
+        0 -> L("Vysoká karta ${r(0)}", "High card ${r(0)}", "Höchste Karte ${r(0)}")
+        1 -> L("Pár ${r(0)}", "Pair of ${r(0)}", "Paar ${r(0)}") + L(", kicker ${r(1)}", ", kicker ${r(1)}", ", Kicker ${r(1)}")
+        2 -> L("Dva páry ${r(0)} a ${r(1)}", "Two pair ${r(0)} and ${r(1)}", "Zwei Paare ${r(0)} und ${r(1)}")
+        3 -> L("Trojice ${r(0)}", "Three of a kind ${r(0)}", "Drilling ${r(0)}")
+        4 -> L("Postupka do $top", "Straight to $top", "Straße bis $top")
+        5 -> L("Barva ${Cards.SYM[Cards.suit(five[0])]} s ${Cards.rl(ranks[0])}", "Flush ${Cards.SYM[Cards.suit(five[0])]}, ${Cards.rl(ranks[0])} high", "Flush ${Cards.SYM[Cards.suit(five[0])]}, ${Cards.rl(ranks[0])} hoch")
+        6 -> L("Full house ${r(0)} + ${r(1)}", "Full house ${r(0)} over ${r(1)}", "Full House ${r(0)} + ${r(1)}")
+        7 -> L("Čtveřice ${r(0)}", "Four of a kind ${r(0)}", "Vierling ${r(0)}")
+        else -> if (top == "A") L("Královská postupka", "Royal flush", "Royal Flush") else L("Postupka v barvě do $top", "Straight flush to $top", "Straight Flush bis $top")
+    }
+}
+
+/** End of a hand: who won, with what (the five cards), and whom he beat. */
+@Composable
+private fun ResultBanner(geo: Geo) {
+    watch()
+    val g = Game
+    val st = g.st
+    val d = st.done ?: return
+    var hidden by remember(st.handNo) { mutableStateOf(false) }
+    if (hidden) return
+    fun nm(k: Int) = if (k == 0) tr("Ty") else g.pl(st.seats[k]).name
+    fun hole(k: Int): List<Int>? = if (k == 0) st.hero.filterNotNull().takeIf { it.size == 2 } else st.reveal?.get(k)
+    val board = g.boardKnown()
+    val heroWon = 0 in d.w
+    val title = if (d.w.size > 1) tr("Dělba potu") + " · " + d.w.joinToString(", ") { nm(it) }
+        else d.w[0].let { k -> if (k == 0) L("Vyhráváš ", "You win ", "Du gewinnst ") + g.fm(d.amt[k]) else nm(k) + L(" vyhrává ", " wins ", " gewinnt ") + g.fm(d.amt[k]) }
+    val wk = d.w[0]
+    val wHole = hole(wk)
+    val five = if (d.sd && wHole != null) bestFive(wHole + board) else null
+    // the best hand that lost at the showdown
+    val loser = if (d.sd) st.seats.indices.filter { it !in d.w && !st.seats[it].folded && hole(it) != null }
+        .maxByOrNull { Cards.ev(hole(it)!! + board) } else null
     Column(
-        Modifier.clip(RoundedCornerShape(10.dp)).background(if (heroWon) C.win.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.55f))
-            .border(1.dp, if (heroWon) C.win else Color.White.copy(alpha = 0.15f), RoundedCornerShape(10.dp)).padding(horizontal = 14.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        Modifier.offset((geo.cx - 220).dp, (geo.cy - 74).dp).width(440.dp).zIndex(12f)
+            .shadow(14.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
+            .background(if (heroWon) Brush.verticalGradient(listOf(Color(0xF01B4D33), Color(0xF00E2A1C))) else Brush.verticalGradient(listOf(Color(0xF0182233), Color(0xF00B121D))))
+            .border(1.5.dp, if (heroWon) C.win else C.gold.copy(alpha = 0.6f), RoundedCornerShape(18.dp))
+            .tap { hidden = true }.padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        T(t, 17.sp, if (heroWon) C.win else C.ink, num = true)
-        T((if (sub.isNotEmpty()) "$sub · " else "") + c, 12.sp, Color.White.copy(alpha = 0.75f), FontWeight.SemiBold)
+        T(title, 24.sp, if (heroWon) C.win else C.gold, num = true, align = TextAlign.Center, maxLines = 2, lineHeight = 27.sp)
+        if (five != null) {
+            T(describe(five), 16.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
+            // the winning five: his own cards glow, the rest come from the board
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                five.sortedByDescending { Cards.rank(it) }.forEach { c -> CardView(c, 40.dp, glow = wHole?.contains(c) == true) }
+            }
+            if (loser != null) {
+                val lf = bestFive(hole(loser)!! + board)
+                T(L("porazil(a): ", "beat: ", "schlug: ") + nm(loser) + " · " + describe(lf), 13.sp, Color.White.copy(alpha = 0.8f), FontWeight.SemiBold, align = TextAlign.Center)
+            }
+            T(L("Zlatě orámované karty měl v ruce, ostatní jsou ze stolu.", "Gold-framed cards were in his hand, the rest are from the board.", "Goldumrandete Karten hatte er auf der Hand, der Rest liegt auf dem Tisch."), 10.5.sp, GlassMuted, align = TextAlign.Center)
+        } else {
+            T(if (d.sd) "" else L("Všichni ostatní složili, karty se neukazovaly.", "Everyone else folded, no cards were shown.", "Alle anderen haben gefoldet."), 14.sp, Color.White.copy(alpha = 0.85f), FontWeight.SemiBold, align = TextAlign.Center)
+        }
     }
 }
 

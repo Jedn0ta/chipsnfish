@@ -61,7 +61,12 @@ object CardImg {
         R.drawable.card2_ks, R.drawable.card2_kh, R.drawable.card2_kd, R.drawable.card2_kc,
         R.drawable.card2_as, R.drawable.card2_ah, R.drawable.card2_ad, R.drawable.card2_ac,
     )
-    val BACKS = mapOf("b_lattice" to R.drawable.back_lattice, "b_rosette" to R.drawable.back_rosette, "b_red" to R.drawable.back_red)
+    val BACKS = mapOf(
+        "b_lattice" to R.drawable.back_lattice, "b_lattice_blue" to R.drawable.back_lattice_blue,
+        "b_rosette" to R.drawable.back_rosette, "b_rosette_blue" to R.drawable.back_rosette_blue,
+        "b_red" to R.drawable.back_red, "b_blue" to R.drawable.back_blue, "b_green" to R.drawable.back_green,
+        "b_black" to R.drawable.back_black, "b_maroon" to R.drawable.back_maroon, "b_navy" to R.drawable.back_navy,
+    )
     private val cache = HashMap<Int, ImageBitmap>()
 
     @Composable

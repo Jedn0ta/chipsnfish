@@ -140,7 +140,6 @@ object Game {
         if (look.face !in com.onoseto.chipsnfish.ui.C.FACES) look.face = "picture"
         look.back = when (look.back) {
             in com.onoseto.chipsnfish.ui.C.BACKS -> look.back
-            "cblue" -> "cred"; "blue", "green", "black", "gold" -> "red"
             else -> "b_lattice"
         }
         // once: switch everybody to the new default red lattice back

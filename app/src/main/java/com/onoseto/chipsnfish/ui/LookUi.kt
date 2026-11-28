@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -115,10 +116,33 @@ fun LookSettings() {
         }
         Column(Modifier.weight(0.85f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Label(tr("Rub karet"))
-            val keys = remember { C.BACKS.keys.toList() }
-            LookCarousel(keys, Game.look.back, 74.dp, 128.dp, { if (Game.look.back != it) { Game.look.back = it; saveLook() } }) { k -> CardBack(74.dp, k) }
-            T(tr(C.BACKS[Game.look.back] ?: ""), 13.sp, LobbyBlue, FontWeight.Bold, maxLines = 1)
-            Dots(keys.size, keys.indexOf(Game.look.back))
+            val keys = remember { C.BACK_DESIGNS.keys.toList() }
+            val design = C.backDesign(Game.look.back)
+            val variants = C.BACK_DESIGNS.getValue(design)
+            val vi = variants.indexOf(Game.look.back).coerceAtLeast(0)
+            val stepPx = with(androidx.compose.ui.platform.LocalDensity.current) { 36.dp.toPx() }
+            Box(Modifier.pointerInput(design) {
+                // swipe up / down over the back = its other colours
+                var acc = 0f
+                detectVerticalDragGestures(onDragStart = { acc = 0f }) { ch, dy ->
+                    ch.consume(); acc += dy
+                    if (kotlin.math.abs(acc) >= stepPx) {
+                        val vs = C.BACK_DESIGNS.getValue(C.backDesign(Game.look.back))
+                        val i = vs.indexOf(Game.look.back).coerceAtLeast(0)
+                        Game.look.back = vs[((i + (if (acc > 0) 1 else -1)) % vs.size + vs.size) % vs.size]; saveLook(); acc = 0f
+                    }
+                }
+            }) {
+                LookCarousel(keys, design, 74.dp, 128.dp, { d ->
+                    if (C.backDesign(Game.look.back) != d) {
+                        // keep the colour position if the new design has it
+                        val vs = C.BACK_DESIGNS.getValue(d)
+                        Game.look.back = vs.getOrElse(vi) { vs[0] }; saveLook()
+                    }
+                }) { d -> CardBack(74.dp, if (d == design) Game.look.back else C.BACK_DESIGNS.getValue(d).getOrElse(vi) { C.BACK_DESIGNS.getValue(d)[0] }) }
+            }
+            T(tr(C.BACK_NAMES[design] ?: "") + if (variants.size > 1) "  ↕ ${vi + 1}/${variants.size}" else "", 13.sp, LobbyBlue, FontWeight.Bold, maxLines = 1)
+            Dots(keys.size, keys.indexOf(design))
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Label(tr("Líc karet"))
