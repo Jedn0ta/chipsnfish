@@ -59,12 +59,28 @@ object GoogleAuth {
             Game.toast(L("Přihlášeno: ", "Signed in: ", "Angemeldet: ") + email)
             return true
         } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
+            // Google also reports a wrong app signature / unlisted tester as "cancelled" ([16] …) – show it
+            ErrorLog.add("google sign-in cancelled", e)
+            lastError = L("Google přihlášení nedokončil", "Google did not finish the sign-in", "Google hat die Anmeldung nicht beendet") +
+                ": " + (e.message ?: "-").take(120) + "\n" + sigHint(ctx)
             return false
         } catch (e: Exception) {
             ErrorLog.add("google sign-in", e)
-            lastError = (e::class.simpleName ?: "") + ": " + (e.message ?: "").take(160)
+            lastError = (e::class.simpleName ?: "") + ": " + (e.message ?: "").take(160) + "\n" + sigHint(ctx)
             Game.toast(L("Přihlášení přes Google se nepovedlo", "Google sign-in failed", "Google-Anmeldung fehlgeschlagen") + ": " + (e.message ?: "").take(80))
             return false
         } finally { busy = false }
     }
+
+    /** SHA-1 of the certificate this installed app is signed with – must be listed in Google Cloud (Android client). */
+    fun sha1(ctx: Context): String = runCatching {
+        val pm = ctx.packageManager
+        val sigs = if (android.os.Build.VERSION.SDK_INT >= 28)
+            pm.getPackageInfo(ctx.packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES).signingInfo?.apkContentsSigners
+        else @Suppress("DEPRECATION") pm.getPackageInfo(ctx.packageName, android.content.pm.PackageManager.GET_SIGNATURES).signatures
+        val d = MessageDigest.getInstance("SHA-1").digest(sigs!![0].toByteArray())
+        d.joinToString(":") { "%02X".format(it) }
+    }.getOrDefault("?")
+
+    private fun sigHint(ctx: Context) = L("SHA-1 aplikace: ", "App SHA-1: ", "App-SHA-1: ") + sha1(ctx)
 }

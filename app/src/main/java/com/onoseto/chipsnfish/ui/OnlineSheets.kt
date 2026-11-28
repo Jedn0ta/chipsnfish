@@ -331,7 +331,7 @@ private fun FriendsTab() {
 private fun FriendMedal(f: OFriend) {
     watch()
     val ring = when { f.table != null -> LobbyBlue; f.online -> C.win; else -> Color.White.copy(alpha = 0.25f) }
-    Column(Modifier.width(86.dp).tap { Ui.open("friend", f) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Column(Modifier.width(96.dp).tap { Ui.open("friend", f) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Box(
             Modifier.size(66.dp).glass(androidx.compose.foundation.shape.CircleShape, if (f.online) Color(0x3326D07C) else Color(0x2A2A5CA8), lift = 8.dp).padding(4.dp),
             contentAlignment = Alignment.Center,
@@ -344,6 +344,7 @@ private fun FriendMedal(f: OFriend) {
         T(f.name, 12.5.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true, align = TextAlign.Center)
         T(when { f.table != null -> L("hraje", "playing", "spielt"); f.online -> "online"; else -> "offline" }, 10.sp,
             if (f.table != null) LobbyBlue else if (f.online) C.win else GlassMuted, FontWeight.Bold, maxLines = 1)
+        if (f.email.isNotEmpty()) T(f.email, 9.sp, GlassMuted, maxLines = 1, fit = true, align = TextAlign.Center)
     }
 }
 
@@ -360,6 +361,7 @@ fun FriendSheet(f: OFriend) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             T(L("PŘÍTEL", "FRIEND", "FREUND"), 10.sp, LobbyBlue, FontWeight.ExtraBold, letter = 2.sp)
             T(f.name, 24.sp, Color.White, FontWeight.ExtraBold, maxLines = 1, fit = true)
+            if (f.email.isNotEmpty()) T(f.email, 12.sp, GlassMuted, maxLines = 1, fit = true)
             T(when {
                 f.table != null -> L("Hraje u stolu ${f.table}", "Playing at table ${f.table}", "Spielt an Tisch ${f.table}")
                 f.online -> L("Je teď v aplikaci", "In the app right now", "Gerade in der App")
@@ -465,6 +467,6 @@ fun GoogleSignInCard(modifier: Modifier = Modifier, compact: Boolean = false) {
         Btn(if (G.busy) L("Přihlašuji…", "Signing in…", "Anmeldung…") else "G  " + L("Přihlásit přes Google", "Sign in with Google", "Mit Google anmelden"), BK.GOLD, Modifier.fillMaxWidth(), height = 38.dp, enabled = !G.busy) {
             scope.launch { G.signIn(ctx) }
         }
-        if (G.lastError.isNotEmpty()) T(G.lastError, 10.5.sp, C.lose, maxLines = 4)
+        if (G.lastError.isNotEmpty()) T(G.lastError, 10.5.sp, C.lose, maxLines = 7)
     }
 }

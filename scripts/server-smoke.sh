@@ -60,8 +60,11 @@ echo "✓ groups"
 UB=$(rpc "$B" cf_view "{\"p_code\":\"$CODE\",\"p_ver\":0}" | jq -r .me)
 [ "$(rpc "$A" cf_friend_add "{\"p_uid\":\"$UB\"}")" = "true" ] || { echo "friend add failed"; exit 1; }
 # everybody is a friend now, test players are left out of the list
-rpc "$A" cf_friends '{}' | jq -e 'type == "array" and length >= 1' >/dev/null || { echo "friends failed (everyone should be listed)"; exit 1; }
-echo "✓ everybody with the app is listed as a friend ($(rpc "$A" cf_friends '{}' | jq length) players)"
+rpc "$A" cf_link_code '{}' | jq -e 'type == "string"' >/dev/null || { echo "schema.sql with Google profiles not run on the server"; exit 1; }
+F=$(rpc "$A" cf_friends '{}')
+echo "$F" | jq -e 'type == "array" and all(.[]; (.email // "") != "")' >/dev/null || { echo "friends list still has players without a Google account"; exit 1; }
+[ "$(echo "$F" | jq '[.[].email | ascii_downcase] | length')" = "$(echo "$F" | jq '[.[].email | ascii_downcase] | unique | length')" ] || { echo "duplicate e-mails in friends"; exit 1; }
+echo "✓ friends: only Google players, one per e-mail ($(echo "$F" | jq length) players)"
 rpc "$A" cf_invite "{\"p_uid\":\"$UB\",\"p_code\":\"$CODE\"}" >/dev/null
 [ "$(rpc "$B" cf_inbox '{}' | jq -r '.[0].from')" = "Test A" ] || { echo "invite failed"; exit 1; }
 rpc "$A" cf_friend_remove "{\"p_uid\":\"$UB\"}" >/dev/null

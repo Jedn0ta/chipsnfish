@@ -36,7 +36,7 @@ import kotlin.math.max
 
 class OPlayer(val uid: String, val name: String, val img: String?, val on: Boolean, val pending: Boolean, val left: Boolean, val hat: String? = null)
 class OTable(val code: String, val name: String, val status: String, val players: Int, val host: Boolean = false)
-class OFriend(val uid: String, val name: String, val img: String, val online: Boolean, val table: String?)
+class OFriend(val uid: String, val name: String, val img: String, val online: Boolean, val table: String?, val email: String = "")
 class OInvite(val id: Long, val code: String, val from: String, val name: String, val at: Long? = null, val duel: Boolean = false, val ans: String? = null)
 class OGroup(val id: String, val name: String, val owner: String, val members: List<OPlayer>, val tables: List<OTable>)
 
@@ -507,7 +507,7 @@ object Online {
                 friends = (Supa.rpc("cf_friends") as JsonArray).map { e ->
                     val o = e.jsonObject
                     OFriend(o["uid"]!!.jsonPrimitive.content, o["name"]?.jsonPrimitive?.contentOrNull ?: "?", o["img"]?.jsonPrimitive?.contentOrNull ?: "",
-                        o["online"]?.jsonPrimitive?.booleanOrNull ?: false, o["table"]?.jsonPrimitive?.contentOrNull)
+                        o["online"]?.jsonPrimitive?.booleanOrNull ?: false, o["table"]?.jsonPrimitive?.contentOrNull, o["email"]?.jsonPrimitive?.contentOrNull ?: "")
                 }
                 // friends always show up in the statistics
                 var added = false

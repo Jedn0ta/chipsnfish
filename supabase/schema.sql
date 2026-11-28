@@ -1582,7 +1582,7 @@ begin
   perform cf_touch_email();
   select lower(email) into me from cf_profiles where uid = u;
   return (select coalesce(jsonb_agg(jsonb_build_object(
-      'uid', p.uid, 'name', p.name, 'img', p.img, 'online', p.seen > now() - interval '3 minutes',
+      'uid', p.uid, 'name', p.name, 'email', p.email, 'img', p.img, 'online', p.seen > now() - interval '3 minutes',
       'table', (select t.code from cf_tables t join cf_players q on q.code = t.code
                 where q.uid = p.uid and q.left_at is null and q.seen > now() - interval '2 minutes' and t.status <> 'over'
                 order by q.seen desc limit 1)
