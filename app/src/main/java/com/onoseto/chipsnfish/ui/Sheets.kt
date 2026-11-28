@@ -795,7 +795,7 @@ private fun SettingsSheet(d: SettingsArg) {
             Triple("game", L("Hra", "Game", "Spiel"), L("rádce, nová hra", "coach, new game", "Coach, neues Spiel")),
             Triple("look", L("Stůl a karty", "Table & cards", "Tisch & Karten"), L("barva, rub, líc", "colour, back, face", "Farbe, Rücken, Bild")),
             Triple("data", L("Můj profil", "My profile", "Mein Profil"), L("jméno, foto, soukromí", "name, photo, privacy", "Name, Foto, Privatsphäre")),
-            Triple("update", L("Aktualizace", "Updates", "Updates"), L("nová verze", "new version", "neue Version")),
+            Triple("update", L("Aplikace", "App", "App"), L("verze, aktualizace, chyby", "version, updates, errors", "Version, Updates, Fehler")),
         ).forEach { (k, l, sub) -> SettingsTabCard(l, sub, d.tab == k) { d.tab = k; Ui.redraw() } }
     }
     Column(Modifier.weight(1f).padding(top = 4.dp, end = 30.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -975,6 +975,52 @@ private fun SettingsTabCard(title: String, sub: String, on: Boolean, onClick: ()
 private fun UpdateTab() {
     watch()
     val ctx = LocalContext.current
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { UpdatePart() }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { AppInfoPart() }
+    }
+}
+
+/** About the app, credits and the error log. */
+@Composable
+private fun AppInfoPart() {
+    watch()
+    val ctx = LocalContext.current
+    var n by remember { mutableStateOf(com.onoseto.chipsnfish.ErrorLog.count()) }
+    var note by remember { mutableStateOf("") }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FishHat(40.dp)
+        Column {
+            T("Hold'em Chips&Fish", 16.sp, Color.White, FontWeight.ExtraBold)
+            T("Onoseto Studio", 12.sp, GlassMuted, FontWeight.Bold)
+        }
+    }
+    Note(L("Poker s přáteli a trénink proti počítači. Karty rozdává server, takže nikdo nevidí do cizích karet.",
+        "Poker with friends and practice against the computer. Cards are dealt by the server, so nobody can see other hands.",
+        "Poker mit Freunden und Training gegen den Computer. Die Karten verteilt der Server."))
+    Label(L("Chyba v aplikaci?", "Something wrong?", "Ein Fehler?"))
+    Note(if (n == 0) L("Zatím se nezaznamenala žádná chyba.", "No errors recorded so far.", "Bisher keine Fehler.")
+         else L("Zaznamenaných chyb: <b>$n</b>.", "Recorded errors: <b>$n</b>.", "Aufgezeichnete Fehler: <b>$n</b>."))
+    Field(note, { note = it.take(300) }, Modifier.fillMaxWidth(), placeholder = L("Co se stalo? (nepovinné)", "What happened? (optional)", "Was ist passiert? (optional)"), single = false, minH = 44.dp)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Btn(L("✉ Odeslat log chyb", "✉ Send error log", "✉ Fehlerlog senden"), BK.GOLD, Modifier.weight(1f), height = 38.dp) {
+            runCatching { com.onoseto.chipsnfish.ErrorLog.send(ctx, note) }.onFailure { Game.toast(L("Nepodařilo se otevřít e-mail", "Couldn't open e-mail", "E-Mail ließ sich nicht öffnen")) }
+        }
+        if (n > 0) Btn(L("Vymazat", "Clear", "Löschen"), BK.GHOST, height = 38.dp) { com.onoseto.chipsnfish.ErrorLog.clear(); n = 0 }
+    }
+    Note(L("Otevře se e-mail s přiloženým záznamem (verze, telefon, chyby). Nic se neposílá samo.",
+        "Opens an e-mail with the log attached (version, phone, errors). Nothing is sent on its own.",
+        "Öffnet eine E-Mail mit dem Protokoll im Anhang. Nichts wird automatisch gesendet."))
+    Label(L("Karty a písmo", "Cards and font", "Karten und Schrift"))
+    Note(L("Anglické karty: Byron Knoll (volné dílo). Francouzské karty a ruby: David Bellot, SVG-cards (LGPL 2.1). Kasino karty a ruby: Public Domain and CC0 Playing Cards (CC0). Písmo Luckiest Guy (Apache 2.0).",
+        "English cards: Byron Knoll (public domain). French cards and backs: David Bellot, SVG-cards (LGPL 2.1). Casino cards and backs: Public Domain and CC0 Playing Cards (CC0). Font Luckiest Guy (Apache 2.0).",
+        "Englische Karten: Byron Knoll (gemeinfrei). Französische Karten: David Bellot, SVG-cards (LGPL 2.1). Kasino-Karten: CC0. Schrift Luckiest Guy (Apache 2.0)."))
+}
+
+@Composable
+private fun UpdatePart() {
+    watch()
+    val ctx = LocalContext.current
     val U = com.onoseto.chipsnfish.Updater
     val (code, name) = remember { U.current(ctx) }
     if (com.onoseto.chipsnfish.BuildConfig.SELF_UPDATE) {
@@ -982,9 +1028,9 @@ private fun UpdateTab() {
         Summary(listOf(L("Nainstalovaná verze", "Installed version", "Installierte Version") to "$name (#$code)",
             L("Aktualizace", "Updates", "Updates") to "Google Play"))
         Note("<b>" + L("Aktualizace teď chodí přes Obchod Play.", "Updates now come from the Play Store.", "Updates kommen jetzt aus dem Play Store.") + "</b> " +
-            L("Tuhle verzi z GitHubu jednou odinstaluj a nainstaluj aplikaci z Obchodu Play, pak se bude aktualizovat sama. Statistiky si předtím zálohuj v Já a data.",
-              "Uninstall this GitHub version once and install the app from the Play Store; then it updates itself. Back up your stats in Me & data first.",
-              "Deinstalliere diese GitHub-Version einmal und installiere die App aus dem Play Store; dann aktualisiert sie sich selbst. Sichere vorher deine Statistiken unter Ich & Daten."))
+            L("Tuhle verzi z GitHubu jednou odinstaluj a nainstaluj aplikaci z Obchodu Play, pak se bude aktualizovat sama.",
+              "Uninstall this GitHub version once and install the app from the Play Store; then it updates itself.",
+              "Deinstalliere diese GitHub-Version einmal und installiere die App aus dem Play Store; dann aktualisiert sie sich selbst."))
         Btn(L("Otevřít v Obchodě Play", "Open in the Play Store", "Im Play Store öffnen"), BK.CALL, Modifier.fillMaxWidth()) { U.openStore(ctx, U.PLAY_TEST) }
         return
     }

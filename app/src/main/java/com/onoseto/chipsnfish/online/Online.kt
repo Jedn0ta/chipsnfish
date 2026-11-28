@@ -107,6 +107,7 @@ object Online {
     fun inTable() = code != null
 
     fun err(e: Throwable): String {
+        com.onoseto.chipsnfish.ErrorLog.add("online error", e)
         val m = e.message ?: ""
         return when {
             m.contains("not found", true) || m.contains("notfound") -> L("Stůl s tímhle kódem neexistuje.", "There's no table with this code.", "Kein Tisch mit diesem Code.")

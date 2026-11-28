@@ -17,6 +17,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ErrorLog.init(applicationContext)
         I18n.load(this)
         Game.init(this)
         Game.onChipSound = { Sound.chip() }

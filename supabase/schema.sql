@@ -1468,8 +1468,12 @@ begin
                 where q.uid = p.uid and q.left_at is null and q.seen > now() - interval '2 minutes' and t.status <> 'over'
                 order by q.seen desc limit 1)
     ) order by (p.seen > now() - interval '3 minutes') desc, p.seen desc), '[]')
-    from cf_profiles p
-    where p.uid <> u and coalesce(btrim(p.name), '') <> '' and p.name not like 'Test %');
+    -- one entry per name: after a reinstall only the newest profile shows, and never my own old one
+    from (select distinct on (lower(btrim(x.name))) x.*
+            from cf_profiles x
+           where x.uid <> u and coalesce(btrim(x.name), '') <> '' and x.name not like 'Test %'
+             and lower(btrim(x.name)) <> lower(btrim(coalesce((select me.name from cf_profiles me where me.uid = u), '')))
+           order by lower(btrim(x.name)), x.seen desc) p);
 end $$;
 
 -- ---------------------------------------------------------------------
