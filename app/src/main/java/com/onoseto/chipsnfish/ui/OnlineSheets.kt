@@ -311,13 +311,11 @@ private fun FriendsTab() {
     if (O.code != null) Note(L("Sedíš u stolu <b>${O.code}</b>. Klepni u přítele na <b>Pozvat</b> a jemu se v aplikaci ukáže pozvánka.",
         "You're at table <b>${O.code}</b>. Tap <b>Invite</b> next to a friend and they'll see the invite in the app.",
         "Du sitzt an Tisch <b>${O.code}</b>. Tippe bei einem Freund auf <b>Einladen</b>, er sieht die Einladung in der App."))
-    AddFriendBar()
     if (fs == null) { Note(L("Načítám…", "Loading…", "Lade…")); return }
     if (fs.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(top = 36.dp, bottom = 20.dp, start = 40.dp, end = 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            T(L("Zatím nemáš žádné přátele", "No friends yet", "Noch keine Freunde"), 20.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
-            T(L("Pošli kamarádovi svůj kód přítele, nebo zadej jeho kód nahoře.", "Send a friend your friend code, or enter theirs above.", "Schick einem Freund deinen Freundescode oder gib seinen oben ein."), 14.sp, Color.White.copy(alpha = 0.75f), align = TextAlign.Center)
-            T(L("Přidat jde i u stolu: klepni na hráče a dej ★ Přidat do přátel.", "At a table: tap a player and choose ★ Add friend.", "Am Tisch: Spieler antippen und ★ Zu Freunden wählen."), 12.5.sp, GlassMuted, align = TextAlign.Center)
+            T(L("Zatím tu nikdo další není", "Nobody else here yet", "Noch niemand sonst hier"), 20.sp, Color.White, FontWeight.ExtraBold, align = TextAlign.Center)
+            T(L("Každý, kdo si nainstaluje aplikaci a zadá jméno, se tu sám objeví.", "Everyone who installs the app and enters a name shows up here automatically.", "Jeder, der die App installiert und einen Namen eingibt, erscheint hier automatisch."), 14.sp, Color.White.copy(alpha = 0.75f), align = TextAlign.Center)
         }
         return
     }
@@ -384,9 +382,6 @@ fun FriendSheet(f: OFriend) {
             Ui.open("player", PlayerArg(f.uid))
         }
         Btn(L("Zpět", "Back", "Zurück"), BK.GHOST, Modifier.weight(1f), height = 38.dp) { Ui.open("groups") }
-        Btn(L("Odebrat", "Remove", "Entfernen"), BK.DANGER, Modifier.weight(1f), height = 38.dp) {
-            Ui.confirm(L("Odebrat z přátel?", "Remove friend?", "Freund entfernen?"), f.name, L("Odebrat", "Remove", "Entfernen")) { O.removeFriend(f.uid); Ui.open("groups") }
-        }
     }
 }
 

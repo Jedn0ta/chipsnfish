@@ -459,8 +459,7 @@ private fun SeatSheet(k: Int) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (g.online() && k != 0 && com.onoseto.chipsnfish.online.SupaCfg.configured) {
                 val O = com.onoseto.chipsnfish.online.Online
-                if (O.isFriend(p.id)) T("★ " + L("V přátelích", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
-                else Btn(L("★ Přidat do přátel", "★ Add friend", "★ Zu Freunden"), BK.GOLD, height = 34.dp) { O.addFriend(p.id, p.name) }
+                T("★ " + L("Přítel", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
             }
             if (g.gm() && k != 0 && g.playing() && !s.out && !s.folded && st.done == null && st.one?.get(k) == null && (g.online() || st.hole[k] != null))
                 Btn("🂠 " + L("Ukaž kartu", "Show a card", "Zeig eine Karte"), BK.DARK, height = 34.dp) { Ui.close(); g.askCard(k) }
@@ -527,10 +526,7 @@ private fun PlayerSheet(a: PlayerArg) {
     PlayerBlock(p, notes, type, save = { savePlayer(p, name, notes.value, type.value) }) {
         val O = com.onoseto.chipsnfish.online.Online
         val online = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-").containsMatchIn(p.id) && p.id != O.me && com.onoseto.chipsnfish.online.SupaCfg.configured
-        if (online) {
-            if (O.isFriend(p.id)) T("★ " + L("V přátelích", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
-            else Btn(L("★ Přidat do přátel", "★ Add friend", "★ Zu Freunden"), BK.GOLD, height = 34.dp) { O.addFriend(p.id, p.name) }
-        }
+        if (online) T("★ " + L("Přítel", "Friend", "Freund"), 12.sp, C.gold, FontWeight.Bold)
         if (g.st.seats.any { it.pid == p.id }) T(tr("Hráč teď sedí u stolu."), 11.sp, C.muted)
         else T(tr(if (a.confirm) "Opravdu smazat i se statistikami?" else "Smazat hráče"), 12.sp, C.lose, FontWeight.Bold, modifier = Modifier.tap {
             if (!a.confirm) { a.confirm = true; Ui.redraw() }
@@ -863,12 +859,6 @@ private fun MySettings() {
                 MiniStat("💰", com.onoseto.chipsnfish.online.Social.bank?.let { g.fm(it) } ?: "…", L("peněženka", "wallet", "Geldbörse"), Modifier.weight(1f))
                 MiniStat("⭐", com.onoseto.chipsnfish.online.Fame.honor?.let { g.fm(it) } ?: "…", L("body cti", "honor", "Ehre"), Modifier.weight(1f))
                 MiniStat("🏆", (com.onoseto.chipsnfish.online.Fame.cups ?: 0).toString(), L("poháry", "cups", "Pokale"), Modifier.weight(1f))
-            }
-            if (online) O.myFriendCode?.let { c ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    T(L("Můj kód pro přátele", "My friend code", "Mein Freundescode"), 12.sp, GlassMuted, FontWeight.Bold, modifier = Modifier.weight(1f))
-                    T(c, 18.sp, LobbyBlue, num = true, letter = 2.sp)
-                }
             }
         }
         // privacy and notifications

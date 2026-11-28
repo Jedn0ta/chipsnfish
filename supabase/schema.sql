@@ -1454,6 +1454,25 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
+-- everybody with the app is everybody's friend (a private app for friends):
+-- no adding by hand, and it works back in time for all existing players
+-- ---------------------------------------------------------------------
+create or replace function cf_friends() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare u uuid := cf_me();
+begin
+  perform cf_touch();
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'uid', p.uid, 'name', p.name, 'img', p.img, 'online', p.seen > now() - interval '3 minutes',
+      'table', (select t.code from cf_tables t join cf_players q on q.code = t.code
+                where q.uid = p.uid and q.left_at is null and q.seen > now() - interval '2 minutes' and t.status <> 'over'
+                order by q.seen desc limit 1)
+    ) order by (p.seen > now() - interval '3 minutes') desc, p.seen desc), '[]')
+    from cf_profiles p
+    where p.uid <> u and coalesce(btrim(p.name), '') <> '' and p.name not like 'Test %');
+end $$;
+
+-- ---------------------------------------------------------------------
 -- permissions: only signed-in users may call the app's functions
 -- ---------------------------------------------------------------------
 do $$
