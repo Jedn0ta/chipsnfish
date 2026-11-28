@@ -23,7 +23,7 @@ object SupaCfg {
     const val KEY = "sb_publishable_esmekdxKuc2F2NbSobe_kw_yfAZtjm6"
     val configured get() = URL.isNotBlank() && KEY.isNotBlank()
     /** OAuth "Web application" client ID from Google Cloud (public). Empty = Google sign-in not set up yet. */
-    const val GOOGLE_WEB_CLIENT_ID = ""
+    const val GOOGLE_WEB_CLIENT_ID = "583566375724-lrpf8ok61ccrcn7ku1omeia4f7ljmte3.apps.googleusercontent.com"
 }
 
 class SupaError(val code: Int, message: String) : Exception(message)
