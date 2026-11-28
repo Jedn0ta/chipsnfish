@@ -1377,8 +1377,8 @@ alter table cf_advent enable row level security;
 revoke all on cf_advent from anon, authenticated;
 
 create or replace function cf_advent_item(d int) returns text language sql immutable as $$
-  select (array['santa','mustache','fish','sock','unicorn','chili','snorkel','chicken','banana','snowman','cheese','duck',
-                'octopus','tree','clown','dino','mushroom','tp','milk','deer','cactus','pizza','penguin','santagold'])[d]
+  select (array['santa','mustache','crescent','paperhat','devil','beer','cowboy','bowtie','beanie','whisky','bowler','slippers',
+                'nightcap','shades','tophat','extinguisher','captain','viking','antlers','beard','gift','crown','carp','dinner'])[d]
 $$;
 
 create or replace function cf_today() returns date language sql stable as $$

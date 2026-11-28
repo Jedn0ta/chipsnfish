@@ -64,7 +64,7 @@ object Social {
         Drink("crown", "👑", "Koruna", "Crown", "Krone", 1000),
     )
     fun hat(id: String) = HATS.firstOrNull { it.id == id }
-    fun hatIcon(id: String) = hat(id)?.icon ?: com.onoseto.chipsnfish.ui.Xmas.item(id)?.icon ?: ""
+    fun hatIcon(id: String) = hat(id)?.icon ?: ""
 
     /** Quick phrases for the short chat: my own (set in Settings), or these to start with. */
     private val strList = kotlinx.serialization.builtins.ListSerializer(String.serializer())

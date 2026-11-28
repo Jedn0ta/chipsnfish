@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.onoseto.chipsnfish.L
+import com.onoseto.chipsnfish.R
 import com.onoseto.chipsnfish.game.Game
 import com.onoseto.chipsnfish.online.Online
 import com.onoseto.chipsnfish.online.Social
@@ -58,43 +59,43 @@ import kotlinx.serialization.json.put
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** One advent window: the same item for everybody. pos = where it sits on the avatar. */
-data class AdItem(val day: Int, val id: String, val icon: String, val cs: String, val en: String, val de: String, val pos: String) {
+/** One advent window: the same item for everybody. pos = where it sits on the avatar (top, eyes, mouth, chin, neck, side). */
+data class AdItem(val day: Int, val id: String, val img: Int, val cs: String, val en: String, val de: String, val pos: String) {
     fun name() = L(cs, en, de)
 }
 
 object Xmas {
     /** Must match cf_advent_item() in schema.sql. */
     val ADVENT = listOf(
-        AdItem(1, "santa", "", "Santova čepice", "Santa hat", "Weihnachtsmütze", "top"),
-        AdItem(2, "mustache", "🥸", "Falešný knír", "Fake moustache", "Falscher Schnurrbart", "face"),
-        AdItem(3, "fish", "🐟", "Živá ryba", "Live fish", "Lebender Fisch", "side"),
-        AdItem(4, "sock", "🧦", "Smradlavá ponožka", "Smelly sock", "Stinkesocke", "side"),
-        AdItem(5, "unicorn", "🦄", "Jednorožec", "Unicorn", "Einhorn", "top"),
-        AdItem(6, "chili", "🌶️", "Pálivá paprička", "Hot chili", "Scharfe Chili", "side"),
-        AdItem(7, "snorkel", "🤿", "Šnorchl", "Snorkel", "Schnorchel", "face"),
-        AdItem(8, "chicken", "🐔", "Slepice na hlavě", "Chicken on the head", "Huhn auf dem Kopf", "top"),
-        AdItem(9, "banana", "🍌", "Banán", "Banana", "Banane", "side"),
-        AdItem(10, "snowman", "⛄", "Sněhulák", "Snowman", "Schneemann", "side"),
-        AdItem(11, "cheese", "🧀", "Smradlavý sýr", "Stinky cheese", "Stinkekäse", "side"),
-        AdItem(12, "duck", "🦆", "Kachna na hlavě", "Duck on the head", "Ente auf dem Kopf", "top"),
-        AdItem(13, "octopus", "🐙", "Chobotnice", "Octopus", "Krake", "top"),
-        AdItem(14, "tree", "🎄", "Stromeček", "Christmas tree", "Tannenbaum", "side"),
-        AdItem(15, "clown", "🤡", "Klaun", "Clown", "Clown", "face"),
-        AdItem(16, "dino", "🦖", "Dinosaurus", "Dinosaur", "Dinosaurier", "side"),
-        AdItem(17, "mushroom", "🍄", "Muchomůrka", "Toadstool", "Fliegenpilz", "top"),
-        AdItem(18, "tp", "🧻", "Toaleťák", "Toilet roll", "Klopapier", "side"),
-        AdItem(19, "milk", "🥛", "Mléko pro Santu", "Milk for Santa", "Milch für Santa", "side"),
-        AdItem(20, "deer", "🦌", "Sob", "Reindeer", "Rentier", "side"),
-        AdItem(21, "cactus", "🌵", "Kaktus na hlavě", "Cactus on the head", "Kaktus auf dem Kopf", "top"),
-        AdItem(22, "pizza", "🍕", "Kousek pizzy", "Slice of pizza", "Stück Pizza", "side"),
-        AdItem(23, "penguin", "🐧", "Tučňák", "Penguin", "Pinguin", "side"),
-        AdItem(24, "santagold", "", "Zlatá Santova čepice", "Golden Santa hat", "Goldene Weihnachtsmütze", "top"),
+        AdItem(1, "santa", R.drawable.adv_santa, "Santova čepice", "Santa hat", "Weihnachtsmütze", "top"),
+        AdItem(2, "mustache", R.drawable.adv_mustache, "Knír", "Moustache", "Schnurrbart", "mouth"),
+        AdItem(3, "crescent", R.drawable.adv_crescent, "Vanilkový rohlíček", "Vanilla crescent", "Vanillekipferl", "side"),
+        AdItem(4, "paperhat", R.drawable.adv_paperhat, "Čepice z novin", "Newspaper hat", "Zeitungshut", "top"),
+        AdItem(5, "devil", R.drawable.adv_devil, "Čertí rohy", "Devil horns", "Teufelshörner", "top"),
+        AdItem(6, "beer", R.drawable.adv_beer, "Pivo", "Beer", "Bier", "side"),
+        AdItem(7, "cowboy", R.drawable.adv_cowboy, "Kovbojský klobouk", "Cowboy hat", "Cowboyhut", "top"),
+        AdItem(8, "bowtie", R.drawable.adv_bowtie, "Motýlek", "Bow tie", "Fliege", "neck"),
+        AdItem(9, "beanie", R.drawable.adv_beanie, "Kulich", "Beanie", "Bommelmütze", "top"),
+        AdItem(10, "whisky", R.drawable.adv_whisky, "Whisky", "Whisky", "Whisky", "side"),
+        AdItem(11, "bowler", R.drawable.adv_bowler, "Buřinka", "Bowler hat", "Melone", "top"),
+        AdItem(12, "slippers", R.drawable.adv_slippers, "Bačkory", "Slippers", "Hausschuhe", "side"),
+        AdItem(13, "nightcap", R.drawable.adv_nightcap, "Noční čepice", "Nightcap", "Schlafmütze", "top"),
+        AdItem(14, "shades", R.drawable.adv_shades, "Sluneční brýle", "Sunglasses", "Sonnenbrille", "eyes"),
+        AdItem(15, "tophat", R.drawable.adv_tophat, "Cylindr", "Top hat", "Zylinder", "top"),
+        AdItem(16, "extinguisher", R.drawable.adv_extinguisher, "Hasicí přístroj", "Fire extinguisher", "Feuerlöscher", "side"),
+        AdItem(17, "captain", R.drawable.adv_captain, "Kapitánská čepice", "Captain's hat", "Kapitänsmütze", "top"),
+        AdItem(18, "viking", R.drawable.adv_viking, "Vikingská helma", "Viking helmet", "Wikingerhelm", "top"),
+        AdItem(19, "antlers", R.drawable.adv_antlers, "Sobí parohy", "Reindeer antlers", "Rentiergeweih", "top"),
+        AdItem(20, "beard", R.drawable.adv_beard, "Santovy vousy", "Santa's beard", "Weihnachtsmann-Bart", "chin"),
+        AdItem(21, "gift", R.drawable.adv_gift, "Dárek", "Present", "Geschenk", "side"),
+        AdItem(22, "crown", R.drawable.adv_crown, "Koruna", "Crown", "Krone", "top"),
+        AdItem(23, "carp", R.drawable.adv_carp, "Vánoční kapr", "Christmas carp", "Weihnachtskarpfen", "side"),
+        AdItem(24, "dinner", R.drawable.adv_dinner, "Řízek se salátem", "Schnitzel and potato salad", "Schnitzel mit Kartoffelsalat", "side"),
     )
     fun item(id: String) = ADVENT.firstOrNull { it.id == id }
 
-    /** Windows are laid out in a mixed order, like a real calendar. */
-    val ORDER = listOf(7, 19, 3, 22, 12, 1, 16, 9, 24, 5, 14, 20, 2, 11, 17, 8, 23, 4, 13, 21, 6, 18, 10, 15)
+    /** Windows in order, one after another. */
+    val ORDER = (1..24).toList()
 
     fun today(): LocalDate = LocalDate.now(ZoneId.of("Europe/Prague"))
     /** Testing before Advent: the calendar shows already and every window can be opened (until 1 December). */
@@ -174,7 +175,7 @@ fun AdventSheet() {
     var preview by remember { mutableStateOf(false) }
     var got by remember { mutableStateOf<AdItem?>(null) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        SantaHat(Modifier.size(30.dp))
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.adv_santa), null, Modifier.size(34.dp))
         T(L("Adventní kalendář", "Advent calendar", "Adventskalender"), 22.sp, Color.White, FontWeight.ExtraBold,
             modifier = Modifier.combinedClickable(remember { MutableInteractionSource() }, null, onLongClick = { preview = !preview }, onClick = {}))
         T(if (Xmas.testing()) L("TEST: do 1. prosince jdou otevřít všechna okénka", "TEST: all windows open until 1 December", "TEST: bis 1. Dezember alle Fenster offen")
@@ -236,8 +237,7 @@ private fun AdWindow(day: Int, open: Boolean, done: Boolean, preview: Boolean, o
 
 @Composable
 fun AdIcon(it: AdItem, size: Dp) {
-    if (it.icon.isEmpty()) SantaHat(Modifier.size(size), gold = it.id == "santagold")
-    else T(it.icon, (size.value * 0.72f).sp, lineHeight = (size.value * 0.85f).sp)
+    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(it.img), it.name(), Modifier.size(size))
 }
 
 /** The fish chip logo; in December it wears a Santa hat. */
@@ -245,6 +245,7 @@ fun AdIcon(it: AdItem, size: Dp) {
 fun FishHat(size: Dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size)) {
         FishLogo(Modifier.matchParentSize())
-        if (Xmas.season()) SantaHat(Modifier.align(Alignment.TopEnd).offset(x = size * 0.2f, y = -size * 0.34f).size(size * 0.66f).graphicsLayer(rotationZ = 16f))
+        if (Xmas.season()) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.adv_santa), null,
+            Modifier.align(Alignment.TopEnd).offset(x = size * 0.24f, y = -size * 0.36f).width(size * 0.78f).graphicsLayer(rotationZ = 14f))
     }
 }

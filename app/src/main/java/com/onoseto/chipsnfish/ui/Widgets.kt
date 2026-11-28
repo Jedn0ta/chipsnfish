@@ -328,11 +328,19 @@ fun Avatar(p: Player, size: Dp, ring: Color? = null, shape: Shape = CircleShape,
         val ad = Xmas.item(p.hat)
         val a = if (dim) 0.6f else 1f
         if (size >= 22.dp && p.hat.isNotEmpty()) when {
-            ad != null && ad.icon.isEmpty() -> SantaHat(
-                Modifier.align(Alignment.TopCenter).offset(x = size * 0.1f, y = -size * 0.4f).size(size * 0.7f).graphicsLayer(rotationZ = 10f, alpha = a), gold = ad.id == "santagold")
-            ad?.pos == "face" -> Box(Modifier.align(Alignment.Center).offset(y = -size * 0.08f).graphicsLayer(alpha = a)) { T(hat, (size.value * 0.42f).sp, lineHeight = (size.value * 0.5f).sp) }
-            ad?.pos == "side" -> Box(Modifier.align(Alignment.BottomEnd).offset(x = size * 0.16f, y = size * 0.06f).graphicsLayer(rotationZ = 10f, alpha = a)) { T(hat, (size.value * 0.36f).sp, lineHeight = (size.value * 0.44f).sp) }
-            ad?.pos == "neck" -> Box(Modifier.align(Alignment.BottomCenter).offset(y = size * 0.16f).graphicsLayer(alpha = a)) { T(hat, (size.value * 0.42f).sp, lineHeight = (size.value * 0.5f).sp) }
+            ad != null -> {
+                // advent items are pictures, placed where they belong
+                val pic = androidx.compose.ui.res.painterResource(ad.img)
+                val (al, w, off) = when (ad.pos) {
+                    "eyes" -> Triple(Alignment.Center, 0.8f, androidx.compose.ui.unit.DpOffset(0.dp, -size * 0.1f))
+                    "mouth" -> Triple(Alignment.Center, 0.56f, androidx.compose.ui.unit.DpOffset(0.dp, size * 0.15f))
+                    "chin" -> Triple(Alignment.BottomCenter, 0.82f, androidx.compose.ui.unit.DpOffset(0.dp, size * 0.28f))
+                    "neck" -> Triple(Alignment.BottomCenter, 0.46f, androidx.compose.ui.unit.DpOffset(0.dp, size * 0.2f))
+                    "side" -> Triple(Alignment.BottomEnd, 0.5f, androidx.compose.ui.unit.DpOffset(size * 0.26f, size * 0.08f))
+                    else -> Triple(Alignment.TopCenter, 0.96f, androidx.compose.ui.unit.DpOffset(0.dp, -size * 0.52f))
+                }
+                androidx.compose.foundation.Image(pic, null, Modifier.align(al).offset(off.x, off.y).width(size * w).graphicsLayer(alpha = a, rotationZ = if (ad.pos == "side") 8f else 0f))
+            }
             hat.isNotEmpty() -> Box(
                 Modifier.align(Alignment.TopCenter).offset(x = size * 0.06f, y = -size * 0.42f).graphicsLayer(rotationZ = -14f, alpha = a),
             ) { T(hat, (size.value * 0.5f).sp, lineHeight = (size.value * 0.6f).sp) }
