@@ -53,8 +53,8 @@ object C {
     val FELT_NAMES = mapOf("green" to "Zelená", "red" to "Vínová", "blue" to "Modrá", "purple" to "Fialová", "gold" to "Zlatá", "black" to "Černá")
     /** Back designs; each has colour variants (swipe up / down over the preview in settings). */
     val BACK_DESIGNS = linkedMapOf(
-        "lattice" to listOf("b_lattice", "b_lattice_blue"),
         "medal" to listOf("cred", "cblue"),
+        "lattice" to listOf("b_lattice", "b_lattice_blue"),
         "rosette" to listOf("b_rosette", "b_rosette_blue"),
         "dots" to listOf("b_red", "b_blue", "b_green", "b_black", "b_maroon", "b_navy"),
         "diamond" to listOf("red", "blue", "green", "black", "gold"),
@@ -63,7 +63,7 @@ object C {
     val BACK_NAMES = mapOf("lattice" to "Mřížka", "medal" to "Klasický", "rosette" to "Rozeta", "dots" to "Tečky", "diamond" to "Diamant", "fish" to "Rybí")
     /** Every back key, for checking stored choices. */
     val BACKS: Set<String> = BACK_DESIGNS.values.flatten().toSet()
-    fun backDesign(key: String) = BACK_DESIGNS.entries.firstOrNull { key in it.value }?.key ?: "lattice"
+    fun backDesign(key: String) = BACK_DESIGNS.entries.firstOrNull { key in it.value }?.key ?: "medal"
     val FACES = linkedMapOf("casino" to "Kasino", "picture" to "Anglické", "french" to "Francouzské", "classic" to "Velké indexy", "jumbo" to "Extra velké", "four" to "Čtyřbarevné")
 
     /** Suggested table colours: hue, intensity (0 = charcoal). */
