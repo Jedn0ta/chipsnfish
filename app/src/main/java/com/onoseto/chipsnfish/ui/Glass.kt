@@ -143,11 +143,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.deluxe(t: Float) {
         drawLine(GOLD_L.copy(alpha = if (i % 2 == 0) 0.05f else 0.025f), o, Offset(o.x + len * kotlin.math.cos(a), o.y + len * kotlin.math.sin(a)), strokeWidth = 1.2f * density)
     }
     for (k in 1..3) drawCircle(GOLD_L.copy(alpha = 0.05f), h * (0.42f + k * 0.16f), o, style = androidx.compose.ui.graphics.drawscope.Stroke(1f * density))
-    // faint embossed suits in the corners
-    val suits = listOf("♠", "♥", "♦", "♣")
-    val pos = listOf(Offset(w * 0.07f, h * 0.3f), Offset(w * 0.93f, h * 0.3f), Offset(w * 0.07f, h * 0.82f), Offset(w * 0.93f, h * 0.82f))
-    val tp = android.graphics.Paint().apply { isAntiAlias = true; textAlign = android.graphics.Paint.Align.CENTER; textSize = h * 0.16f; color = android.graphics.Color.argb(14, 255, 230, 170) }
-    drawIntoCanvas { c -> pos.forEachIndexed { i, p -> c.nativeCanvas.drawText(suits[i], p.x, p.y + tp.textSize * 0.35f, tp) } }
     // twinkling gold glints
     for (i in 0 until 26) {
         val sx = ((i * 0.6180339f) % 1f) * w
@@ -161,22 +156,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.deluxe(t: Float) {
     }
 }
 
-/** Double thin gold frame with stepped art-deco corners. */
+/** Double thin gold frame. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.decoFrame() {
     val w = size.width; val h = size.height; val d = density
-    val i1 = 6f * d; val i2 = 10f * d; val c = 26f * d
+    val i1 = 6f * d; val i2 = 10f * d
     val st1 = androidx.compose.ui.graphics.drawscope.Stroke(1.2f * d); val st2 = androidx.compose.ui.graphics.drawscope.Stroke(0.7f * d)
     drawRect(GOLD_L.copy(alpha = 0.35f), Offset(i1, i1), androidx.compose.ui.geometry.Size(w - 2 * i1, h - 2 * i1), style = st1)
     drawRect(GOLD_L.copy(alpha = 0.18f), Offset(i2, i2), androidx.compose.ui.geometry.Size(w - 2 * i2, h - 2 * i2), style = st2)
-    listOf(Offset(i2, i2) to Offset(1f, 1f), Offset(w - i2, i2) to Offset(-1f, 1f), Offset(i2, h - i2) to Offset(1f, -1f), Offset(w - i2, h - i2) to Offset(-1f, -1f)).forEach { (p, dir) ->
-        for (k in 1..3) {
-            val q = c * k / 3f
-            drawLine(GOLD_L.copy(alpha = 0.4f), Offset(p.x + dir.x * q, p.y), Offset(p.x + dir.x * q, p.y + dir.y * (c - q + 4f * d)), strokeWidth = 0.9f * d)
-            drawLine(GOLD_L.copy(alpha = 0.4f), Offset(p.x, p.y + dir.y * q), Offset(p.x + dir.x * (c - q + 4f * d), p.y + dir.y * q), strokeWidth = 0.9f * d)
-        }
-        val m = Offset(p.x + dir.x * 5f * d, p.y + dir.y * 5f * d)
-        drawPath(androidx.compose.ui.graphics.Path().apply { moveTo(m.x, m.y - 4f * d); lineTo(m.x + 4f * d, m.y); lineTo(m.x, m.y + 4f * d); lineTo(m.x - 4f * d, m.y); close() }, GOLD_L.copy(alpha = 0.7f))
-    }
 }
 
 /** Slowly drifting cool light specks. */

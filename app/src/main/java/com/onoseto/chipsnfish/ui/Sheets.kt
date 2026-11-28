@@ -1049,9 +1049,9 @@ private fun AppInfoPart() {
         "Opens an e-mail with the log attached (version, phone, errors). Nothing is sent on its own.",
         "Öffnet eine E-Mail mit dem Protokoll im Anhang. Nichts wird automatisch gesendet."))
     Label(L("Karty a písmo", "Cards and font", "Karten und Schrift"))
-    Note(L("Anglické karty: Byron Knoll (volné dílo). Francouzské karty a ruby: David Bellot, SVG-cards (LGPL 2.1). Kasino karty a ruby: Public Domain and CC0 Playing Cards (CC0). Písmo Luckiest Guy (Apache 2.0).",
-        "English cards: Byron Knoll (public domain). French cards and backs: David Bellot, SVG-cards (LGPL 2.1). Casino cards and backs: Public Domain and CC0 Playing Cards (CC0). Font Luckiest Guy (Apache 2.0).",
-        "Englische Karten: Byron Knoll (gemeinfrei). Französische Karten: David Bellot, SVG-cards (LGPL 2.1). Kasino-Karten: CC0. Schrift Luckiest Guy (Apache 2.0)."))
+    Note(L("Anglické karty: Byron Knoll (volné dílo). Francouzské karty a ruby: David Bellot, SVG-cards (LGPL 2.1). Kasino karty a ruby: Public Domain and CC0 Playing Cards (CC0). Písmo Cinzel Decorative (OFL).",
+        "English cards: Byron Knoll (public domain). French cards and backs: David Bellot, SVG-cards (LGPL 2.1). Casino cards and backs: Public Domain and CC0 Playing Cards (CC0). Font Cinzel Decorative (OFL).",
+        "Englische Karten: Byron Knoll (gemeinfrei). Französische Karten: David Bellot, SVG-cards (LGPL 2.1). Kasino-Karten: CC0. Schrift Cinzel Decorative (OFL)."))
 }
 
 @Composable
