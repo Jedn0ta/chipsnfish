@@ -3,6 +3,7 @@ package com.onoseto.chipsnfish.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -14,11 +15,11 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,112 +29,82 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
+import com.onoseto.chipsnfish.R
 import kotlinx.coroutines.launch
 import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.random.Random
 
-/** Main PLAY button: two aces held in a fan, wrapped in crackling electric magic; a tap makes it flare. */
+/** Display font for the big lobby title (Luckiest Guy, Apache 2.0). */
+val Lucky = FontFamily(Font(R.font.luckiest_guy))
+
+/** Big title with a thick dark outline and a golden fill. */
 @Composable
-fun PlayCards(title: String, sub: String, tilt: Offset, onClick: () -> Unit) {
-    val scope = rememberCoroutineScope()
-    val inf = rememberInfiniteTransition(label = "magic")
-    val t by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "t")
-    var seed by remember { mutableIntStateOf(1) }
-    val flare = remember { Animatable(0f) }
-    var busy by remember { mutableStateOf(false) }
-    // lightning flickers: new bolts several times a second
-    LaunchedEffect(Unit) { while (true) { delay(70L + Random.nextLong(90)); seed++ } }
-    val src = remember { MutableInteractionSource() }
-    val pressed by src.collectIsPressedAsState()
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier.size(170.dp).clickable(src, null) {
-                if (busy) return@clickable
-                busy = true
-                scope.launch {
-                    flare.snapTo(0f); flare.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
-                    onClick(); flare.snapTo(0f); busy = false
-                }
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            val f = flare.value
-            // aura behind
-            Canvas(Modifier.fillMaxSize()) {
-                val pulse = 0.55f + 0.2f * sin(t * 2f * PI.toFloat() * 2f) + 0.4f * f
-                drawCircle(Brush.radialGradient(listOf(Color(0xFF6FD3FF).copy(alpha = 0.45f * pulse), Color(0xFF7B4DFF).copy(alpha = 0.22f * pulse), Color.Transparent), center, size.minDimension * 0.5f), size.minDimension * 0.5f)
-            }
-            // the two aces
-            val dn = androidx.compose.ui.platform.LocalDensity.current.density
-            val press = if (pressed) 0.94f else 1f
-            val spread = 1f + 0.35f * sin(f * PI.toFloat())
-            Box(Modifier.graphicsLayer(scaleX = press, scaleY = press, rotationY = tilt.x * 10f, rotationX = -tilt.y * 8f, cameraDistance = 12f * dn)) {
-                CardView(48, 62.dp, "picture", glow = true, modifier = Modifier.graphicsLayer(rotationZ = -13f * spread, translationX = -22f * spread * dn, translationY = 4f * dn))
-                CardView(49, 62.dp, "picture", glow = true, modifier = Modifier.graphicsLayer(rotationZ = 11f * spread, translationX = 22f * spread * dn))
-            }
-            // electricity and sparks in front
-            Canvas(Modifier.fillMaxSize()) {
-                val rnd = Random(seed)
-                val c = center
-                val rIn = size.minDimension * 0.27f
-                val rOut = size.minDimension * (0.44f + 0.05f * f)
-                val bolts = 3 + (f * 4).toInt()
-                repeat(bolts) {
-                    val a = rnd.nextFloat() * 2f * PI.toFloat()
-                    val a2 = a + (rnd.nextFloat() - 0.5f) * 0.9f
-                    val p0 = Offset(c.x + cos(a) * rIn * (0.8f + 0.3f * rnd.nextFloat()), c.y + sin(a) * rIn * 1.15f)
-                    val p1 = Offset(c.x + cos(a2) * rOut, c.y + sin(a2) * rOut)
-                    bolt(p0, p1, rnd, 0.55f + 0.45f * f)
-                }
-                // an arc jumping between the two cards
-                if (rnd.nextFloat() < 0.6f + 0.4f * f) bolt(Offset(c.x - 30f * density, c.y - 34f * density), Offset(c.x + 30f * density, c.y - 38f * density), rnd, 0.7f)
-                // orbiting sparks
-                for (i in 0 until 14) {
-                    val ph = (t * (1f + i % 3 * 0.4f) + i / 14f) * 2f * PI.toFloat()
-                    val rr = rOut * (0.78f + 0.18f * sin(ph * 2f + i))
-                    val p = Offset(c.x + cos(ph) * rr, c.y + sin(ph) * rr * 0.9f)
-                    val tail = Offset(c.x + cos(ph - 0.18f) * rr, c.y + sin(ph - 0.18f) * rr * 0.9f)
-                    drawLine(Color(0xFF9EE6FF).copy(alpha = 0.35f), tail, p, strokeWidth = 2f * density, cap = StrokeCap.Round)
-                    drawCircle(Color.White, (1.3f + (i % 3)) * density * 0.6f, p)
-                }
-            }
-        }
-        T(title, 22.sp, Color.White, num = true, letter = 3.sp, maxLines = 1, lineHeight = 24.sp)
-        T(sub, 11.5.sp, LobbyBlue, FontWeight.ExtraBold, letter = 1.5.sp, maxLines = 1)
+fun StrokeTitle(text: String, size: TextUnit, modifier: Modifier = Modifier) {
+    val d = LocalDensity.current.density
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Text(text, style = TextStyle(fontFamily = Lucky, fontSize = size, textAlign = TextAlign.Center, color = Color(0xFF0A1530), letterSpacing = 1.sp,
+            drawStyle = Stroke(width = 7f * d, join = StrokeJoin.Round)))
+        Text(text, style = TextStyle(fontFamily = Lucky, fontSize = size, textAlign = TextAlign.Center, letterSpacing = 1.sp,
+            brush = Brush.verticalGradient(listOf(Color(0xFFFFF4C2), Color(0xFFFFD24A), Color(0xFFE59A12))),
+            shadow = Shadow(Color(0x99000000), Offset(0f, 3f * d), 6f * d)))
     }
 }
 
-/** A jagged lightning bolt (midpoint displacement) with a soft glow. */
-private fun DrawScope.bolt(a: Offset, b: Offset, rnd: Random, strength: Float) {
-    var pts = listOf(a, b)
-    var disp = (b - a).getDistance() * 0.28f
-    repeat(5) {
-        val n = ArrayList<Offset>(pts.size * 2)
-        for (i in 0 until pts.size - 1) {
-            val p = pts[i]; val q = pts[i + 1]
-            val m = Offset((p.x + q.x) / 2f, (p.y + q.y) / 2f)
-            val d = q - p
-            val len = d.getDistance().coerceAtLeast(0.001f)
-            val nx = -d.y / len; val ny = d.x / len
-            val k = (rnd.nextFloat() - 0.5f) * 2f * disp
-            n.add(p); n.add(Offset(m.x + nx * k, m.y + ny * k))
+/** Main PLAY button: two aces that gently breathe and float, with the title written over them. */
+@Composable
+fun PlayCards(title: String, sub: String, tilt: Offset, onClick: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val inf = rememberInfiniteTransition(label = "cards")
+    val t by inf.animateFloat(0f, 1f, infiniteRepeatable(tween(3600, easing = LinearEasing)), label = "t")
+    val glow by inf.animateFloat(0.35f, 0.7f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "glow")
+    val flare = remember { Animatable(0f) }
+    var busy by remember { mutableStateOf(false) }
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val dn = LocalDensity.current.density
+    val ph = t * 2f * PI.toFloat()
+    Box(
+        Modifier.size(190.dp, 176.dp).clickable(src, null) {
+            if (busy) return@clickable
+            busy = true
+            scope.launch {
+                flare.snapTo(0f); flare.animateTo(1f, tween(550, easing = FastOutSlowInEasing))
+                onClick(); flare.snapTo(0f); busy = false
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        val f = flare.value
+        // soft light behind the cards
+        Canvas(Modifier.fillMaxSize()) {
+            val a = glow + 0.4f * f
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF6FB6FF).copy(alpha = 0.5f * a), Color(0xFF2F7BFF).copy(alpha = 0.18f * a), Color.Transparent), center, size.minDimension * 0.55f), size.minDimension * 0.55f)
         }
-        n.add(pts.last()); pts = n; disp *= 0.5f
+        val press = if (pressed) 0.94f else 1f
+        val spread = 1f + 0.35f * sin(f * PI.toFloat())
+        Box(Modifier.offset(y = (-14).dp).graphicsLayer(scaleX = press, scaleY = press, rotationY = tilt.x * 10f, rotationX = -tilt.y * 8f, cameraDistance = 12f * dn)) {
+            // each card breathes (bigger / smaller) and floats up and down, a little out of step
+            val s1 = 1f + 0.05f * sin(ph); val y1 = 5f * sin(ph + 0.6f)
+            val s2 = 1f + 0.05f * sin(ph + 1.9f); val y2 = 5f * sin(ph + 2.5f)
+            CardView(48, 66.dp, "picture", glow = true, modifier = Modifier.graphicsLayer(scaleX = s1, scaleY = s1, rotationZ = -12f * spread, translationX = -24f * spread * dn, translationY = (4f + y1) * dn))
+            CardView(49, 66.dp, "picture", glow = true, modifier = Modifier.graphicsLayer(scaleX = s2, scaleY = s2, rotationZ = 10f * spread, translationX = 24f * spread * dn, translationY = y2 * dn))
+        }
+        // the title, written over the cards
+        Column(Modifier.align(Alignment.BottomCenter).graphicsLayer(scaleX = 1f + 0.12f * f, scaleY = 1f + 0.12f * f), horizontalAlignment = Alignment.CenterHorizontally) {
+            StrokeTitle(title, 40.sp)
+            StrokeTitle(sub, 19.sp, Modifier.offset(y = (-6).dp))
+        }
     }
-    val path = Path().apply { moveTo(pts[0].x, pts[0].y); for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y) }
-    drawPath(path, Color(0xFF4FC3FF).copy(alpha = 0.22f * strength), style = Stroke(7f * density, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    drawPath(path, Color(0xFF8FE0FF).copy(alpha = 0.6f * strength), style = Stroke(3f * density, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    drawPath(path, Color.White.copy(alpha = 0.95f * strength), style = Stroke(1.1f * density, cap = StrokeCap.Round, join = StrokeJoin.Round))
 }

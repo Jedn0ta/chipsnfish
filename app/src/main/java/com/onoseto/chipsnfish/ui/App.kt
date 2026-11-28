@@ -361,8 +361,8 @@ private fun MenuScreen(onExit: () -> Unit) {
         // centre: the big play button
         Column(Modifier.align(Alignment.Center).padding(top = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             val tilt by rememberTilt()
-            if (O.code != null) PlayCards(L("POKRAČOVAT", "CONTINUE", "WEITER"), L("stůl ${O.code}", "table ${O.code}", "Tisch ${O.code}"), tilt) { goTable() }
-            else PlayCards(L("HRÁT", "PLAY", "SPIELEN"), L("s přáteli", "with friends", "mit Freunden"), tilt) { Ui.open("online", OnlineArg()) }
+            if (O.code != null) PlayCards(L("DÁL", "GO ON", "WEITER"), L("STŮL ${O.code}", "TABLE ${O.code}", "TISCH ${O.code}"), tilt) { goTable() }
+            else PlayCards(L("HRÁT", "PLAY", "SPIELEN"), L("S PŘÁTELI", "WITH FRIENDS", "MIT FREUNDEN"), tilt) { Ui.open("online", OnlineArg()) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (O.code != null) GlassPill(L("Jiný stůl", "Other table", "Anderer Tisch")) { Ui.open("online", OnlineArg()) }
                 GlassPill(L("Mám kód stolu", "I have a code", "Ich habe einen Code")) { Ui.open("online", OnlineArg(tab = "join")) }
