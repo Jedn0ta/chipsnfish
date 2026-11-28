@@ -117,6 +117,40 @@ object Supa {
         if (old != null) runCatching { rpc("cf_link_claim", buildJsonObject { put("p_code", kotlinx.serialization.json.JsonPrimitive(old)) }) }
     }
 
+    /** Browser sign-in (PKCE): no app fingerprint needed in Google Cloud. Returns the URL to open. */
+    fun pkceUrl(linkCode: String?): String {
+        val v = java.util.UUID.randomUUID().toString() + java.util.UUID.randomUUID().toString()
+        val ch = android.util.Base64.encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(v.toByteArray()),
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+        prefs.edit().putString("pkce", v).putString("pkce_link", linkCode ?: "").apply()
+        return SupaCfg.URL.trimEnd('/') + "/auth/v1/authorize?provider=google&redirect_to=" +
+            java.net.URLEncoder.encode(REDIRECT, "UTF-8") + "&code_challenge=" + ch + "&code_challenge_method=s256"
+    }
+    const val REDIRECT = "chipsnfish://auth"
+
+    suspend fun linkCodeIfAnonymous(): String? =
+        if (email.isEmpty() && access.isNotEmpty()) runCatching { (rpc("cf_link_code") as? kotlinx.serialization.json.JsonPrimitive)?.content }.getOrNull() else null
+
+    /** Finishes the browser sign-in with the code from chipsnfish://auth?code=… */
+    suspend fun pkceFinish(code: String) {
+        val v = prefs.getString("pkce", "") ?: ""
+        if (v.isEmpty()) throw SupaError(0, "sign-in was not started on this phone")
+        val old = prefs.getString("pkce_link", "")?.takeIf { it.isNotEmpty() }
+        lock.withLock {
+            withContext(Dispatchers.IO) {
+                val body = buildJsonObject {
+                    put("auth_code", kotlinx.serialization.json.JsonPrimitive(code))
+                    put("code_verifier", kotlinx.serialization.json.JsonPrimitive(v))
+                }.toString()
+                val (c, t) = http("/auth/v1/token?grant_type=pkce", body, null)
+                if (c !in 200..299) throw SupaError(c, errMsg(t))
+                store(json.parseToJsonElement(t).jsonObject)
+            }
+        }
+        prefs.edit().remove("pkce").remove("pkce_link").apply()
+        if (old != null) runCatching { rpc("cf_link_claim", buildJsonObject { put("p_code", kotlinx.serialization.json.JsonPrimitive(old)) }) }
+    }
+
     private fun errMsg(t: String): String = runCatching {
         val o = json.parseToJsonElement(t).jsonObject
         (o["message"] ?: o["msg"] ?: o["error_description"] ?: o["error"])?.jsonPrimitive?.content

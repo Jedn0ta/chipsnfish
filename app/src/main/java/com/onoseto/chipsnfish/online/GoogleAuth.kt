@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.security.MessageDigest
 import java.util.UUID
+import kotlinx.coroutines.launch
 
 /** "Sign in with Google": the player's profile is tied to his Google account, so it is the same on every phone and after reinstalling. */
 object GoogleAuth {
@@ -32,8 +33,11 @@ object GoogleAuth {
 
     suspend fun signIn(ctx: Context): Boolean {
         if (!available || busy) return false
-        busy = true
         lastError = ""
+        val pr = ctx.getSharedPreferences("cf_online", Context.MODE_PRIVATE)
+        // Google refused this app's fingerprint before: go straight to the browser
+        if (pr.getBoolean("g_browser", false)) return browser(ctx)
+        busy = true
         try {
             val raw = UUID.randomUUID().toString()
             val hashed = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray()).joinToString("") { "%02x".format(it) }
@@ -43,6 +47,54 @@ object GoogleAuth {
             if (c !is CustomCredential || c.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) { lastError = "unexpected credential: " + c.type; return false }
             val g = GoogleIdTokenCredential.createFrom(c.data)
             Supa.signInGoogle(g.idToken, raw)
+            return afterLogin(g.displayName)
+        } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
+            val m = e.message ?: ""
+            // "[16] Account reauth failed" = this app's fingerprint isn't registered: use the browser instead
+            if (m.contains("[16]") || m.contains("reauth", true)) { pr.edit().putBoolean("g_browser", true).apply(); busy = false; return browser(ctx) }
+            return false
+        } catch (e: androidx.credentials.exceptions.GetCredentialException) {
+            ErrorLog.add("google sign-in (credential manager)", e)
+            busy = false
+            return browser(ctx)
+        } catch (e: Exception) {
+            ErrorLog.add("google sign-in", e)
+            lastError = (e::class.simpleName ?: "") + ": " + (e.message ?: "").take(160)
+            return false
+        } finally { busy = false }
+    }
+
+    /** Sign-in through the browser (Supabase + Google web page); the result comes back via chipsnfish://auth */
+    suspend fun browser(ctx: Context): Boolean {
+        busy = true
+        return try {
+            val link = Supa.linkCodeIfAnonymous()
+            val i = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(Supa.pkceUrl(link)))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            ctx.startActivity(i)
+            false
+        } catch (e: Exception) {
+            ErrorLog.add("google sign-in (browser)", e)
+            lastError = (e::class.simpleName ?: "") + ": " + (e.message ?: "").take(160)
+            false
+        } finally { busy = false }
+    }
+
+    /** Called from MainActivity with chipsnfish://auth?code=… (or ?error=…) */
+    fun onRedirect(u: android.net.Uri) {
+        val err = u.getQueryParameter("error_description") ?: u.getQueryParameter("error")
+        val code = u.getQueryParameter("code")
+        if (code == null) { lastError = L("Přihlášení se nepovedlo", "Sign-in failed", "Anmeldung fehlgeschlagen") + ": " + (err ?: "?"); return }
+        Game.scope.launch {
+            busy = true; lastError = ""
+            try { Supa.pkceFinish(code); afterLogin(null) }
+            catch (e: Exception) { ErrorLog.add("google sign-in (finish)", e); lastError = (e::class.simpleName ?: "") + ": " + (e.message ?: "").take(160) }
+            finally { busy = false }
+        }
+    }
+
+    private suspend fun afterLogin(displayName: String?): Boolean {
+        run {
             email = Supa.email
             if (email.isEmpty()) { lastError = L("Server přihlášení přijal, ale nevrátil e-mail.", "Server accepted the sign-in but returned no e-mail.", "Server lieferte keine E-Mail."); return false }
             // my profile from the server (after a reinstall) – or the one on this phone goes up
@@ -52,24 +104,13 @@ object GoogleAuth {
             if (!sName.isNullOrBlank()) {
                 me.name = sName
                 prof["img"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }?.let { me.img = it }
-            } else if (me.name.isBlank() || me.name == "Ty") me.name = g.displayName?.substringBefore(' ')?.take(20) ?: me.name
+            } else if (me.name.isBlank() || me.name == "Ty") me.name = displayName?.substringBefore(' ')?.take(20) ?: Supa.email.substringBefore('@').take(20)
             Game.saveLocal(); Game.bump()
             runCatching { Online.syncProfile() }
             runCatching { Social.loadBank() }
             Game.toast(L("Přihlášeno: ", "Signed in: ", "Angemeldet: ") + email)
             return true
-        } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
-            // Google also reports a wrong app signature / unlisted tester as "cancelled" ([16] …) – show it
-            ErrorLog.add("google sign-in cancelled", e)
-            lastError = L("Google přihlášení nedokončil", "Google did not finish the sign-in", "Google hat die Anmeldung nicht beendet") +
-                ": " + (e.message ?: "-").take(120) + "\n" + sigHint(ctx)
-            return false
-        } catch (e: Exception) {
-            ErrorLog.add("google sign-in", e)
-            lastError = (e::class.simpleName ?: "") + ": " + (e.message ?: "").take(160) + "\n" + sigHint(ctx)
-            Game.toast(L("Přihlášení přes Google se nepovedlo", "Google sign-in failed", "Google-Anmeldung fehlgeschlagen") + ": " + (e.message ?: "").take(80))
-            return false
-        } finally { busy = false }
+        }
     }
 
     /** SHA-1 of the certificate this installed app is signed with – must be listed in Google Cloud (Android client). */

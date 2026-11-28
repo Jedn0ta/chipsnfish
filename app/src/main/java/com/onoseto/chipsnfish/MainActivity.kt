@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
     /** https://onoseto.com/cf/?t=CODE · ?g=GROUP · chipsnfish://t/CODE · chipsnfish://g/GROUP */
     private fun handleLink(i: android.content.Intent?) {
         val u = i?.data ?: return
+        if (u.scheme == "chipsnfish" && u.host == "auth") { com.onoseto.chipsnfish.online.GoogleAuth.onRedirect(u); return }
         val t = u.getQueryParameter("t") ?: if (u.scheme == "chipsnfish" && u.host == "t") u.lastPathSegment else null
         val g = u.getQueryParameter("g") ?: if (u.scheme == "chipsnfish" && u.host == "g") u.lastPathSegment else null
         val f = u.getQueryParameter("f") ?: if (u.scheme == "chipsnfish" && u.host == "f") u.lastPathSegment else null
