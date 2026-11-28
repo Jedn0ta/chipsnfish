@@ -110,7 +110,7 @@ object Xmas {
     var opened by mutableStateOf<Set<Int>>(emptySet())
 
     fun load() {
-        opened = (Game.getS("hr-advent-${today().year}") ?: "").split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        opened = (Game.getS("hr-advent-${today().year}-dec") ?: "").split(",").mapNotNull { it.toIntOrNull() }.toSet()
         if (!SupaCfg.configured) return
         Game.scope.launch {
             runCatching {
@@ -121,7 +121,7 @@ object Xmas {
         }
     }
 
-    private fun save() = Game.setS("hr-advent-${today().year}", opened.sorted().joinToString(","))
+    private fun save() = Game.setS("hr-advent-${today().year}-dec", opened.sorted().joinToString(","))
 
     fun open(day: Int, done: (AdItem) -> Unit) {
         val it = ADVENT[day - 1]
